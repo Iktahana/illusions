@@ -17,7 +17,13 @@ interface UseKeyboardShortcutsParams {
   handleToggleTcy: () => void;
   setShowSettingsModal: (value: boolean) => void;
   setSearchOpenTrigger: Dispatch<SetStateAction<number>>;
-  incrementEditorKey: () => void;
+  /**
+   * エディタ強制再マウント用キーのインクリメント。
+   * NOTE: タブナビゲーションでは呼ばない（#1878: タブ往復で Undo/Redo が消える退行）。
+   * 表示設定変更やファイル再読込など、真に再マウントが必要な経路でのみ使う。
+   * このフックでは現在消費しないが、呼び出し側の API 互換のため受け取る。
+   */
+  incrementEditorKey?: () => void;
   // Tab operations
   nextTab: () => void;
   prevTab: () => void;
@@ -55,7 +61,6 @@ export function useKeyboardShortcuts({
   handleToggleTcy,
   setShowSettingsModal,
   setSearchOpenTrigger,
-  incrementEditorKey,
   nextTab,
   prevTab,
   newTab,
@@ -74,43 +79,20 @@ export function useKeyboardShortcuts({
   const { effectiveBindings } = useKeymap();
 
   const handlers = useMemo<Partial<Record<CommandId, () => void>>>(() => {
+    // タブナビゲーション（⌘1..9 / 次・前タブ）は activeTabId を変えるだけで、
+    // エディタを再マウントしてはならない。incrementEditorKey() を呼ぶと
+    // 各タブの Milkdown/ProseMirror history が破棄され、タブ往復後に
+    // Undo/Redo できなくなる退行が起きる (#1878)。
     const tabHandlers: Partial<Record<CommandId, () => void>> = {
-      "nav.tab1": () => {
-        switchToIndex(0);
-        incrementEditorKey();
-      },
-      "nav.tab2": () => {
-        switchToIndex(1);
-        incrementEditorKey();
-      },
-      "nav.tab3": () => {
-        switchToIndex(2);
-        incrementEditorKey();
-      },
-      "nav.tab4": () => {
-        switchToIndex(3);
-        incrementEditorKey();
-      },
-      "nav.tab5": () => {
-        switchToIndex(4);
-        incrementEditorKey();
-      },
-      "nav.tab6": () => {
-        switchToIndex(5);
-        incrementEditorKey();
-      },
-      "nav.tab7": () => {
-        switchToIndex(6);
-        incrementEditorKey();
-      },
-      "nav.tab8": () => {
-        switchToIndex(7);
-        incrementEditorKey();
-      },
-      "nav.tab9": () => {
-        switchToIndex(8);
-        incrementEditorKey();
-      },
+      "nav.tab1": () => switchToIndex(0),
+      "nav.tab2": () => switchToIndex(1),
+      "nav.tab3": () => switchToIndex(2),
+      "nav.tab4": () => switchToIndex(3),
+      "nav.tab5": () => switchToIndex(4),
+      "nav.tab6": () => switchToIndex(5),
+      "nav.tab7": () => switchToIndex(6),
+      "nav.tab8": () => switchToIndex(7),
+      "nav.tab9": () => switchToIndex(8),
     };
 
     const closeTabHandler = isElectron
@@ -155,20 +137,12 @@ export function useKeyboardShortcuts({
       "format.tcy": isEditorTabActive ? handleToggleTcy : undefined,
       "nav.settings": () => setShowSettingsModal(true),
       "nav.search": isEditorTabActive ? () => setSearchOpenTrigger((prev) => prev + 1) : undefined,
-      "nav.nextTab": () => {
-        nextTab();
-        incrementEditorKey();
-      },
-      "nav.prevTab": () => {
-        prevTab();
-        incrementEditorKey();
-      },
-      "file.newTab": isElectron
-        ? undefined
-        : () => {
-            newTab();
-            incrementEditorKey();
-          },
+      // タブ往復で history を保つため remount しない (#1878)。
+      "nav.nextTab": () => nextTab(),
+      "nav.prevTab": () => prevTab(),
+      // 新規タブは固有の bufferId を持つため key は自動的に変わる。
+      // ここで incrementEditorKey() を呼ぶと既存タブの history まで破棄される (#1878)。
+      "file.newTab": isElectron ? undefined : () => newTab(),
       "file.closeTab": closeTabHandler,
       "view.splitRight": splitEditorRight,
       "view.splitDown": splitEditorDown,
@@ -188,7 +162,6 @@ export function useKeyboardShortcuts({
     handleToggleTcy,
     setShowSettingsModal,
     setSearchOpenTrigger,
-    incrementEditorKey,
     nextTab,
     prevTab,
     newTab,

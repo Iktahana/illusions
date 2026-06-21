@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mapRawJsonToDictEntry, queryByEntry, queryByReading } from "../genji-api-backend";
+import {
+  mapRawJsonToDictEntry,
+  queryByEntry,
+  queryByReading,
+  lookupBatchRemote,
+} from "../genji-api-backend";
 
 // ---------------------------------------------------------------------------
 // Sample raw_json fixture
@@ -215,5 +220,60 @@ describe("queryByReading", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0].reading.primary).toBe("ゆき");
+  });
+});
+
+describe("lookupBatchRemote kana reading normalization (#1935)", () => {
+  const originalFetch = globalThis.fetch;
+
+  // Verb 有る stored under its kanji headword with kana reading ある.
+  const ARU_RAW = {
+    uuid: "u-aru",
+    entry: "有る",
+    reading: { primary: "ある", alternatives: [] },
+    grammar: { pos: ["動詞"], ctype: null, inflections: null },
+    definitions: [{ index: 1, gloss: "to exist" }],
+    relations: { homophones: [], synonyms: [], antonyms: [], related: [] },
+  };
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  /** Mock that branches on the SQL: entry-IN misses, reading-IN finds 有る. */
+  function mockBranchingFetch() {
+    return vi.fn((input: RequestInfo | URL) => {
+      const sql = new URL(String(input)).searchParams.get("sql") ?? "";
+      const rows = sql.includes("reading_primary IN")
+        ? [{ raw_json: JSON.stringify(ARU_RAW) }]
+        : [];
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ rows }),
+      }) as Promise<Response>;
+    });
+  }
+
+  it("resolves all-kana 「ある」 to 有る via the reading index", async () => {
+    globalThis.fetch = mockBranchingFetch();
+    const map = await lookupBatchRemote(["ある"]);
+    expect(map.get("ある")).toMatchObject({ found: true, reading: "ある", pos: "動詞" });
+  });
+
+  it("does NOT issue a reading query when normalize is false", async () => {
+    const fetchMock = mockBranchingFetch();
+    globalThis.fetch = fetchMock;
+    const map = await lookupBatchRemote(["ある"], false);
+    expect(map.get("ある")).toEqual({ found: false });
+    const calledReading = fetchMock.mock.calls.some((c) =>
+      String(c[0]).includes("reading_primary"),
+    );
+    expect(calledReading).toBe(false);
+  });
+
+  it("does NOT reading-resolve kanji terms (圕 stays out-of-dictionary)", async () => {
+    globalThis.fetch = mockBranchingFetch();
+    const map = await lookupBatchRemote(["圕"]);
+    expect(map.get("圕")).toEqual({ found: false });
   });
 });

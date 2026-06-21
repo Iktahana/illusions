@@ -13,6 +13,9 @@
 import type { Token } from "@/lib/nlp-client/types";
 import type { DictLookup } from "@/lib/dict/dict-types";
 import type { GenjiHealthState } from "@/lib/dict/dict-access";
+import type { DictCandidateOptions } from "@/lib/linting/dict-candidate-terms";
+
+export type { DictCandidateOptions };
 
 import type {
   AbstractDocumentLintRule,
@@ -109,6 +112,22 @@ export interface DictToolkit {
   hasCached(term: string): boolean;
   /** Synchronous projection lookup against the current prewarmed snapshot. */
   lookupCached(term: string): DictLookup | undefined;
+  /**
+   * The dictionary headword a token should be looked up under, or `null` if the
+   * token is not a checkable content word (名詞 → surface, 動詞/形容詞 → basic
+   * form, falling back to surface).
+   *
+   * Host-owned so rulesets need NOT vendor a private copy of this selection.
+   * The host prewarms snapshot membership with the exact same logic, so the key
+   * a rule queries always matches a key that was prewarmed — eliminating the
+   * "ruleset mirror drifts out of sync → snapshot miss" failure mode.
+   */
+  candidateTerm(token: Token, opts?: DictCandidateOptions): string | null;
+  /**
+   * Deduplicated list of dictionary headwords to query for a token set — the
+   * same selection {@link candidateTerm} applies, used by the host at prewarm.
+   */
+  candidateTerms(tokens: ReadonlyArray<Token>, opts?: DictCandidateOptions): string[];
 }
 
 /** Shared detector library. Centralizes logic so rules stay declarative-ish. */

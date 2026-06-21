@@ -36,9 +36,22 @@ export interface GenjiHealth {
 }
 
 interface ElectronDictApi {
-  lookupBatch: (terms: string[]) => Promise<Array<{ entry: string } & DictLookup>>;
+  lookupBatch: (
+    terms: string[],
+    normalize?: boolean,
+  ) => Promise<Array<{ entry: string } & DictLookup>>;
   verify: () => Promise<{ ok: boolean; reason?: string }>;
   getStatus: () => Promise<{ status: string; installedVersion?: string }>;
+}
+
+/** Options for {@link DictAccess.lookupBatch}. */
+export interface DictLookupOptions {
+  /**
+   * Resolve all-kana terms that miss the headword index via the reading index
+   * (e.g. kana 「ある」 → headword 「有る」, #1935). Default true. Pass false for a
+   * strict headword-only lookup.
+   */
+  normalize?: boolean;
 }
 
 function getElectronDict(): ElectronDictApi | null {
@@ -133,7 +146,11 @@ class DictAccess {
    * Batch exact-match lookup. Returns a map keyed by every requested (deduped,
    * non-empty) term; misses map to `{ found: false }`. Cached per-term.
    */
-  async lookupBatch(terms: string[]): Promise<Map<string, DictLookup>> {
+  async lookupBatch(
+    terms: string[],
+    opts: DictLookupOptions = {},
+  ): Promise<Map<string, DictLookup>> {
+    const normalize = opts.normalize ?? true;
     const out = new Map<string, DictLookup>();
     const misses: string[] = [];
     const seen = new Set<string>();
@@ -152,9 +169,9 @@ class DictAccess {
 
     const dict = getElectronDict();
     if (dict) {
-      await this.lookupLocal(dict, misses, out);
+      await this.lookupLocal(dict, misses, out, normalize);
     } else {
-      await this.lookupRemote(misses, out);
+      await this.lookupRemote(misses, out, normalize);
     }
     return out;
   }
@@ -163,12 +180,13 @@ class DictAccess {
     dict: ElectronDictApi,
     misses: string[],
     out: Map<string, DictLookup>,
+    normalize: boolean,
   ): Promise<void> {
     for (let i = 0; i < misses.length; i += LOCAL_BATCH_CHUNK) {
       const chunk = misses.slice(i, i + LOCAL_BATCH_CHUNK);
       let rows: Array<{ entry: string } & DictLookup>;
       try {
-        rows = await dict.lookupBatch(chunk);
+        rows = await dict.lookupBatch(chunk, normalize);
       } catch (err) {
         // A transient IPC error must NOT be recorded as "these words are absent":
         // leave the chunk unresolved (callers see no entry → treat as unknown,
@@ -198,7 +216,11 @@ class DictAccess {
     }
   }
 
-  private async lookupRemote(misses: string[], out: Map<string, DictLookup>): Promise<void> {
+  private async lookupRemote(
+    misses: string[],
+    out: Map<string, DictLookup>,
+    normalize: boolean,
+  ): Promise<void> {
     const capped = misses.slice(0, REMOTE_MAX_TERMS);
     if (capped.length < misses.length) {
       console.warn(
@@ -208,7 +230,7 @@ class DictAccess {
 
     let map: Map<string, DictLookup>;
     try {
-      map = await GenjiApiBackend.lookupBatchRemote(capped);
+      map = await GenjiApiBackend.lookupBatchRemote(capped, normalize);
     } catch (err) {
       // Same fail-safe as the local path: a network error must not be cached as
       // "absent". Leave the terms unresolved so a later request can retry and so

@@ -34,6 +34,7 @@ export type {
   UnitDetectorOptions,
   UnitSpec,
   WordListMatch,
+  DictCandidateOptions,
 } from "./ruleset-context";
 
 // Core lint types ruleset code interacts with

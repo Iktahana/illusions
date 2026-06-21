@@ -2,6 +2,20 @@ import { describe, it, expect, vi } from "vitest";
 
 import { createDictToolkit, createSnapshotDictToolkit } from "../dict-toolkit";
 import type { GenjiHealth } from "@/lib/dict/dict-access";
+import type { Token } from "@/lib/nlp-client/types";
+
+function tok(partial: Partial<Token> & { surface: string; pos: string }): Token {
+  return {
+    pos_detail_1: undefined,
+    pos_detail_2: undefined,
+    pos_detail_3: undefined,
+    basic_form: partial.surface,
+    reading: undefined,
+    start: 0,
+    end: partial.surface.length,
+    ...partial,
+  } as Token;
+}
 
 function spyDict() {
   return {
@@ -39,6 +53,32 @@ describe("createDictToolkit", () => {
     const tk = createDictToolkit({ state: "ready" } as GenjiHealth, spyDict());
     expect(tk.hasCached("猫")).toBe(false);
     expect(tk.lookupCached("猫")).toBeUndefined();
+  });
+});
+
+describe("candidateTerm / candidateTerms (Tier 0, #1935)", () => {
+  // Host-owned headword selection so rulesets need not vendor a private copy.
+  it.each([
+    createDictToolkit({ state: "ready" } as GenjiHealth, spyDict()),
+    createSnapshotDictToolkit(),
+  ])("exposes the host headword selection on every toolkit variant", (tk) => {
+    // 名詞 → surface; 動詞 → basic_form; auxiliary/ascii → null.
+    expect(tk.candidateTerm(tok({ surface: "辞書", pos: "名詞", pos_detail_1: "一般" }))).toBe(
+      "辞書",
+    );
+    expect(
+      tk.candidateTerm(
+        tok({ surface: "走っ", pos: "動詞", pos_detail_1: "自立", basic_form: "走る" }),
+      ),
+    ).toBe("走る");
+    expect(tk.candidateTerm(tok({ surface: "を", pos: "助詞" }))).toBeNull();
+
+    const terms = tk.candidateTerms([
+      tok({ surface: "猫", pos: "名詞", pos_detail_1: "一般" }),
+      tok({ surface: "が", pos: "助詞" }),
+      tok({ surface: "走っ", pos: "動詞", pos_detail_1: "自立", basic_form: "走る" }),
+    ]);
+    expect(terms.sort()).toEqual(["猫", "走る"].sort());
   });
 });
 

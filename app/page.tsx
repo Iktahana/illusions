@@ -31,10 +31,12 @@ import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import { notificationManager } from "@/lib/services/notification-manager";
+import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
@@ -350,6 +352,7 @@ export default function EditorPage() {
     lastSaveWasAuto,
     openFile: tabOpenFile,
     saveFile,
+    saveAllDirtyTabs,
     saveAsFile,
     newFile: tabNewFile,
     updateFileName,
@@ -378,6 +381,9 @@ export default function EditorPage() {
     handleCloseTabCancel,
     flushTabState,
     restoreProjectTabs,
+    notifyFileRenamed,
+    findTabsAffectedByDelete,
+    notifyFileDeleted,
   } = tabManager;
 
   // Keep a live tabs ref for dockview panel renderers captured by stale closures.
@@ -507,6 +513,14 @@ export default function EditorPage() {
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [newFileTrigger, setNewFileTrigger] = useState(0);
+  // Incremented to ask the files panel to reload the tree after an external
+  // mutation (e.g. inspector rename, #1870).
+  const [fileTreeRefreshTrigger, setFileTreeRefreshTrigger] = useState(0);
+  // Pending file-name collision confirmation raised by the inspector rename.
+  const [renameCollision, setRenameCollision] = useState<{
+    name: string;
+    execute: () => Promise<void>;
+  } | null>(null);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const [selectedManuscriptCells, setSelectedManuscriptCells] = useState(0);
   const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
@@ -646,8 +660,11 @@ export default function EditorPage() {
   } = projectLifecycle;
 
   // Unsaved warning hook (project mode transitions only; tabs handle per-tab dirty checks)
+  // #1859: save ALL dirty tabs (not just the active one) and block the pending
+  // action when any save is cancelled/failed, so background dirty tabs and
+  // cancelled saves no longer lose unsaved content.
   const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
-  const unsavedWarning = useUnsavedWarning(anyDirty, saveFile, currentFile?.name || null);
+  const unsavedWarning = useUnsavedWarning(anyDirty, saveAllDirtyTabs, currentFile?.name || null);
 
   // Auto-recovered editor remount
   useEffect(() => {
@@ -1402,7 +1419,11 @@ export default function EditorPage() {
     projectSearchBuffers,
     onProjectBufferChange: handleProjectSearchBufferChange,
     newFileTrigger,
+    fileTreeRefreshTrigger,
     openProjectFile,
+    onFileRenamed: notifyFileRenamed,
+    onFileDeleted: notifyFileDeleted,
+    findTabsAffectedByDelete,
     incrementEditorKey,
     onWordSearch: (word: string) => {
       // 共有検索語へ反映し、フローティング検索窓を開く。
@@ -1410,6 +1431,64 @@ export default function EditorPage() {
       setSearchOpenTrigger((prev) => prev + 1);
     },
   } as const;
+
+  // Inspector file-name rename (#1870). For an open *project* file the rename
+  // must hit disk via the same VFS the explorer uses, then sync the open tab's
+  // path/name so subsequent saves write to the new path. Standalone / untitled
+  // tabs have no known VFS file, so we keep the display-only descriptor update.
+  const handleInspectorRename = useCallback(
+    async (newName: string) => {
+      const tab = tabsRef.current.find((t) => t.id === activeTabId);
+      const editorTab = tab && isEditorTab(tab) ? tab : null;
+      const vfsPath = editorTab?.file?.path ?? null;
+
+      // Standalone / untitled: no real file to rename — display-only.
+      if (!isProjectMode(editorMode) || !editorTab || !vfsPath) {
+        updateFileName(newName);
+        return;
+      }
+
+      // Apply a successful rename result to the open tab descriptor + tree.
+      // Reuse #1868's tab-path-sync (notifyFileRenamed → applyTabRename), which
+      // rewrites path/name/fileType (incl. extension change) for the renamed tab
+      // and any tab nested under it, instead of a bespoke single-tab update.
+      const applyRename = (outcome: Extract<RenameOutcome, { kind: "renamed" }>): void => {
+        notifyFileRenamed(outcome.oldPath, outcome.newPath);
+        setFileTreeRefreshTrigger((v) => v + 1);
+      };
+
+      const { getProjectFileService } = await import("@/lib/services/project-file-service");
+      const vfs = getProjectFileService();
+      const outcome = await renameProjectFile(vfs, { currentPath: vfsPath, newName });
+
+      switch (outcome.kind) {
+        case "noop":
+          return;
+        case "renamed":
+          applyRename(outcome);
+          return;
+        case "collision":
+          // Defer to the user via the safe overwrite dialog (#1869 parity).
+          setRenameCollision({
+            name: outcome.name,
+            execute: async () => {
+              const forced = await renameProjectFile(vfs, { currentPath: vfsPath, newName }, true);
+              if (forced.kind === "renamed") {
+                applyRename(forced);
+              } else if (forced.kind === "error") {
+                notificationManager.error("ファイル名の変更に失敗しました");
+              }
+            },
+          });
+          return;
+        case "error":
+          // Leave the displayed name unchanged so the inspector reverts.
+          notificationManager.error("ファイル名の変更に失敗しました");
+          return;
+      }
+    },
+    [activeTabId, editorMode, updateFileName, notifyFileRenamed],
+  );
 
   const inspectorProps = {
     compactMode,
@@ -1425,7 +1504,7 @@ export default function EditorPage() {
     isSaving,
     lastSavedTime,
     onSaveFile: saveFile,
-    onFileNameChange: updateFileName,
+    onFileNameChange: handleInspectorRename,
     sentenceCount,
     charTypeAnalysis,
     charUsageRates,
@@ -1644,6 +1723,19 @@ export default function EditorPage() {
         format={txtDialogFormat ?? "txt"}
         onConfirm={(options) => resolveTxtExportOptions(options)}
         onCancel={() => resolveTxtExportOptions(null)}
+      />
+      <ConfirmDialog
+        isOpen={renameCollision !== null}
+        title="上書きの確認"
+        message={`「${renameCollision?.name ?? ""}」はすでに存在します。上書きしますか？\nこの操作は元に戻せません。`}
+        confirmLabel="上書きする"
+        cancelLabel="キャンセル"
+        onConfirm={() => {
+          const pending = renameCollision;
+          setRenameCollision(null);
+          void pending?.execute();
+        }}
+        onCancel={() => setRenameCollision(null)}
       />
     </>
   );

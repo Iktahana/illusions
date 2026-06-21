@@ -2,6 +2,18 @@
 
 import { useState, useCallback, useRef } from "react";
 
+/**
+ * Result of the save callback passed to useUnsavedWarning (#1859).
+ *
+ * `allSaved` must be true only when every dirty buffer was actually written.
+ * When false (a save was cancelled / failed / conflicted), the pending action
+ * is NOT executed and the warning stays open — preventing silent data loss on
+ * project switch.
+ */
+export interface UnsavedSaveResult {
+  allSaved: boolean;
+}
+
 export interface UseUnsavedWarningReturn {
   showWarning: boolean;
   confirmBeforeAction: (action: () => void | Promise<void>) => Promise<void>;
@@ -20,7 +32,13 @@ export interface UseUnsavedWarningReturn {
  */
 export function useUnsavedWarning(
   isDirty: boolean,
-  saveFile: () => Promise<void>,
+  /**
+   * Save callback. Must save ALL dirty buffers (not just the active tab) and
+   * report whether every one succeeded (#1859). A `void`-returning callback is
+   * still accepted for backward compatibility; the absence of a result is
+   * treated as success.
+   */
+  saveFile: () => Promise<UnsavedSaveResult | void>,
   _currentFileName: string | null,
 ): UseUnsavedWarningReturn {
   const [showWarning, setShowWarning] = useState(false);
@@ -51,10 +69,16 @@ export function useUnsavedWarning(
    */
   const handleSave = useCallback(async () => {
     try {
-      // まずファイルを保存
-      await saveFile();
+      // まず全ての未保存バッファを保存 (#1859)
+      const result = await saveFile();
 
-      // 保存成功後、待機中の操作を実行
+      // 保存がキャンセル/失敗した場合は操作を実行せず、ダイアログも閉じない。
+      // (result が void の場合は後方互換のため成功扱い)
+      if (result && result.allSaved === false) {
+        return;
+      }
+
+      // 全保存成功後、待機中の操作を実行
       if (pendingActionRef.current) {
         await pendingActionRef.current();
         pendingActionRef.current = null;

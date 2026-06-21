@@ -13,11 +13,14 @@ import { getHistoryService } from "../services/history-service";
 import type { SnapshotType } from "../services/history-policy";
 import { getProjectFileService } from "../services/project-file-service";
 import { executeTabSave } from "./save-executor";
+import type { SaveOutcome } from "./save-executor";
+import { decideReopenExistingTab } from "./reopen-existing-tab";
+import { resolveSaveAsDuplicate, saveAsDuplicateWarning } from "./save-as-dedup";
 import type { TabId, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import { generateTabId, inferFileType, getErrorMessage } from "./types";
 import { isEditableExtension, resolveNativePath } from "./open-with-default-app";
-import type { TabManagerCore } from "./types";
+import type { TabManagerCore, SaveAllDirtyResult } from "./types";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -26,6 +29,19 @@ import type { TabManagerCore } from "./types";
 export interface UseFileIOParams extends TabManagerCore {
   updateTab: (tabId: TabId, updates: Partial<EditorTabState>) => void;
   findTabByPath: (path: string) => EditorTabState | undefined;
+  /**
+   * Force-close a tab without the unsaved-changes dialog (#1872). Used by
+   * Save-As consolidation to drop a redundant CLEAN duplicate tab whose buffer
+   * is now stale relative to the just-written disk content.
+   */
+  forceCloseTab: (tabId: TabId) => void;
+  /**
+   * Close a tab, routing through the unsaved-changes dialog when the tab is
+   * dirty (#1872 regression fix). Save-As consolidation uses this — instead of
+   * forceCloseTab — for a DIRTY duplicate so the user's own unsaved edits on the
+   * destination tab cannot be silently destroyed.
+   */
+  closeTab: (tabId: TabId) => void;
   /**
    * Ref holding the active editor's on-demand live-content flush (#1840).
    * Called right before saving the active tab so the persisted content reflects
@@ -43,6 +59,13 @@ export interface UseFileIOReturn {
   openFile: () => Promise<void>;
   /** Save the active tab. */
   saveFile: (isAutoSave?: boolean) => Promise<void>;
+  /**
+   * Save every dirty editor tab (#1859). Used by the unsaved-warning flow
+   * (project switch) so that background dirty tabs are not silently dropped.
+   * Returns an aggregate result; the pending action must only proceed when
+   * `allSaved` is true.
+   */
+  saveAllDirtyTabs: () => Promise<SaveAllDirtyResult>;
   /** Save As (always shows dialog). */
   saveAsFile: () => Promise<void>;
   /** Load a system file by path + content into a tab. */
@@ -89,6 +112,8 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     isElectron,
     updateTab,
     findTabByPath,
+    forceCloseTab,
+    closeTab,
     flushActiveEditorRef,
   } = params;
 
@@ -225,18 +250,15 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
     const { descriptor, content: fileContent } = result;
 
-    // Deduplicate: if the same path is already open, reload from disk and activate
+    // Deduplicate: if the same path is already open, just activate that tab.
+    // #1873: NEVER overwrite the in-memory buffer from disk here. Doing so
+    // silently destroyed unsaved edits (dirty tab) and forced an implicit
+    // reload on clean tabs. A real disk reload is a separate, explicit,
+    // confirmation-gated action handled by the file-watch integration.
     if (descriptor.path) {
-      const existing = findTabByPath(descriptor.path);
-      if (existing) {
-        // Force-refresh tab content so stale in-memory state is replaced with the
-        // latest content that was just read from disk by openMdiFile().
-        updateTab(existing.id, {
-          content: fileContent,
-          lastSavedContent: fileContent,
-          isDirty: false,
-        });
-        setActiveTabId(existing.id);
+      const decision = decideReopenExistingTab(findTabByPath(descriptor.path));
+      if (decision) {
+        setActiveTabId(decision.activateTabId);
         return;
       }
     }
@@ -351,6 +373,96 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     ],
   );
 
+  /**
+   * Save every dirty editor tab (#1859).
+   *
+   * Root cause this fixes: the project-switch unsaved warning raised for ALL
+   * dirty editor tabs but only ever saved the active tab, and because the
+   * single-tab saveFile swallows non-saved SaveOutcome statuses, the pending
+   * action ran even when a save was cancelled/failed — losing unsaved content.
+   *
+   * This loops every dirty editor tab through executeTabSave (reusing the
+   * shared per-path save lock for serialization), flushing the active tab's
+   * live content first. Save As / untitled tabs may pop a native dialog; if
+   * the user cancels one, we short-circuit the remaining saves cleanly.
+   * Notifications are surfaced here so the caller only needs the aggregate.
+   */
+  const saveAllDirtyTabs = useCallback(async (): Promise<SaveAllDirtyResult> => {
+    if (isSavingRef.current) {
+      // A save is already in flight; report locked so the caller blocks.
+      return { allSaved: false, outcomes: [{ status: "locked" }] };
+    }
+
+    const dirtyTabs = tabsRef.current.filter(
+      (t): t is EditorTabState => isEditorTab(t) && t.isDirty,
+    );
+    if (dirtyTabs.length === 0) {
+      return { allSaved: true, outcomes: [] };
+    }
+
+    isSavingRef.current = true;
+    const outcomes: SaveOutcome[] = [];
+    try {
+      for (const tab of dirtyTabs) {
+        // Block conflicted tabs up front (mirrors saveFile's guard).
+        if (tab.fileSyncStatus === "conflicted") {
+          notificationManager.warning(
+            "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
+          );
+          outcomes.push({ status: "conflicted" });
+          break;
+        }
+
+        // #1840: flush live editor content for the active tab before saving.
+        const tabToSave = flushActiveTabContent(tab);
+        const outcome = await executeTabSave({
+          tab: tabToSave,
+          isProject: isProjectRef.current,
+          tabsRef,
+          setTabs,
+          tryCreateSnapshot,
+          snapshotType: "manual",
+          updateProjectMetadata: true,
+          persistFileReference,
+        });
+        outcomes.push(outcome);
+
+        if (outcome.status === "saved") {
+          if (outcome.persistFailed) {
+            notificationManager.warning(PERSIST_FAILURE_WARNING);
+          }
+          continue;
+        }
+
+        // Non-saved: surface the right notification and stop saving the rest.
+        if (outcome.status === "conflicted") {
+          notificationManager.warning(
+            "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
+          );
+        } else if (outcome.status === "failed") {
+          console.error("保存に失敗しました:", outcome.error);
+          notificationManager.error(`保存に失敗しました: ${getErrorMessage(outcome.error)}`);
+        }
+        // "cancelled" (user dismissed Save As) / "locked" / "skipped":
+        // no notification, but still blocks the pending action.
+        break;
+      }
+    } finally {
+      isSavingRef.current = false;
+    }
+
+    const allSaved =
+      outcomes.length === dirtyTabs.length && outcomes.every((o) => o.status === "saved");
+    return { allSaved, outcomes };
+  }, [
+    persistFileReference,
+    tryCreateSnapshot,
+    setTabs,
+    tabsRef,
+    isProjectRef,
+    flushActiveTabContent,
+  ]);
+
   /** Save As (always shows dialog) */
   const saveAsFile = useCallback(async () => {
     if (isSavingRef.current) return;
@@ -379,8 +491,45 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         persistFileReference,
       });
 
-      if (outcome.status === "saved" && outcome.persistFailed) {
-        notificationManager.warning(PERSIST_FAILURE_WARNING);
+      if (outcome.status === "saved") {
+        if (outcome.persistFailed) {
+          notificationManager.warning(PERSIST_FAILURE_WARNING);
+        }
+        // #1872 (DATA LOSS): the Save-As destination may already be open in
+        // another tab. Leaving both tabs alive yields two divergent buffers on
+        // the same path that silently overwrite each other (and the path-keyed
+        // watcher suppression hides the other's write). Consolidate into a
+        // single tab: the source tab now holds the just-written content that is
+        // authoritative on disk. The check runs against the latest tabsRef
+        // (TOCTOU-safe — it reads state at completion time) and uses
+        // isSameEntry() for path-less web handles.
+        if (outcome.descriptor) {
+          const { duplicateTab } = await resolveSaveAsDuplicate(
+            tabsRef.current,
+            outcome.descriptor,
+            tab.id,
+          );
+          if (duplicateTab) {
+            // #1872 regression fix (DATA LOSS): the duplicate tab may itself be
+            // DIRTY with its own unsaved edits that differ from what Save As just
+            // wrote. Force-closing it unconditionally would silently destroy
+            // those edits. So branch on the duplicate's dirty state:
+            //   - CLEAN  → silently consolidate (force-close); it has no unsaved
+            //              work, only a now-stale clean buffer.
+            //   - DIRTY  → route through closeTab, which raises the normal
+            //              unsaved-changes dialog so the user can save/discard/
+            //              cancel rather than losing their edits.
+            if (duplicateTab.isDirty) {
+              setActiveTabId(tab.id);
+              notificationManager.warning(saveAsDuplicateWarning(outcome.descriptor.name, true));
+              closeTab(duplicateTab.id);
+            } else {
+              forceCloseTab(duplicateTab.id);
+              setActiveTabId(tab.id);
+              notificationManager.warning(saveAsDuplicateWarning(outcome.descriptor.name));
+            }
+          }
+        }
       } else if (outcome.status === "failed") {
         console.error("名前を付けて保存に失敗しました:", outcome.error);
         notificationManager.error(
@@ -397,6 +546,9 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     tryCreateSnapshot,
     tabsRef,
     activeTabIdRef,
+    setActiveTabId,
+    forceCloseTab,
+    closeTab,
     isProjectRef,
     flushActiveTabContent,
   ]);
@@ -404,16 +556,12 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   /** Load a file by path + content into a new tab (or reuse/deduplicate) */
   const loadSystemFile = useCallback(
     (path: string, fileContent: string) => {
-      // Deduplication
-      const existing = findTabByPath(path);
-      if (existing) {
-        updateTab(existing.id, {
-          content: fileContent,
-          lastSavedContent: fileContent,
-          isDirty: false,
-          lastSavedTime: Date.now(),
-        });
-        setActiveTabId(existing.id);
+      // Deduplication (#1873): if the same path is already open (e.g. Finder
+      // re-open / OS open-file event), just activate the tab. Never overwrite
+      // the in-memory buffer from disk — that silently destroyed unsaved edits.
+      const decision = decideReopenExistingTab(findTabByPath(path));
+      if (decision) {
+        setActiveTabId(decision.activateTabId);
         return;
       }
 
@@ -624,6 +772,7 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   return {
     openFile,
     saveFile,
+    saveAllDirtyTabs,
     saveAsFile,
     loadSystemFile,
     openProjectFile,

@@ -5,6 +5,25 @@ import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-docum
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension, WorkspaceTab } from "../project/project-types";
 import type { TabId, TabState, EditorTabState, TerminalTabState } from "./tab-types";
+import type { SaveOutcome } from "./save-executor";
+import type { AffectedTab } from "./tab-path-sync";
+
+// ---------------------------------------------------------------------------
+// Save-all aggregate result (#1859)
+// ---------------------------------------------------------------------------
+
+/**
+ * Aggregate result of saving every dirty editor tab (#1859).
+ *
+ * `allSaved` is true only when EVERY dirty tab returned status "saved". Any
+ * non-saved outcome (cancelled / failed / conflicted / locked / skipped) makes
+ * it false so the project-switch unsaved warning can block the pending action
+ * and keep the dialog open — preventing silent data loss.
+ */
+export interface SaveAllDirtyResult {
+  allSaved: boolean;
+  outcomes: SaveOutcome[];
+}
 
 // ---------------------------------------------------------------------------
 // Public return type (must stay identical to the original useTabManager)
@@ -21,6 +40,12 @@ export interface UseTabManagerReturn {
   lastSaveWasAuto: boolean;
   openFile: () => Promise<void>;
   saveFile: (isAutoSave?: boolean) => Promise<void>;
+  /**
+   * Save every dirty editor tab and report an aggregate result (#1859).
+   * `allSaved` is false unless every dirty tab was written, so callers (the
+   * project-switch unsaved warning) can block the pending action on cancel/fail.
+   */
+  saveAllDirtyTabs: () => Promise<SaveAllDirtyResult>;
   saveAsFile: () => Promise<void>;
   newFile: (fileType?: SupportedFileExtension) => void;
   updateFileName: (newName: string) => void;
@@ -32,7 +57,11 @@ export interface UseTabManagerReturn {
   tabs: TabState[];
   activeTabId: TabId;
   newTab: (fileType?: SupportedFileExtension) => void;
-  /** Create a new editor tab pre-populated with content and file association from a source tab. */
+  /**
+   * Duplicate a source tab's content into a new INDEPENDENT draft tab (#1874).
+   * The clone is detached from the source file (untitled) and born dirty so it
+   * cannot silently overwrite the original path. See cloneTabState().
+   */
   cloneTab: (source: EditorTabState) => void;
   closeTab: (tabId: TabId) => void;
   switchTab: (tabId: TabId) => void;
@@ -95,6 +124,26 @@ export interface UseTabManagerReturn {
     savedTabs: { tabs: WorkspaceTab[]; activeIndex: number } | undefined,
     rootPath: string | null,
   ) => Promise<boolean>;
+
+  // Explorer file-system mutation sync (#1868, shared with #1870)
+  /**
+   * Notify the tab manager that a project file/folder was renamed or moved
+   * (paths VFS-relative). Atomically rewrites the path/name/fileType of the
+   * affected tab and every tab nested under a renamed directory so the next
+   * save targets the new path instead of resurrecting the old one.
+   */
+  notifyFileRenamed: (oldPath: string, newPath: string) => void;
+  /**
+   * List the open editor tabs at or under the given VFS-relative path. The
+   * explorer uses this to confirm dirty tabs before a delete.
+   */
+  findTabsAffectedByDelete: (deletedPath: string) => AffectedTab[];
+  /**
+   * Notify the tab manager that a project file/folder was deleted (VFS-relative
+   * path). Detaches the descriptor of every affected tab so no save flow can
+   * recreate the deleted path; the tab survives as an untitled dirty buffer.
+   */
+  notifyFileDeleted: (deletedPath: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -206,4 +255,32 @@ export function createNewTab(
     fileSyncStatus: "clean",
     conflictDiskContent: null,
   };
+}
+
+/**
+ * Produce a TRUE independent draft clone of an editor tab (issue #1874).
+ *
+ * Historically cloneTab copied `source.file` so the new tab shared the same
+ * file path. That made editor split create two tabs pointing at the SAME file
+ * but holding independent buffers, so each pane could silently overwrite the
+ * other's edits on save (P0 data loss). It also reported the clone as clean
+ * even when the source buffer was dirty.
+ *
+ * The interim fix detaches the file descriptor (`file = null`) so the clone is
+ * an untitled draft that CANNOT save to the original path, and marks it dirty
+ * so the unsaved draft is never silently lost. This trades the "second view of
+ * the same document" UX for a "duplicate as draft" UX, eliminating the
+ * data-loss path. A full single-buffer multi-view refactor is a follow-up.
+ *
+ * `lastSavedContent` is set to the empty string (the descriptor-less baseline)
+ * so the clone is correctly reported dirty as long as it holds any content.
+ */
+export function cloneTabState(source: EditorTabState): EditorTabState {
+  const draft = createNewTab(source.content, source.fileType);
+  // Detach from the source document: an untitled draft with no save target.
+  draft.file = null;
+  // Born dirty so the unsaved draft is never silently discarded.
+  draft.isDirty = true;
+  draft.lastSavedContent = "";
+  return draft;
 }

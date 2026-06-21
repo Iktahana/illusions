@@ -417,16 +417,23 @@ export default function MilkdownEditor({
   }, [get, isPlainText]);
 
   // flush を親へ登録/解除する（onEditorViewReady と同じ readiness パターン）。
-  // 非アクティブな dockview パネルは NovelEditor を描画しないため、マウント中の
-  // インスタンスは常にアクティブタブのエディタに対応する（last-wins で一致）。
-  const registerFlushRef = useRef(registerFlush);
-  registerFlushRef.current = registerFlush;
+  // dockview はタブ切替や分割表示でも非アクティブな pane を portal でマウントし続ける
+  // ため、エディタはタブ切替で再マウントされない（#1878）。代わりに親
+  // (EditorLayout) は active pane にだけ実体の registrar を渡し、inactive pane には
+  // undefined を渡す。よって登録/解除は registerFlush の変化（= アクティブ状態の
+  // 反転）に追従させる必要がある。registerFlush を ref 越しに読んで [flushContent]
+  // だけに依存すると effect が再実行されず、flushActiveEditorRef がマウント時に
+  // アクティブだった pane を指したまま固まり、保存時に別 pane の内容を直列化して
+  // しまう（#1878 の退行）。registerFlush を依存に含め、アクティブな pane の flush
+  // だけが常に登録されている状態を保証する。inactive 化時は registerFlush が
+  // undefined になるので cleanup は no-op となり、新たに active 化した pane の登録を
+  // 上書きしない。
   useEffect(() => {
-    registerFlushRef.current?.(flushContent);
+    registerFlush?.(flushContent);
     return () => {
-      registerFlushRef.current?.(null);
+      registerFlush?.(null);
     };
-  }, [flushContent]);
+  }, [registerFlush, flushContent]);
 
   // posHighlight 設定を動的に更新（Editor を再作成せずに）。
   // enabled は power policy 由来の実効値（バックグラウンド中は停止、

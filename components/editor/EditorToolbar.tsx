@@ -39,21 +39,24 @@ export default function EditorToolbar({
   const paragraphSpacingOptions = Array.from({ length: 31 }, (_, i) => +(i * 0.1).toFixed(1)); // 0–3.0
 
   return (
-    <div className="h-12 border-y border-border bg-background-secondary flex items-center justify-between px-4">
-      <div className="flex items-center gap-4">
+    // #1856: 狭いウィンドウで検索／読み上げボタンが画面外に押し出されないよう、
+    // gap-x を縮め、設定グループ(min-w-0)が縮小・はみ出しを許容するようにする。
+    // 縦書き／読み上げ／検索の主要操作は shrink-0 で常に可視のまま残す。
+    <div className="min-h-12 border-y border-border bg-background-secondary flex items-center justify-between gap-2 px-4 py-1">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden sm:gap-4">
         {/* 縦書き/横書き */}
         <button
           onClick={onToggleVertical}
-          className="flex items-center gap-2 px-3 py-1.5 rounded font-medium bg-accent text-accent-foreground hover:bg-accent-hover transition-colors whitespace-nowrap"
+          className="flex shrink-0 items-center gap-2 px-3 py-1.5 rounded font-medium bg-accent text-accent-foreground hover:bg-accent-hover transition-colors whitespace-nowrap"
           style={{ fontSize: "clamp(0.75rem, 1.5vw, 0.875rem)" }}
         >
           <Type className="w-4 h-4 shrink-0" />
           <span className="overflow-hidden text-ellipsis">{isVertical ? "縦書き" : "横書き"}</span>
         </button>
 
-        {/* 現在の設定 */}
-        <div className="flex items-center gap-2 text-xs text-foreground-secondary">
-          <AlignLeft className="w-4 h-4 text-foreground-tertiary" />
+        {/* 現在の設定 — 狭幅では本グループが先に縮む／横スクロールする */}
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto text-xs text-foreground-secondary">
+          <AlignLeft className="w-4 h-4 shrink-0 text-foreground-tertiary" />
           <ValuePicker
             value={fontScale}
             label={`${fontScale}%`}
@@ -79,7 +82,7 @@ export default function EditorToolbar({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         {/* 読み上げ */}
         {speechState.isSupported && (
           <button
