@@ -56,6 +56,8 @@ interface FilesPanelProps {
   onFileMiddleClick?: (vfsPath: string) => void;
   /** Increment to trigger a new file creation at root with default name. */
   newFileTrigger?: number;
+  /** Increment to force the tree to reload after an external mutation (#1870). */
+  refreshTrigger?: number;
   /**
    * Notify the tab manager that a file/folder was renamed/moved (#1868).
    * Paths are VFS-relative (no leading slash), matching `tab.file.path`.
@@ -74,6 +76,7 @@ export function FilesPanel({
   onFileDoubleClick,
   onFileMiddleClick,
   newFileTrigger,
+  refreshTrigger,
   onFileRenamed,
   onFileDeleted,
   findTabsAffectedByDelete,
@@ -128,6 +131,13 @@ export function FilesPanel({
   }, []);
 
   const refresh = useCallback(() => setRefreshToken((v) => v + 1), []);
+
+  // Reload the tree when an external mutation (e.g. inspector rename, #1870)
+  // bumps the refresh trigger. Skip the initial mount (token 0/undefined).
+  useEffect(() => {
+    if (refreshTrigger === undefined || refreshTrigger === 0) return;
+    refresh();
+  }, [refreshTrigger, refresh]);
 
   const loadDirectory = useCallback(
     async (dirPath: string): Promise<FileTreeEntry[]> => {

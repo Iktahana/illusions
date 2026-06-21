@@ -61,6 +61,8 @@ interface SidebarPanelProps {
   onProjectBufferChange: (path: string, content: string) => void | Promise<void>;
   /** Trigger counter for opening the new-file dialog inside the files panel. */
   newFileTrigger: number;
+  /** Trigger counter asking the files panel to reload its tree (#1870). */
+  fileTreeRefreshTrigger?: number;
   /** Opens a project file by VFS path. */
   openProjectFile: (vfsPath: string, options: { preview: boolean }) => Promise<void>;
   /** Notify the tab manager that a project file/folder was renamed/moved (#1868). */
@@ -115,6 +117,7 @@ export default function SidebarPanel({
   projectSearchBuffers,
   onProjectBufferChange,
   newFileTrigger,
+  fileTreeRefreshTrigger,
   openProjectFile,
   onFileRenamed,
   onFileDeleted,
@@ -138,6 +141,7 @@ export default function SidebarPanel({
                 void openProjectFile(vfsPath, { preview: false });
               }}
               newFileTrigger={newFileTrigger}
+              refreshTrigger={fileTreeRefreshTrigger}
               onFileRenamed={onFileRenamed}
               onFileDeleted={onFileDeleted}
               findTabsAffectedByDelete={findTabsAffectedByDelete}
