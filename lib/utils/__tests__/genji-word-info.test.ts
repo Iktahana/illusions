@@ -170,4 +170,46 @@ describe("buildGenjiWordInfoViewModel", () => {
     expect(vm!.matchedHeadword).toBe("青い鳥");
     expect(vm!.isExactMatch).toBe(false);
   });
+
+  // ----- #1958: variant writings + needs_gloss -----
+
+  it("exposes variant writings and counts a variant query as an exact match", () => {
+    // Querying the historical-kana writing 「ゐる」 resolves to headword 「居る」.
+    const entry = makeEntry({
+      entry: "居る",
+      reading: { primary: "いる", alternatives: [] },
+      variantWritings: ["ゐる"],
+    });
+    const vm = buildGenjiWordInfoViewModel("ゐる", makeResult([entry]));
+    expect(vm!.matchedHeadword).toBe("居る");
+    expect(vm!.variantWritings).toEqual(["ゐる"]);
+    // A registered variant is an exact resolution → no "prefix only" note.
+    expect(vm!.isExactMatch).toBe(true);
+  });
+
+  it("defaults variantWritings to an empty array when absent", () => {
+    const vm = buildGenjiWordInfoViewModel("雪", makeResult());
+    expect(vm!.variantWritings).toEqual([]);
+    expect(vm!.needsGloss).toBe(false);
+  });
+
+  it("flags a skeleton entry (needs_gloss) while keeping it a real word", () => {
+    const entry = makeEntry({
+      entry: "新語",
+      reading: { primary: "しんご", alternatives: [] },
+      definitions: [{ gloss: "" }],
+      needsGloss: true,
+    });
+    const vm = buildGenjiWordInfoViewModel("新語", makeResult([entry]));
+    expect(vm!.isExactMatch).toBe(true);
+    expect(vm!.glosses).toEqual([]);
+    expect(vm!.needsGloss).toBe(true);
+  });
+
+  it("treats an entry with no usable gloss as needsGloss even without the flag", () => {
+    const entry = makeEntry({ definitions: [{ gloss: "   " }] });
+    const vm = buildGenjiWordInfoViewModel("雪", makeResult([entry]));
+    expect(vm!.glosses).toEqual([]);
+    expect(vm!.needsGloss).toBe(true);
+  });
 });

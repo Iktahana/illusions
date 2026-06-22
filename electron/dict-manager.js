@@ -278,6 +278,32 @@ class DictManager {
       } catch (readingIdxErr) {
         console.warn("[DictManager] reading index create skipped:", readingIdxErr.message);
       }
+      // Variant-writings index (#1958): resolves a manuscript word written in
+      // an absorbed variant form — old kanji / historical kana (e.g. ゐる→居る,
+      // 來→来) — to its canonical headword so the 辞書外語 rule does not flag it
+      // as unknown. `meta.variant_writings` lives inside raw_json (un-indexable
+      // directly), so we materialize a (variant → entry) table once via json_each
+      // and index it. Built only when absent; it persists in the DB file until a
+      // dict update replaces the file, then rebuilds. Best-effort — guarded so a
+      // DB lacking the field / JSON support (older DB) does not fail the open.
+      try {
+        const variantTbl = rwDb
+          .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='variant_lookup'")
+          .get();
+        if (!variantTbl) {
+          rwDb.exec(
+            `CREATE TABLE variant_lookup AS
+               SELECT je.value AS variant, e.entry AS entry
+               FROM entries e,
+                    json_each(json_extract(e.raw_json, '$.meta.variant_writings')) je
+               WHERE json_valid(e.raw_json)
+                 AND json_type(e.raw_json, '$.meta.variant_writings') = 'array';`,
+          );
+          rwDb.exec("CREATE INDEX IF NOT EXISTS idx_variant_lookup ON variant_lookup(variant);");
+        }
+      } catch (variantIdxErr) {
+        console.warn("[DictManager] variant index create skipped:", variantIdxErr.message);
+      }
     } catch (err) {
       // Index creation is best-effort; don't fail the whole open
       console.warn("[DictManager] Index check/create failed:", err);
@@ -318,10 +344,44 @@ class DictManager {
         )
         .all(term, `${escaped}%`, term, limit);
 
-      return rows.map((row) => this._rawJsonToEntry(row.raw_json)).filter(Boolean);
+      const entries = rows.map((row) => this._rawJsonToEntry(row.raw_json)).filter(Boolean);
+      // #1958: when neither an exact nor a prefix match exists, the term may be
+      // an absorbed variant writing (旧字体/歴史的仮名遣い). Resolve it to the
+      // canonical headword so the lookup panel shows the real entry (e.g. ゐる→居る)
+      // instead of "not found".
+      if (entries.length === 0) {
+        const resolved = this._resolveHeadwordByVariant(db, term, limit);
+        if (resolved.length > 0) return resolved;
+      }
+      return entries;
     } catch (err) {
       console.error("[DictManager] query error:", err);
       if (this._isCorruptionError(err)) this._corrupt = true;
+      return [];
+    }
+  }
+
+  /**
+   * Resolve a term that is an absorbed variant writing to its canonical entries
+   * via the `variant_lookup` table (#1958). Best-effort — returns [] when the
+   * table is absent (older DB) or the query fails.
+   * @private
+   * @returns {import("../lib/dict/dict-types").DictEntry[]}
+   */
+  _resolveHeadwordByVariant(db, term, limit = 20) {
+    try {
+      const rows = db
+        .prepare(
+          `SELECT e.raw_json AS raw_json
+             FROM variant_lookup vl
+             JOIN entries e ON e.entry = vl.entry
+            WHERE vl.variant = ?
+            LIMIT ?`,
+        )
+        .all(term, limit);
+      return rows.map((row) => this._rawJsonToEntry(row.raw_json)).filter(Boolean);
+    } catch (err) {
+      console.warn("[DictManager] variant headword resolve failed:", err);
       return [];
     }
   }
@@ -400,8 +460,45 @@ class DictManager {
 
     if (normalize) {
       this._resolveKanaByReading(db, unique, byEntry);
+      this._resolveByVariantWriting(db, unique, byEntry);
     }
     return [...byEntry.values()];
+  }
+
+  /**
+   * Variant-writings fallback (#1958) for terms that missed both the headword
+   * and reading indexes. Resolves an absorbed variant form (旧字体・歴史的仮名遣い,
+   * e.g. ゐる, 來) to the canonical entry via the materialized `variant_lookup`
+   * table, keying the hit by the original requested term so out-of-dict callers
+   * see it as found. Isolated try/catch: a missing `variant_lookup` table (older
+   * DB / build skipped) degrades silently to no variant resolution.
+   * @private
+   */
+  _resolveByVariantWriting(db, unique, byEntry) {
+    const misses = unique.filter((t) => !byEntry.has(t));
+    if (misses.length === 0) return;
+
+    try {
+      const placeholders = misses.map(() => "?").join(",");
+      const rows = db
+        .prepare(
+          `SELECT vl.variant AS variant, e.raw_json AS raw_json
+             FROM variant_lookup vl
+             JOIN entries e ON e.entry = vl.entry
+            WHERE vl.variant IN (${placeholders})`,
+        )
+        .all(...misses);
+
+      for (const row of rows) {
+        if (byEntry.has(row.variant)) continue;
+        const proj = this._rawJsonToLookup(row.raw_json);
+        if (proj) byEntry.set(row.variant, { entry: row.variant, ...proj });
+      }
+    } catch (err) {
+      // variant_lookup may not exist (older DB / build skipped). Best-effort —
+      // never mark corrupt, never clear existing results.
+      console.warn("[DictManager] variant fallback failed:", err);
+    }
   }
 
   /**
@@ -474,6 +571,9 @@ class DictManager {
       pos: raw.grammar?.pos?.join("・") || undefined,
       register: register || undefined,
       freqRank: typeof raw.meta?.freq_rank === "number" ? raw.meta.freq_rank : undefined,
+      // #1958: a skeleton entry is still a real word — surface needsGloss so the
+      // analysis/lint side keeps `found:true` and only the gloss is treated as pending.
+      needsGloss: raw.meta?.needs_gloss === true ? true : undefined,
     };
   }
 
@@ -573,6 +673,12 @@ class DictManager {
       inflections: raw.grammar?.inflections ?? undefined,
       definitions,
       relationships,
+      // #1958: variant writings (異表記) + skeleton flag from meta.
+      variantWritings:
+        Array.isArray(raw.meta?.variant_writings) && raw.meta.variant_writings.length > 0
+          ? raw.meta.variant_writings
+          : undefined,
+      needsGloss: raw.meta?.needs_gloss === true ? true : undefined,
       source: PROVIDER_ID,
     };
   }

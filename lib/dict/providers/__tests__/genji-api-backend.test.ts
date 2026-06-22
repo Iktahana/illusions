@@ -118,6 +118,22 @@ describe("mapRawJsonToDictEntry", () => {
     expect(entry.relationships.related).toEqual(["吹雪", "雪崩"]);
   });
 
+  it("maps meta.variant_writings and meta.needs_gloss (#1958)", () => {
+    const raw = {
+      ...SAMPLE_RAW,
+      meta: { ...SAMPLE_RAW.meta, variant_writings: ["ゐる", "居"], needs_gloss: true },
+    };
+    const entry = mapRawJsonToDictEntry(raw);
+    expect(entry.variantWritings).toEqual(["ゐる", "居"]);
+    expect(entry.needsGloss).toBe(true);
+  });
+
+  it("leaves variantWritings/needsGloss undefined when meta lacks them (#1958)", () => {
+    const entry = mapRawJsonToDictEntry(SAMPLE_RAW);
+    expect(entry.variantWritings).toBeUndefined();
+    expect(entry.needsGloss).toBeUndefined();
+  });
+
   it("handles null/missing optional fields gracefully", () => {
     const minimal = {
       uuid: "abc-123",
