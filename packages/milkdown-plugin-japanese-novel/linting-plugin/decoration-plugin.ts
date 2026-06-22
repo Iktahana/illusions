@@ -432,7 +432,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
               }
 
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
-              const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
+              const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to, true);
               const from = paragraph.pos + 1 + issue.from + extraFrom;
               const to = paragraph.pos + 1 + issue.to + extraTo;
 
