@@ -21,6 +21,11 @@ export interface LintingPluginOptions {
   ruleRunner: RuleRunnerLike | null;
   nlpClient?: INlpClient | null;
   ignoredCorrections?: IgnoredCorrection[];
+  /**
+   * Terms that dictionary-matching rules must treat as known (never flag as
+   * 辞書外語). Unioned into the prewarm snapshot as dictionary hits.
+   */
+  knownTerms?: ReadonlySet<string>;
   onIssuesUpdated?: (issues: LintIssue[]) => void;
   /** Callback fired when NLP tokenization fails (e.g., kuromoji init error).
    *  Called once per failure episode (not per-paragraph). */
@@ -47,6 +52,8 @@ export interface LintingSettingsUpdate {
   /** @deprecated Use changeReason instead */
   forceFullScan?: boolean;
   ignoredCorrections?: IgnoredCorrection[];
+  /** Terms to treat as known by dictionary-matching rules (see LintingPluginOptions). */
+  knownTerms?: ReadonlySet<string>;
   /** Identifies the trigger for this change, enabling precise cache invalidation */
   changeReason?: ConfigChangeReason;
 }
