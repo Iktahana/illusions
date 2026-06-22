@@ -175,7 +175,7 @@ export function createPosHighlightPlugin(
 
               if (color) {
                 const extraFrom = getAtomOffset(paragraph.atomAdjustments, token.start);
-                const extraTo = getAtomOffset(paragraph.atomAdjustments, token.end);
+                const extraTo = getAtomOffset(paragraph.atomAdjustments, token.end, true);
                 const from = paragraph.pos + 1 + token.start + extraFrom;
                 const to = paragraph.pos + 1 + token.end + extraTo;
 
