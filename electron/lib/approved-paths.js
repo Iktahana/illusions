@@ -96,4 +96,27 @@ function createApprovedPathRegistry(maxEntries = DEFAULT_MAX_APPROVED_PATHS) {
   };
 }
 
-module.exports = { createApprovedPathRegistry, DEFAULT_MAX_APPROVED_PATHS };
+/**
+ * Determine whether a normalized path is contained within (or equal to) any of
+ * the given approved paths. Used by vfs:set-root so that promoting a child of an
+ * already-approved tree to root does not trigger a redundant native dialog.
+ *
+ * All inputs MUST be pre-normalized to forward slashes with trailing slashes
+ * trimmed (the caller's normalizePath), so the comparison is a pure prefix test
+ * and is immune to NFC/NFD differences introduced by native dialogs.
+ *
+ * @param {readonly string[]} approvedPaths - Normalized approved paths
+ * @param {string} normalizedPath - Normalized candidate path
+ * @returns {boolean} true if the candidate is within an approved tree
+ */
+function isWithinApprovedTree(approvedPaths, normalizedPath) {
+  return approvedPaths.some(
+    (approved) => normalizedPath === approved || normalizedPath.startsWith(`${approved}/`),
+  );
+}
+
+module.exports = {
+  createApprovedPathRegistry,
+  isWithinApprovedTree,
+  DEFAULT_MAX_APPROVED_PATHS,
+};

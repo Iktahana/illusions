@@ -6,7 +6,7 @@
 const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
-const { createApprovedPathRegistry } = require("../lib/approved-paths");
+const { createApprovedPathRegistry, isWithinApprovedTree } = require("../lib/approved-paths");
 const {
   toForwardSlash,
   assertPathInsideRoot,
@@ -389,7 +389,25 @@ function registerVFSHandlers() {
 
     // 4. Check approval: in-session dialog approval OR persisted project approval
     // #1476: rehydration — load persisted approvals so re-prompting is skipped on restart
-    const alreadyApprovedInSession = dialogApprovedPaths.has(event.sender.id, resolved);
+    let alreadyApprovedInSession = dialogApprovedPaths.has(event.sender.id, resolved);
+
+    // A path inside an already-approved tree is itself approved. The new-project
+    // flow approves the *parent* via openDirectory(), then creates a child folder
+    // and promotes it to root — that child is legitimately accessible (the VFS
+    // already grants read/write to the whole approved tree), so re-prompting is
+    // both unnecessary and broken: on macOS the second dialog returns the NFD
+    // on-disk name while the requested path is NFC, so the exact-match check at
+    // step 5 would reject it ("選択されたディレクトリが要求されたパスと一致しません").
+    if (!alreadyApprovedInSession) {
+      const approvedTrees = dialogApprovedPaths
+        .listWindowPaths(event.sender.id)
+        .map((approved) => normalizePath(approved));
+      if (isWithinApprovedTree(approvedTrees, normalizedResolved)) {
+        approveDialogPath(event.sender.id, resolved);
+        alreadyApprovedInSession = true;
+      }
+    }
+
     let alreadyApprovedFromDisk = false;
     if (!alreadyApprovedInSession && effectiveProjectId) {
       const persistedSet = await loadApprovals(APPROVED_PATHS_FILE, effectiveProjectId);
