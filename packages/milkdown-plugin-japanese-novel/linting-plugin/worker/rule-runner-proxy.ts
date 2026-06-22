@@ -604,6 +604,18 @@ export class RuleRunnerProxy implements RuleRunnerLike {
       });
       this.fallbackRunner = runner;
       this.workerHasMorphRules = runnerHasRegisteredMorphRules(runner);
+      // Diagnostics for #1964 (packaged main-thread fallback returns 0 issues).
+      // The proxy/runner pipeline is verified correct in unit tests, so a
+      // packaged-only zero must come from upstream — this line distinguishes
+      // "rulesets failed to import" (modules=0), "createRules quarantined"
+      // (registered=0), or "mode/config disabled everything" (enabled=0) from
+      // an actual rule/lint-pass problem (enabled>0).
+      const registered = runner.getRegisteredRules().length;
+      const enabled = runner.getEnabledRules().length;
+      console.info(
+        `[lint] fallback runner built: ${this.fallbackModules.size} module(s), ` +
+          `${registered} registered rule(s), ${enabled} enabled (#1964 diag)`,
+      );
     } catch (e) {
       console.error("[lint] fallback runner build failed:", e);
     }
