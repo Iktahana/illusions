@@ -53,9 +53,19 @@ export default function GenjiWordInfoSection({
 
       {state.status === "found" && (
         <div className="space-y-2">
+          {/* 完全一致がない（前方一致のみヒット）場合の注記。誤って「選択語が辞書にある」と
+              読めてしまうのを防ぐ（例：「青い」を選択 → 見出し「青い鳥」が前方一致でヒット）。 */}
+          {!state.viewModel.isExactMatch && (
+            <p className="text-xs text-foreground-tertiary">
+              「{state.viewModel.word}
+              」に完全一致する項目はありません。前方一致する見出しを表示しています。
+            </p>
+          )}
           {/* 見出し・読み・品詞 */}
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-foreground">{state.viewModel.word}</span>
+            <span className="text-sm font-semibold text-foreground">
+              {state.viewModel.matchedHeadword}
+            </span>
             {state.viewModel.reading && (
               <span className="text-xs text-foreground-secondary">{state.viewModel.reading}</span>
             )}
