@@ -485,6 +485,19 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           const tr = view.state.tr.setMeta(lintingKey, { decorations });
           view.dispatch(tr);
 
+          // Diagnostics for #1964: a packaged lint pass that re-lints paragraphs
+          // yet yields nothing is the exact symptom. Logging only this case keeps
+          // the console quiet on normal (clean) passes while capturing the flags
+          // needed to pinpoint where the zero comes from.
+          if (allIssues.length === 0 && uncachedParagraphs.length > 0) {
+            console.info(
+              `[lint] 0 issues for ${uncachedParagraphs.length} relinted paragraph(s) (#1964 diag): ` +
+                `dict=${currentRuleRunner.hasDictRules()}, ` +
+                `morph=${currentRuleRunner.hasMorphologicalRules()}, ` +
+                `dictReady=${dictPayload?.ready ?? "n/a"}`,
+            );
+          }
+
           // Notify parent of all issues
           onIssuesUpdated?.(allIssues);
         }, delay);
