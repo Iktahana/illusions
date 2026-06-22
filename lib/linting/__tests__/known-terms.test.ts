@@ -15,6 +15,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { DictLookup } from "@/lib/dict/dict-types";
 import type { EditorMode } from "@/lib/project/project-types";
+import type { Token } from "@/lib/nlp-client/types";
+import { createSnapshotDictToolkit } from "@/lib/linting/toolkit";
+import { collectDictCandidateTerms } from "@/lib/linting/dict-candidate-terms";
 
 const loadEntries = vi.fn();
 const loadEntriesStandalone = vi.fn();
@@ -57,6 +60,60 @@ describe("applyKnownTermsToSnapshot", () => {
     const map = new Map<string, DictLookup>([["x", { found: false }]]);
     applyKnownTermsToSnapshot(map, ["x"], new Set(["not-a-candidate"]));
     expect(map.has("not-a-candidate")).toBe(false);
+  });
+
+  it("preserves projection fields on entries it does not override", () => {
+    const map = new Map<string, DictLookup>([
+      ["猫", { found: true, freqRank: 10 } as DictLookup],
+      ["造語", { found: false }],
+    ]);
+    applyKnownTermsToSnapshot(map, ["猫", "造語"], new Set(["造語"]));
+    expect(map.get("猫")).toEqual({ found: true, freqRank: 10 });
+  });
+});
+
+/**
+ * End-to-end contract: the override must be visible through the exact surface the
+ * out-of-dict rule reads — `createSnapshotDictToolkit().lookupCached`. The rule
+ * flags a term only when lookupCached returns `{ found: false }`, so a known term
+ * appearing as `{ found: true }` here proves it will NOT be flagged.
+ */
+describe("known terms suppress out-of-dict via the snapshot toolkit", () => {
+  it("a known miss reads back as found:true; an unknown miss stays found:false", () => {
+    // Genji reported both as absent...
+    const map = new Map<string, DictLookup>([
+      ["造語", { found: false }],
+      ["誤変換", { found: false }],
+    ]);
+    // ...but the user registered 「造語」.
+    applyKnownTermsToSnapshot(map, map.keys(), new Set(["造語"]));
+
+    const dict = createSnapshotDictToolkit();
+    dict.setSnapshot([...map.entries()], true);
+
+    // 造語 → not flagged (rule skips found:true); 誤変換 → still flagged.
+    expect(dict.lookupCached("造語")).toEqual({ found: true });
+    expect(dict.lookupCached("誤変換")).toEqual({ found: false });
+  });
+
+  it("suppresses a conjugated verb when its basic form is a known term", () => {
+    // The rule queries the basic form (dictCandidateTerm), so the user must
+    // register the basic form 「走る」, not the surface 「走っ」.
+    const token = {
+      surface: "走っ",
+      pos: "動詞",
+      pos_detail_1: "自立",
+      basic_form: "走る",
+    } as unknown as Token;
+    const terms = collectDictCandidateTerms([token]);
+    expect(terms).toContain("走る");
+
+    const map = new Map<string, DictLookup>(terms.map((t) => [t, { found: false } as DictLookup]));
+    applyKnownTermsToSnapshot(map, terms, new Set(["走る"]));
+
+    const dict = createSnapshotDictToolkit();
+    dict.setSnapshot([...map.entries()], true);
+    expect(dict.lookupCached("走る")).toEqual({ found: true });
   });
 });
 
