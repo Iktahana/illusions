@@ -1343,6 +1343,66 @@ export default function EditorPage() {
     setFeatures(getAvailableFeatures());
   }, []);
 
+  // Inspector file-name rename (#1870). For an open *project* file the rename
+  // must hit disk via the same VFS the explorer uses, then sync the open tab's
+  // path/name so subsequent saves write to the new path. Standalone / untitled
+  // tabs have no known VFS file, so we keep the display-only descriptor update.
+  // NOTE: must stay ABOVE the `editorMode === null` early return below — hooks
+  // cannot be declared after a conditional return (#1960 follow-up crash fix).
+  const handleInspectorRename = useCallback(
+    async (newName: string) => {
+      const tab = tabsRef.current.find((t) => t.id === activeTabId);
+      const editorTab = tab && isEditorTab(tab) ? tab : null;
+      const vfsPath = editorTab?.file?.path ?? null;
+
+      // Standalone / untitled: no real file to rename — display-only.
+      if (!isProjectMode(editorMode) || !editorTab || !vfsPath) {
+        updateFileName(newName);
+        return;
+      }
+
+      // Apply a successful rename result to the open tab descriptor + tree.
+      // Reuse #1868's tab-path-sync (notifyFileRenamed → applyTabRename), which
+      // rewrites path/name/fileType (incl. extension change) for the renamed tab
+      // and any tab nested under it, instead of a bespoke single-tab update.
+      const applyRename = (outcome: Extract<RenameOutcome, { kind: "renamed" }>): void => {
+        notifyFileRenamed(outcome.oldPath, outcome.newPath);
+        setFileTreeRefreshTrigger((v) => v + 1);
+      };
+
+      const { getProjectFileService } = await import("@/lib/services/project-file-service");
+      const vfs = getProjectFileService();
+      const outcome = await renameProjectFile(vfs, { currentPath: vfsPath, newName });
+
+      switch (outcome.kind) {
+        case "noop":
+          return;
+        case "renamed":
+          applyRename(outcome);
+          return;
+        case "collision":
+          // Defer to the user via the safe overwrite dialog (#1869 parity).
+          setRenameCollision({
+            name: outcome.name,
+            execute: async () => {
+              const forced = await renameProjectFile(vfs, { currentPath: vfsPath, newName }, true);
+              if (forced.kind === "renamed") {
+                applyRename(forced);
+              } else if (forced.kind === "error") {
+                notificationManager.error("ファイル名の変更に失敗しました");
+              }
+            },
+          });
+          return;
+        case "error":
+          // Leave the displayed name unchanged so the inspector reverts.
+          notificationManager.error("ファイル名の変更に失敗しました");
+          return;
+      }
+    },
+    [activeTabId, editorMode, updateFileName, notifyFileRenamed],
+  );
+
   // --- Routing: WelcomeScreen vs Editor ---
   if (editorMode === null) {
     // Show blank screen while auto-restoring last project (avoid WelcomeScreen flash)
@@ -1449,64 +1509,6 @@ export default function EditorPage() {
       setSearchOpenTrigger((prev) => prev + 1);
     },
   } as const;
-
-  // Inspector file-name rename (#1870). For an open *project* file the rename
-  // must hit disk via the same VFS the explorer uses, then sync the open tab's
-  // path/name so subsequent saves write to the new path. Standalone / untitled
-  // tabs have no known VFS file, so we keep the display-only descriptor update.
-  const handleInspectorRename = useCallback(
-    async (newName: string) => {
-      const tab = tabsRef.current.find((t) => t.id === activeTabId);
-      const editorTab = tab && isEditorTab(tab) ? tab : null;
-      const vfsPath = editorTab?.file?.path ?? null;
-
-      // Standalone / untitled: no real file to rename — display-only.
-      if (!isProjectMode(editorMode) || !editorTab || !vfsPath) {
-        updateFileName(newName);
-        return;
-      }
-
-      // Apply a successful rename result to the open tab descriptor + tree.
-      // Reuse #1868's tab-path-sync (notifyFileRenamed → applyTabRename), which
-      // rewrites path/name/fileType (incl. extension change) for the renamed tab
-      // and any tab nested under it, instead of a bespoke single-tab update.
-      const applyRename = (outcome: Extract<RenameOutcome, { kind: "renamed" }>): void => {
-        notifyFileRenamed(outcome.oldPath, outcome.newPath);
-        setFileTreeRefreshTrigger((v) => v + 1);
-      };
-
-      const { getProjectFileService } = await import("@/lib/services/project-file-service");
-      const vfs = getProjectFileService();
-      const outcome = await renameProjectFile(vfs, { currentPath: vfsPath, newName });
-
-      switch (outcome.kind) {
-        case "noop":
-          return;
-        case "renamed":
-          applyRename(outcome);
-          return;
-        case "collision":
-          // Defer to the user via the safe overwrite dialog (#1869 parity).
-          setRenameCollision({
-            name: outcome.name,
-            execute: async () => {
-              const forced = await renameProjectFile(vfs, { currentPath: vfsPath, newName }, true);
-              if (forced.kind === "renamed") {
-                applyRename(forced);
-              } else if (forced.kind === "error") {
-                notificationManager.error("ファイル名の変更に失敗しました");
-              }
-            },
-          });
-          return;
-        case "error":
-          // Leave the displayed name unchanged so the inspector reverts.
-          notificationManager.error("ファイル名の変更に失敗しました");
-          return;
-      }
-    },
-    [activeTabId, editorMode, updateFileName, notifyFileRenamed],
-  );
 
   const inspectorProps = {
     compactMode,
