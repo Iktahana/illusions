@@ -65,6 +65,10 @@ interface RawJson {
     source?: string;
     updated_at?: string;
     freq_rank?: number;
+    /** #1958: skeleton entry whose gloss is not yet generated. */
+    needs_gloss?: boolean;
+    /** #1958: variant writings (old kanji / historical kana) folded into this entry. */
+    variant_writings?: string[];
   };
 }
 
@@ -116,6 +120,12 @@ export function mapRawJsonToDictEntry(raw: RawJson): DictEntry {
     inflections: raw.grammar?.inflections ?? undefined,
     definitions,
     relationships,
+    // #1958: variant writings (異表記) + skeleton flag from meta.
+    variantWritings:
+      Array.isArray(raw.meta?.variant_writings) && raw.meta.variant_writings.length > 0
+        ? raw.meta.variant_writings
+        : undefined,
+    needsGloss: raw.meta?.needs_gloss === true ? true : undefined,
     source: "genji",
   };
 }
@@ -198,6 +208,8 @@ function rawJsonToLookup(raw: RawJson): DictLookup {
     pos: raw.grammar?.pos?.join("・") || undefined,
     register: register || undefined,
     freqRank: typeof raw.meta?.freq_rank === "number" ? raw.meta.freq_rank : undefined,
+    // #1958: a skeleton entry is still a real, recognized word.
+    needsGloss: raw.meta?.needs_gloss === true ? true : undefined,
   };
 }
 
