@@ -26,13 +26,19 @@ import { createRequire } from "module";
 
 // Load the CommonJS path-utils module via createRequire so vitest can import it
 const require = createRequire(import.meta.url);
-const { toForwardSlash, assertPathInsideRoot, getWindowsDenyPrefixes, resolveRealPath } =
-  require("../../../electron/lib/path-utils") as {
-    toForwardSlash: (p: string) => string;
-    assertPathInsideRoot: (resolvedPath: string, rootPath: string) => void;
-    getWindowsDenyPrefixes: () => string[];
-    resolveRealPath: (p: string) => Promise<string>;
-  };
+const {
+  toForwardSlash,
+  assertPathInsideRoot,
+  getWindowsDenyPrefixes,
+  resolveRealPath,
+  normalizeForCompare,
+} = require("../../../electron/lib/path-utils") as {
+  toForwardSlash: (p: string) => string;
+  assertPathInsideRoot: (resolvedPath: string, rootPath: string) => void;
+  getWindowsDenyPrefixes: () => string[];
+  resolveRealPath: (p: string) => Promise<string>;
+  normalizeForCompare: (p: string) => string;
+};
 
 // -----------------------------------------------------------------------
 // toForwardSlash
@@ -266,5 +272,40 @@ describe("resolveRealPath()", () => {
     fsSync.symlinkSync(path.join(outsideDir, "does-not-exist.txt"), link);
 
     await expect(resolveRealPath(link)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+// -----------------------------------------------------------------------
+// normalizeForCompare — the canonical comparison form used by vfs:set-root.
+// This is what fixes opening a Japanese-named project from the recent list
+// (#1955 follow-up): macOS dialogs return the on-disk NFD form while the
+// renderer / recent-projects list supplies NFC, and they must compare equal.
+// -----------------------------------------------------------------------
+describe("normalizeForCompare()", () => {
+  // 「が」: NFC = U+30AC (が), NFD = U+30AB U+3099 (か + combining dakuten).
+  const NFC = "ガ";
+  const NFD = "ガ";
+
+  it("folds NFD and NFC encodings of the same Japanese path to an equal value", () => {
+    // Pre-condition: the two strings are genuinely different byte sequences.
+    expect(NFC).not.toBe(NFD);
+    const nfcPath = `/Users/u/${NFC}`;
+    const nfdPath = `/Users/u/${NFD}`;
+    // Without NFC folding these would compare unequal and set-root would throw
+    // "選択されたディレクトリが要求されたパスと一致しません".
+    expect(normalizeForCompare(nfdPath)).toBe(normalizeForCompare(nfcPath));
+    expect(normalizeForCompare(nfdPath)).toBe(nfcPath);
+  });
+
+  it("still trims trailing slashes and converts backslashes while folding NFC", () => {
+    const nfdWithCruft = `\\Users\\u\\${NFD}\\\\`;
+    expect(normalizeForCompare(nfdWithCruft)).toBe(`/Users/u/${NFC}`);
+  });
+
+  it("does NOT collapse genuinely different directories to equal (no false match)", () => {
+    expect(normalizeForCompare(`/Users/u/${NFC}`)).not.toBe(
+      normalizeForCompare(`/Users/u/${NFC}2`),
+    );
+    expect(normalizeForCompare("/a/b")).not.toBe(normalizeForCompare("/a/c"));
   });
 });
