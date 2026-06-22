@@ -40,8 +40,23 @@ export interface GenjiWordInfoViewModel {
    * 「青い」 hits the entry 「青い鳥」) this differs from `word`.
    */
   matchedHeadword: string;
-  /** True when `matchedHeadword` exactly equals the queried `word`. */
+  /**
+   * True when the query resolves to this exact headword — either `matchedHeadword`
+   * equals `word`, or `word` is a registered variant writing of it (#1958, e.g.
+   * querying 「ゐる」 → headword 「居る」). Only a prefix-only hit is non-exact.
+   */
   isExactMatch: boolean;
+  /**
+   * Variant writings (異表記) of the matched headword — old kanji / historical
+   * kana folded into this entry (#1958). Empty when none.
+   */
+  variantWritings: string[];
+  /**
+   * True when the entry is a skeleton without a generated gloss (#1958). The
+   * word is real; the panel should indicate the gloss is pending rather than
+   * render an empty definition.
+   */
+  needsGloss: boolean;
 }
 
 /**
@@ -79,7 +94,12 @@ export function buildGenjiWordInfoViewModel(
   // 「青い鳥」). Surface this so the panel never implies the queried word itself is
   // in the dictionary when only a longer headword shares its prefix.
   const matchedHeadword = entry.entry.trim() || word;
-  const isExactMatch = matchedHeadword === word;
+  const variantWritings = (entry.variantWritings ?? [])
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  // A query for a registered variant writing (e.g. 「ゐる」 → 「居る」) is an exact
+  // resolution, not a prefix-only hit, so the "no exact match" note stays hidden (#1958).
+  const isExactMatch = matchedHeadword === word || variantWritings.includes(word);
 
   const reading = entry.reading.primary.trim() || null;
   const partOfSpeech = entry.partOfSpeech?.trim() || null;
@@ -102,6 +122,9 @@ export function buildGenjiWordInfoViewModel(
     register,
     glosses,
     synonyms,
+    variantWritings,
+    // A skeleton entry has needs_gloss=true OR simply no non-empty gloss yet.
+    needsGloss: entry.needsGloss === true || glosses.length === 0,
   };
 }
 

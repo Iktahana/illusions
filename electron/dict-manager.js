@@ -474,6 +474,9 @@ class DictManager {
       pos: raw.grammar?.pos?.join("・") || undefined,
       register: register || undefined,
       freqRank: typeof raw.meta?.freq_rank === "number" ? raw.meta.freq_rank : undefined,
+      // #1958: a skeleton entry is still a real word — surface needsGloss so the
+      // analysis/lint side keeps `found:true` and only the gloss is treated as pending.
+      needsGloss: raw.meta?.needs_gloss === true ? true : undefined,
     };
   }
 
@@ -573,6 +576,12 @@ class DictManager {
       inflections: raw.grammar?.inflections ?? undefined,
       definitions,
       relationships,
+      // #1958: variant writings (異表記) + skeleton flag from meta.
+      variantWritings:
+        Array.isArray(raw.meta?.variant_writings) && raw.meta.variant_writings.length > 0
+          ? raw.meta.variant_writings
+          : undefined,
+      needsGloss: raw.meta?.needs_gloss === true ? true : undefined,
       source: PROVIDER_ID,
     };
   }
