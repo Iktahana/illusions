@@ -151,4 +151,23 @@ describe("buildGenjiWordInfoViewModel", () => {
     const vm = buildGenjiWordInfoViewModel("QUERY", makeResult());
     expect(vm!.word).toBe("QUERY");
   });
+
+  it("exposes the matched headword and marks an exact match", () => {
+    const vm = buildGenjiWordInfoViewModel("雪", makeResult());
+    expect(vm!.matchedHeadword).toBe("雪");
+    expect(vm!.isExactMatch).toBe(true);
+  });
+
+  it("marks a prefix-only match as not exact and surfaces the real headword", () => {
+    // Querying 「青い」 hits the longer headword 「青い鳥」 via prefix match — the
+    // panel must NOT imply the queried word itself is in the dictionary.
+    const entry = makeEntry({
+      entry: "青い鳥",
+      reading: { primary: "あおいとり", alternatives: [] },
+    });
+    const vm = buildGenjiWordInfoViewModel("青い", makeResult([entry]));
+    expect(vm!.word).toBe("青い");
+    expect(vm!.matchedHeadword).toBe("青い鳥");
+    expect(vm!.isExactMatch).toBe(false);
+  });
 });

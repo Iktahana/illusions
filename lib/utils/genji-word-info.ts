@@ -35,6 +35,13 @@ export interface GenjiWordInfoViewModel {
   glosses: string[];
   /** Up to MAX_SYNONYMS synonym strings */
   synonyms: string[];
+  /**
+   * The actual headword that matched. On a prefix-only match (e.g. querying
+   * 「青い」 hits the entry 「青い鳥」) this differs from `word`.
+   */
+  matchedHeadword: string;
+  /** True when `matchedHeadword` exactly equals the queried `word`. */
+  isExactMatch: boolean;
 }
 
 /**
@@ -67,6 +74,13 @@ export function buildGenjiWordInfoViewModel(
 
   const entry = result.entries[0];
 
+  // queryByEntry matches "entry = term OR entry LIKE term%", so a query with no
+  // exact headword still returns the shortest prefix hit (querying 「青い」 returns
+  // 「青い鳥」). Surface this so the panel never implies the queried word itself is
+  // in the dictionary when only a longer headword shares its prefix.
+  const matchedHeadword = entry.entry.trim() || word;
+  const isExactMatch = matchedHeadword === word;
+
   const reading = entry.reading.primary.trim() || null;
   const partOfSpeech = entry.partOfSpeech?.trim() || null;
   const register = extractRegister(entry);
@@ -79,7 +93,16 @@ export function buildGenjiWordInfoViewModel(
     .filter((s) => s.length > 0)
     .slice(0, MAX_SYNONYMS);
 
-  return { word, reading, partOfSpeech, register, glosses, synonyms };
+  return {
+    word,
+    matchedHeadword,
+    isExactMatch,
+    reading,
+    partOfSpeech,
+    register,
+    glosses,
+    synonyms,
+  };
 }
 
 // ---------------------------------------------------------------------------
