@@ -29,12 +29,29 @@ export interface ParagraphInfo {
 }
 
 /**
- * Get additional offset for converting textContent position to ProseMirror paragraph offset.
+ * Get additional offset for converting a textContent position to a ProseMirror
+ * paragraph offset.
+ *
+ * An atom adjustment records `textPos` as the textContent position *just before*
+ * the atom node. Whether a position sitting exactly on that boundary should
+ * include the atom's offset depends on the kind of position:
+ *
+ * - **Inclusive (token START, default)**: a token that begins where an atom
+ *   sits comes *after* the atom, so its offset must include the atom.
+ * - **Exclusive (token END)**: a token whose exclusive end lands on the atom
+ *   boundary ends *just before* the atom, so it must NOT include it — otherwise
+ *   the decoration over-extends and bleeds onto the atom node (e.g. coloring a
+ *   ruby base or underlining it as a lint issue).
  */
-export function getAtomOffset(adjustments: AtomAdjustment[], textPos: number): number {
+export function getAtomOffset(
+  adjustments: AtomAdjustment[],
+  textPos: number,
+  exclusive = false,
+): number {
   let offset = 0;
   for (const adj of adjustments) {
-    if (adj.textPos <= textPos) {
+    const isBefore = exclusive ? adj.textPos < textPos : adj.textPos <= textPos;
+    if (isBefore) {
       offset = adj.cumulativeOffset;
     } else {
       break;

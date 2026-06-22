@@ -77,6 +77,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
   // Ignored corrections list (updated dynamically via setMeta)
   let currentIgnoredCorrections: IgnoredCorrection[] = options.ignoredCorrections ?? [];
 
+  // Known terms — words dictionary-matching rules must not flag as 辞書外語
+  // (user dictionary + registered dictionary-ruleset sources). Updated via setMeta.
+  let currentKnownTerms: ReadonlySet<string> = options.knownTerms ?? new Set();
+
   // NLP error state: tracks whether tokenization has failed.
   // When true, L2 (morphological) rules are explicitly disabled
   // and the user has been notified via onNlpError callback.
@@ -161,7 +165,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 break;
               case "rule-config-change":
               case "guideline-change":
-                // Clear issue cache and force re-run (keep token cache)
+              case "known-terms-change":
+                // Known terms feed the prewarm snapshot, which the rule consumes
+                // at run time — so a re-run is required (not just a re-filter).
+                // Clear issue cache and force re-run (keep token cache).
                 issueCache.clear();
                 documentIssueCache = null;
                 pendingFullScan = true;
@@ -183,6 +190,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           // Update ignoredCorrections list if provided
           if ("ignoredCorrections" in meta) {
             currentIgnoredCorrections = meta.ignoredCorrections ?? [];
+          }
+          // Update known terms if provided
+          if ("knownTerms" in meta) {
+            currentKnownTerms = meta.knownTerms ?? new Set();
           }
           // enabled/disabled change
           if (meta.enabled !== undefined) {
@@ -330,6 +341,15 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
               if (ready && terms.size > 0) {
                 const map = await access.lookupBatch([...terms]);
                 if (version !== processingVersion) return;
+                // Treat known terms (user dictionary + other dictionary rulesets)
+                // as dictionary hits so out-of-dict rules never flag them. Mirrors
+                // applyKnownTermsToSnapshot in @/lib/linting/known-terms, inlined
+                // here to keep this package free of application-root imports.
+                if (currentKnownTerms.size > 0) {
+                  for (const term of terms) {
+                    if (currentKnownTerms.has(term)) map.set(term, { found: true });
+                  }
+                }
                 entries = [...map.entries()];
               }
               dictPayload = { ready, entries };
@@ -432,7 +452,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
               }
 
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
-              const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
+              const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to, true);
               const from = paragraph.pos + 1 + issue.from + extraFrom;
               const to = paragraph.pos + 1 + issue.to + extraTo;
 

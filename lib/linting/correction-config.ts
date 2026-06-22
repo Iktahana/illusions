@@ -16,6 +16,7 @@ export type ConfigChangeReason =
   | "mode-change" // clear all caches, full re-run
   | "guideline-change" // clear issue + validation cache
   | "ignored-correction" // rebuild decorations only (no re-run)
+  | "known-terms-change" // known-terms set changed: clear issue cache, full re-run
   | "manual-refresh"; // clear all caches, force re-run
 
 /** Correction mode identifiers */

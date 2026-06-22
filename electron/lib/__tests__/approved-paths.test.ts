@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const { createApprovedPathRegistry, DEFAULT_MAX_APPROVED_PATHS } =
+const { createApprovedPathRegistry, isWithinApprovedTree, DEFAULT_MAX_APPROVED_PATHS } =
   require("../../../electron/lib/approved-paths") as {
     createApprovedPathRegistry: (maxEntries?: number) => {
       approve: (webContentsId: number, p: string) => void;
@@ -21,6 +21,7 @@ const { createApprovedPathRegistry, DEFAULT_MAX_APPROVED_PATHS } =
       listWindowPaths: (webContentsId: number) => string[];
       revokeWindow: (webContentsId: number) => void;
     };
+    isWithinApprovedTree: (approvedPaths: readonly string[], normalizedPath: string) => boolean;
     DEFAULT_MAX_APPROVED_PATHS: number;
   };
 
@@ -112,5 +113,39 @@ describe("createApprovedPathRegistry()", () => {
     registry.approve(1, "/p/c");
     expect(registry.has(1, "/p/a")).toBe(false);
     expect(registry.has(1, "/p/c")).toBe(true);
+  });
+});
+
+describe("isWithinApprovedTree()", () => {
+  it("returns true for the exact approved path", () => {
+    expect(isWithinApprovedTree(["/Users/foo/Documents"], "/Users/foo/Documents")).toBe(true);
+  });
+
+  it("returns true for a child of an approved tree (new-project flow)", () => {
+    // openDirectory() approves the parent; createProject promotes the new child.
+    expect(isWithinApprovedTree(["/Users/foo/Documents"], "/Users/foo/Documents/缶詰")).toBe(true);
+  });
+
+  it("returns true for a deeply nested descendant", () => {
+    expect(isWithinApprovedTree(["/Users/foo/Documents"], "/Users/foo/Documents/a/b/c")).toBe(true);
+  });
+
+  it("returns false for a sibling that merely shares a name prefix", () => {
+    // Must not treat "/Users/foo/Documents-evil" as inside "/Users/foo/Documents".
+    expect(isWithinApprovedTree(["/Users/foo/Documents"], "/Users/foo/Documents-evil")).toBe(false);
+  });
+
+  it("returns false for a parent of an approved path (no upward escape)", () => {
+    expect(isWithinApprovedTree(["/Users/foo/Documents"], "/Users/foo")).toBe(false);
+  });
+
+  it("returns false when there are no approved paths", () => {
+    expect(isWithinApprovedTree([], "/Users/foo/Documents")).toBe(false);
+  });
+
+  it("matches against any of multiple approved trees", () => {
+    const trees = ["/a/b", "/Users/foo/Documents"];
+    expect(isWithinApprovedTree(trees, "/Users/foo/Documents/proj")).toBe(true);
+    expect(isWithinApprovedTree(trees, "/c/d/proj")).toBe(false);
   });
 });
