@@ -10,8 +10,7 @@ const { createApprovedPathRegistry, isWithinApprovedTree } = require("../lib/app
 const {
   toForwardSlash,
   assertPathInsideRoot,
-  normalizeSeparators,
-  trimTrailingSlashes,
+  normalizeForCompare,
   resolveRealPath,
 } = require("../lib/path-utils");
 const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
@@ -100,14 +99,18 @@ function registerVFSHandlers() {
   }
 
   /**
-   * Normalize path separators to forward slashes for cross-platform compatibility.
-   * Intentional difference vs file-ipc.js: trailing slashes are trimmed here
-   * because VFS roots are prefix-matched (`${root}/`) by assertPathInsideRoot.
+   * Normalize a path to the canonical comparison form (forward slashes, no
+   * trailing slash, NFC). Delegates to the shared path-utils primitive so the
+   * NFC-immunity contract documented in approved-paths.js actually holds: macOS
+   * dialogs return the on-disk NFD form for Japanese names while the renderer /
+   * recent-projects list supplies NFC, and set-root must treat them as equal
+   * (#1955 follow-up). Trailing slashes are trimmed because VFS roots are
+   * prefix-matched (`${root}/`) by assertPathInsideRoot.
    * @param {string} p
    * @returns {string}
    */
   function normalizePath(p) {
-    return trimTrailingSlashes(normalizeSeparators(p));
+    return normalizeForCompare(p);
   }
 
   /**
@@ -411,7 +414,13 @@ function registerVFSHandlers() {
     let alreadyApprovedFromDisk = false;
     if (!alreadyApprovedInSession && effectiveProjectId) {
       const persistedSet = await loadApprovals(APPROVED_PATHS_FILE, effectiveProjectId);
-      alreadyApprovedFromDisk = persistedSet.has(resolvedReal) || persistedSet.has(resolved);
+      // Persisted entries were written from earlier dialog confirmations, so on
+      // macOS they may carry the on-disk NFD form while the requested path is
+      // NFC (or vice versa). Fold both sides to NFC so a Japanese-named project
+      // matches its stored approval regardless of Unicode encoding (#1955).
+      const persistedNFC = new Set([...persistedSet].map((p) => normalizePath(p)));
+      alreadyApprovedFromDisk =
+        persistedNFC.has(resolvedReal) || persistedNFC.has(normalizedResolved);
       if (alreadyApprovedFromDisk) {
         // Restore in-session approval so subsequent calls are fast
         approveDialogPath(event.sender.id, resolved);
