@@ -378,7 +378,11 @@ function registerVFSHandlers() {
       }
     } catch (error) {
       if (error.code === "ENOENT") {
-        throw new Error("指定されたディレクトリが見つかりません");
+        // Prefix with the ENOENT marker so the renderer can classify this as a
+        // "folder not found" failure across the IPC boundary — ipcMain.handle
+        // serialization strips custom error properties like `.code`, but the
+        // message survives, so callers can offer recovery (remove from recent).
+        throw new Error("ENOENT: 指定されたディレクトリが見つかりません");
       }
       throw error;
     }
