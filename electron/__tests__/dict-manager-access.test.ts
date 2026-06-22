@@ -26,7 +26,12 @@ vi.mock("electron", () => ({
 
 type DbMode = "healthy" | "no-table" | "malformed";
 
-type FakeRow = { entry: string; reading_primary: string; raw_json: string };
+type FakeRow = {
+  entry: string;
+  reading_primary: string;
+  raw_json: string;
+  variantWritings?: string[];
+};
 
 class FakeStatement {
   constructor(
@@ -56,6 +61,24 @@ class FakeStatement {
         .filter((r) => wanted.has(r.reading_primary))
         .map((r) => ({ reading_primary: r.reading_primary, raw_json: r.raw_json }));
     }
+    // #1958 variant_lookup JOIN — batch form: WHERE vl.variant IN (...)
+    if (this.sql.includes("variant_lookup") && this.sql.includes("vl.variant IN")) {
+      const wanted = new Set(args as string[]);
+      const out: Array<{ variant: string; raw_json: string }> = [];
+      for (const r of this.rows) {
+        for (const v of r.variantWritings ?? []) {
+          if (wanted.has(v)) out.push({ variant: v, raw_json: r.raw_json });
+        }
+      }
+      return out;
+    }
+    // #1958 variant_lookup JOIN — single form: WHERE vl.variant = ? LIMIT ?
+    if (this.sql.includes("variant_lookup") && this.sql.includes("vl.variant = ?")) {
+      const [term] = args as string[];
+      return this.rows
+        .filter((r) => (r.variantWritings ?? []).includes(term))
+        .map((r) => ({ raw_json: r.raw_json }));
+    }
     return [];
   }
   run(): void {}
@@ -82,9 +105,15 @@ interface RawJsonInput {
   pos?: string[];
   register?: string;
   freqRank?: number;
+  variantWritings?: string[];
+  needsGloss?: boolean;
 }
 
 function rawJson(input: RawJsonInput): string {
+  const meta: Record<string, unknown> = {};
+  if (input.freqRank !== undefined) meta.freq_rank = input.freqRank;
+  if (input.variantWritings) meta.variant_writings = input.variantWritings;
+  if (input.needsGloss !== undefined) meta.needs_gloss = input.needsGloss;
   return JSON.stringify({
     uuid: `uuid-${input.entry}`,
     entry: input.entry,
@@ -94,7 +123,7 @@ function rawJson(input: RawJsonInput): string {
       ? [{ index: 0, gloss: "x", register: input.register }]
       : [{ index: 0, gloss: "x" }],
     relations: { homophones: [], synonyms: [], antonyms: [], related: [] },
-    meta: input.freqRank !== undefined ? { freq_rank: input.freqRank } : {},
+    meta,
   });
 }
 
@@ -127,6 +156,7 @@ async function freshManager(dictDir: string, opts: ManagerOptions = {}): Promise
     entry: r.entry,
     reading_primary: r.reading,
     raw_json: rawJson(r),
+    variantWritings: r.variantWritings,
   }));
   const { getDictManager } = await import("../dict-manager.js");
   const mgr = getDictManager() as unknown as TestableManager;
@@ -263,6 +293,54 @@ describe("DictManager analysis access (#1624)", () => {
       fs.writeFileSync(dbPath, "sqlite");
       const mgr = await freshManager(dictDir, { rows: NORMALIZE_ROWS });
       expect(mgr.lookupBatch(["ある"], false)).toEqual([]);
+    });
+  });
+
+  describe("variant-writings resolution (#1958)", () => {
+    // 居る absorbs the historical-kana writing ゐる; 来 absorbs the old-kanji 來.
+    const VARIANT_ROWS: RawJsonInput[] = [
+      { entry: "居る", reading: "いる", pos: ["動詞"], variantWritings: ["ゐる"] },
+      { entry: "来", reading: "く", pos: ["動詞"], variantWritings: ["來"] },
+      { entry: "雪", reading: "ゆき", pos: ["名詞"] },
+    ];
+
+    it("resolves a variant writing to its canonical headword in lookupBatch (ゐる→居る)", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: VARIANT_ROWS });
+      const hit = mgr.lookupBatch(["ゐる"]);
+      // Keyed by the requested term; found:true so the 辞書外語 rule won't flag it.
+      expect(hit).toEqual([{ entry: "ゐる", found: true, reading: "いる", pos: "動詞" }]);
+    });
+
+    it("does NOT flag old-kanji/old-kana manuscript words as out-of-dictionary", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: VARIANT_ROWS });
+      const found = new Set(mgr.lookupBatch(["ゐる", "來"]).map((r) => r.entry));
+      expect(found.has("ゐる")).toBe(true);
+      expect(found.has("來")).toBe(true);
+    });
+
+    it("prefers an exact headword hit over the variant fallback", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: VARIANT_ROWS });
+      // 居る matches the headword directly — must resolve there, not via variant.
+      const hit = mgr.lookupBatch(["居る"]);
+      expect(hit).toEqual([{ entry: "居る", found: true, reading: "いる", pos: "動詞" }]);
+    });
+
+    it("normalize:false disables the variant fallback", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: VARIANT_ROWS });
+      expect(mgr.lookupBatch(["ゐる"], false)).toEqual([]);
+    });
+
+    it("query() resolves a variant writing to the canonical entry (panel path)", async () => {
+      fs.writeFileSync(dbPath, "sqlite");
+      const mgr = await freshManager(dictDir, { rows: VARIANT_ROWS });
+      const entries = (
+        mgr as unknown as { query: (t: string, l?: number) => Array<{ entry: string }> }
+      ).query("ゐる");
+      expect(entries.map((e) => e.entry)).toEqual(["居る"]);
     });
   });
 });
