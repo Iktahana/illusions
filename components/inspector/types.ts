@@ -93,6 +93,9 @@ export interface InspectorProps {
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
+  onAddToUserDictionary?: (issue: LintIssue) => void;
+  /** Rule ids whose detections support adding the flagged word to the user dictionary. */
+  dictEntryRuleIds?: ReadonlySet<string>;
   onRefreshLinting?: () => void;
   isLinting?: boolean;
   activeLintIssueIndex?: number | null;

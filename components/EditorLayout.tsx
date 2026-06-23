@@ -205,6 +205,10 @@ interface EditorLayoutProps {
     handleIgnoreCorrection: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onIgnoreCorrection"]
     >;
+    handleAddToUserDictionary: NonNullable<
+      React.ComponentProps<typeof NovelEditor>["onAddToUserDictionary"]
+    >;
+    dictEntryRuleIds: React.ComponentProps<typeof NovelEditor>["dictEntryRuleIds"];
     switchTab: (tabId: string) => void;
     updateTab: (tabId: string, updates: Partial<EditorTabState>) => void;
     registerFlush: NonNullable<React.ComponentProps<typeof NovelEditor>["registerFlush"]>;
@@ -582,6 +586,8 @@ export default function EditorLayout({
                                   onOpenDictionary={mainArea.handleOpenDictionary}
                                   onShowLintHint={mainArea.handleShowLintHint}
                                   onIgnoreCorrection={mainArea.handleIgnoreCorrection}
+                                  onAddToUserDictionary={mainArea.handleAddToUserDictionary}
+                                  dictEntryRuleIds={mainArea.dictEntryRuleIds}
                                   mdiExtensionsEnabled={panelMdiEnabled}
                                   gfmEnabled={panelGfmEnabled}
                                   externalContent={panelPendingExternalContent}

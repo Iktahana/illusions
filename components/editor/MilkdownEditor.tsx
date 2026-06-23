@@ -73,6 +73,9 @@ interface MilkdownEditorProps {
   onOpenDictionary?: (searchTerm?: string) => void;
   onShowLintHint?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
+  onAddToUserDictionary?: (issue: LintIssue) => void;
+  /** Rule ids whose detections support adding the flagged word to the user dictionary. */
+  dictEntryRuleIds?: ReadonlySet<string>;
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
   onStartSpeech?: () => void;
@@ -113,6 +116,8 @@ export default function MilkdownEditor({
   onOpenDictionary,
   onShowLintHint,
   onIgnoreCorrection,
+  onAddToUserDictionary,
+  dictEntryRuleIds,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
   onStartSpeech,
@@ -828,6 +833,11 @@ export default function MilkdownEditor({
             onIgnoreCorrection?.(lintIssueAtCursor, true);
           }
           break;
+        case "add-to-user-dict":
+          if (lintIssueAtCursor) {
+            onAddToUserDictionary?.(lintIssueAtCursor);
+          }
+          break;
         case "start-speech":
           onStartSpeech?.();
           break;
@@ -843,6 +853,7 @@ export default function MilkdownEditor({
       lintIssueAtCursor,
       onShowLintHint,
       onIgnoreCorrection,
+      onAddToUserDictionary,
       onStartSpeech,
       onFind,
     ],
@@ -860,6 +871,9 @@ export default function MilkdownEditor({
               { label: "校正提示を表示", action: "show-lint-hint" },
               { label: "この指摘を無視", action: "ignore-correction" },
               { label: "同じ指摘をすべて無視", action: "ignore-correction-all" },
+              ...(dictEntryRuleIds?.has(issue.ruleId)
+                ? [{ label: "この語をユーザー辞書に追加", action: "add-to-user-dict" }]
+                : []),
               { label: "-", action: "_separator" },
             ]
           : []),
@@ -903,6 +917,7 @@ export default function MilkdownEditor({
       handleContextMenuAction,
       mdiExtensionsEnabled,
       selectionState.hasSelection,
+      dictEntryRuleIds,
     ],
   );
 
@@ -1103,6 +1118,9 @@ export default function MilkdownEditor({
           onAction={handleContextMenuAction}
           hasSelection={selectionState.hasSelection}
           lintIssueAtCursor={lintIssueAtCursor}
+          canAddLintIssueToDict={
+            !!(lintIssueAtCursor && dictEntryRuleIds?.has(lintIssueAtCursor.ruleId))
+          }
           onContextMenuOpen={(e) =>
             setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))
           }
