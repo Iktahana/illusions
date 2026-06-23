@@ -28,7 +28,7 @@ async function createHandler(hasAppKey = true): Promise<TrackEventHandler> {
 describe("registerAnalyticsHandlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.APTABASE_APP_KEY = "A-US-test";
+    process.env.APTABASE_APP_KEY = "test-app-key";
     loadAppStateMock.mockResolvedValue({});
     trackEventMock.mockResolvedValue(undefined);
   });

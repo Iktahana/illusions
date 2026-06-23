@@ -25,24 +25,6 @@ if (!fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
 }
 
-// Load APTABASE_APP_KEY from .env.local for local dev builds (CI sets it directly
-// via job env / secrets). Not a real secret (it's a public app identifier, like a
-// Sentry DSN), but CLAUDE.md forbids hardcoding it in source, so it's baked into
-// the bundle at build time via esbuild `define` instead of read from process.env
-// at runtime (the packaged app has no .env file or shell env to read from).
-if (!process.env.APTABASE_APP_KEY) {
-  const envLocalPath = join(projectRoot, ".env.local");
-  if (fs.existsSync(envLocalPath)) {
-    const match = fs
-      .readFileSync(envLocalPath, "utf8")
-      .split("\n")
-      .find((line) => line.startsWith("APTABASE_APP_KEY="));
-    if (match) {
-      process.env.APTABASE_APP_KEY = match.slice("APTABASE_APP_KEY=".length).trim();
-    }
-  }
-}
-
 console.log("📦 Bundling Electron main process...");
 
 // Bundle main process
