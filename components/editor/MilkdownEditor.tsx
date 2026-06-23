@@ -41,6 +41,7 @@ import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin
 import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { commitPendingComposition } from "@/lib/editor-page/commit-pending-composition";
 import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
 import {
   getScrollProgress,
@@ -386,7 +387,11 @@ export default function MilkdownEditor({
     try {
       let result: string | null = null;
       editor.action((ctx) => {
-        const doc = ctx.get(editorViewCtx).state.doc;
+        const view = ctx.get(editorViewCtx);
+        // IME 変換中なら未確定文字を取りこぼさないよう、シリアライズ前に
+        // composition を best-effort でコミットする（#1971）。通常経路は no-op。
+        commitPendingComposition(view);
+        const doc = view.state.doc;
         if (isPlainText) {
           // listener の plain-text 経路（行 = node.textContent）と同一ロジック。
           const lines: string[] = [];
