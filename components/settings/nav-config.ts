@@ -10,6 +10,7 @@ import {
   AudioLines,
   Terminal,
   BatteryMedium,
+  ShieldCheck,
   Info,
 } from "lucide-react";
 
@@ -60,7 +61,10 @@ export function buildSettingsNavConfig(): ReadonlyArray<SettingsNavGroup<Setting
     },
     {
       label: "システム",
-      items: [{ id: "power", label: "省電力", icon: BatteryMedium, hidden: !isElectron }],
+      items: [
+        { id: "power", label: "省電力", icon: BatteryMedium, hidden: !isElectron },
+        { id: "privacy", label: "プライバシー", icon: ShieldCheck, hidden: !isElectron },
+      ],
     },
     {
       label: "ヘルプ",

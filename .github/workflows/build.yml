@@ -245,6 +245,7 @@ jobs:
       TEAM_ID: ${{ vars.TEAM_ID }}
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
@@ -337,6 +338,7 @@ jobs:
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
@@ -433,6 +435,7 @@ jobs:
       matrix:
         arch: [x64, arm64]
     env:
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
@@ -557,6 +560,7 @@ jobs:
     outputs:
       version: ${{ needs.compute-version.outputs.full }}
     env:
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
@@ -672,6 +676,7 @@ jobs:
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ubuntu-latest
     env:
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
