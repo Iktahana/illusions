@@ -199,7 +199,7 @@ function Characters({ content }: CharactersProps) {
   }, []);
 
   return (
-    <div className="h-full bg-background-secondary border-r border-border flex flex-col">
+    <div className="h-full bg-background-secondary flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-border flex items-center justify-between">
         <h2 className="text-lg font-semibold text-foreground">登場人物</h2>

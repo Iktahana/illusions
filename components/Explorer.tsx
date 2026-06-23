@@ -33,7 +33,7 @@ export default function Explorer({
   }, [activeTab]);
 
   return (
-    <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
+    <aside className={clsx("h-full bg-background flex flex-col", className)}>
       {/* Tabs */}
       <div
         className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}
