@@ -88,17 +88,16 @@ export default function ResizablePanel({
       className={clsx(
         "relative flex-shrink-0",
         !isResizing && "transition-all duration-300 ease-in-out",
-        // 左ナビゲーション側は ActivityBar(bg-background-tertiary rgb 30,30,30)の
-        // 背景ブロックが境界を明瞭にするが、右インスペクタは隣接ブロックが無く
+        // 左右の境界線はこの ResizablePanel が唯一の発生源（内側のサイドバー各
+        // コンポーネントからは border を除去済み）。左右で同一の太さ・色で描画する。
         // ダークテーマでは 1px の border-border(rgb 45,45,45)が暗いエディタ背景
-        // (rgb 8,8,8)に紛れて「境界線が無い」ように見える。そのためダーク時のみ
-        // 右側を 2px かつより明るい border-border-secondary(rgb 60,60,60)で強調する。
-        // ライトテーマでは border-border(rgb 210)が 1px でも十分視認でき、2px だと
-        // 左ボーダー(1px)と太さ・濃さが食い違って不揃いに見えるため左右対称に揃える。
+        // (rgb 8,8,8)に紛れて見えづらいため、両側とも 2px かつより明るい
+        // border-border-secondary(rgb 60,60,60)で強調する。ライトテーマでは
+        // border-border(rgb 210)の 1px で左右とも十分視認でき、太さも揃う。
         !isCollapsed &&
           (side === "right"
             ? "border-l border-border dark:border-l-2 dark:border-border-secondary"
-            : "border-r border-border"),
+            : "border-r border-border dark:border-r-2 dark:border-border-secondary"),
         className,
       )}
       style={{ width: isCollapsed ? "0px" : `${width}px` }}
