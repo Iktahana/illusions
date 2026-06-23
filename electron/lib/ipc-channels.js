@@ -200,6 +200,14 @@ const SAFE_STORAGE_CHANNELS = Object.freeze({
   event: Object.freeze({}),
 });
 
+// Usage analytics / Aptabase (electron/ipc/analytics-ipc.js)
+const ANALYTICS_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    trackEvent: "analytics:track-event",
+  }),
+  event: Object.freeze({}),
+});
+
 // Power monitoring (invoke in electron/ipc/system-ipc.js; event pushed from
 // electron/window-manager.js)
 const POWER_CHANNELS = Object.freeze({
@@ -295,6 +303,7 @@ module.exports = {
   VFS_CHANNELS,
   AUTH_CHANNELS,
   SAFE_STORAGE_CHANNELS,
+  ANALYTICS_CHANNELS,
   POWER_CHANNELS,
   EDITOR_CHANNELS,
   NLP_CHANNELS,

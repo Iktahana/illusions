@@ -171,6 +171,18 @@ export function usePowerSettings() {
   );
 }
 
+/** Usage analytics consent (Aptabase) */
+export function useAnalyticsSettings() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(
+    () => ({
+      usageAnalyticsConsent: settings.usageAnalyticsConsent,
+      onUsageAnalyticsConsentChange: handlers.handleUsageAnalyticsConsentChange,
+    }),
+    [settings, handlers],
+  );
+}
+
 /** UI settings (compact mode, auto-save, settings modal) */
 export function useUISettings() {
   const { settings, handlers } = useEditorSettingsContext();

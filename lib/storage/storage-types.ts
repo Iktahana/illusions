@@ -195,6 +195,13 @@ export interface AppState {
   allowBetaUpdates?: boolean;
   /** 起動時に校正ルールセットの更新を自動で適用する（デフォルト: true） */
   rulesetAutoUpdate?: boolean;
+
+  // プライバシー設定
+  /**
+   * 匿名使用統計（Aptabase）の送信に同意する（デフォルト: true）。
+   * 本文・ファイル名・パス・検索語など内容に関わる情報は送信対象に含まれない。
+   */
+  usageAnalyticsConsent?: boolean;
 }
 
 /**
