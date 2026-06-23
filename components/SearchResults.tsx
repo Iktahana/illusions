@@ -430,7 +430,7 @@ export default function SearchResults({
   };
 
   return (
-    <div className="h-full bg-background-secondary border-r border-border flex flex-col">
+    <div className="h-full bg-background-secondary flex flex-col">
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Search className="w-5 h-5 text-foreground-secondary" />

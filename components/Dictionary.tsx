@@ -325,7 +325,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   }, []);
 
   return (
-    <div className="h-full bg-background-secondary border-r border-border flex flex-col">
+    <div className="h-full bg-background-secondary flex flex-col">
       {/* Header */}
       <div className="px-4 py-2.5 border-b border-border">
         <div className="flex items-center justify-between mb-2">
