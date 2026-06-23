@@ -367,6 +367,8 @@ export default function EditorPage() {
     newFile: tabNewFile,
     updateFileName,
     wasAutoRecovered,
+    recoveredBuffer,
+    clearRecoveredBuffer,
     onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
     tabs,
@@ -683,6 +685,21 @@ export default function EditorPage() {
       incrementEditorKey();
     }
   }, [wasAutoRecovered, incrementEditorKey]);
+
+  // #1966 H-5: 復元バッファをエディタへ適用する。setContent が active タブ内容を
+  // 差し替え dirty を自動判定し、incrementEditorKey で Milkdown を再マウントして
+  // 反映する（自動復元と同じ remount 機構）。適用後は永続バッファを破棄する。
+  const applyRecoveredBuffer = useCallback(async () => {
+    if (!recoveredBuffer) return;
+    setContent(recoveredBuffer.content);
+    incrementEditorKey();
+    await clearRecoveredBuffer?.();
+  }, [recoveredBuffer, setContent, incrementEditorKey, clearRecoveredBuffer]);
+
+  // #1966 H-6: ディスク内容を維持し、復元バッファを破棄する（既定で読込済み）。
+  const discardRecoveredBuffer = useCallback(async () => {
+    await clearRecoveredBuffer?.();
+  }, [clearRecoveredBuffer]);
 
   // With tabs, open/new don't need unsaved warnings (they create new tabs)
   const openFile = useCallback(async () => {
@@ -1168,6 +1185,8 @@ export default function EditorPage() {
     recoveryExiting,
     setDismissedRecovery,
     setRecoveryExiting,
+    // #1966 H-5/H-6: バッファ選択待ちの間はバナーを自動フェードアウトさせない。
+    recoveryActionPending: recoveredBuffer != null,
     editorViewInstance,
     contentRef,
     setContent,
@@ -1661,6 +1680,9 @@ export default function EditorPage() {
           recoveryExiting,
           setRecoveryExiting,
           currentFileName: currentFile?.name,
+          recoveredBuffer,
+          applyRecoveredBuffer,
+          discardRecoveredBuffer,
         }}
         upgrade={{
           showUpgradeBanner,

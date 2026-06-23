@@ -131,6 +131,12 @@ interface EditorLayoutProps {
     recoveryExiting: boolean;
     setRecoveryExiting: Dispatch<SetStateAction<boolean>>;
     currentFileName?: string;
+    /** #1966 H-5/H-6: 復元バッファがディスクと食い違う場合の選択肢データ。 */
+    recoveredBuffer?: { content: string; fileName: string } | null;
+    /** バッファ内容をエディタへ適用する（H-5）。 */
+    applyRecoveredBuffer?: () => void;
+    /** バッファを破棄しディスク内容を維持する（H-6）。 */
+    discardRecoveredBuffer?: () => void;
   };
   upgrade: {
     showUpgradeBanner: boolean;
@@ -350,29 +356,65 @@ export default function EditorLayout({
                 fileType={dialogs.printDialog.fileType}
               />
 
-              {!chrome.isElectron && recovery.wasAutoRecovered && !recovery.dismissedRecovery && (
-                <div
-                  className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recovery.recoveryExiting ? "animate-slide-out-up" : "animate-slide-in-down"}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
-                    <p className="text-sm text-foreground">
-                      <span className="font-semibold text-foreground">
-                        ✓ 前回編集したファイルを復元しました：
-                      </span>{" "}
-                      <span className="font-mono text-success">{recovery.currentFileName}</span>
-                    </p>
+              {/* #1966 H-5/H-6: 復元バッファがディスクと食い違う場合は「使用 / 破棄」を
+                  選択させる（自動フェードアウトしない）。食い違いが無ければ従来どおり
+                  情報バナー（自動フェードアウト + ✕）。Electron でも表示する。 */}
+              {recovery.wasAutoRecovered &&
+                !recovery.dismissedRecovery &&
+                (recovery.recoveredBuffer ? (
+                  <div className="fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg animate-slide-in-down">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-warning rounded-full flex-shrink-0 animate-pulse-glow"></div>
+                      <p className="text-sm text-foreground">
+                        <span className="font-semibold text-foreground">
+                          未保存の変更が見つかりました：
+                        </span>{" "}
+                        <span className="font-mono text-warning">
+                          {recovery.recoveredBuffer.fileName}
+                        </span>{" "}
+                        <span className="text-foreground-secondary">
+                          前回終了時の未保存内容を使用しますか？
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                      <button
+                        onClick={() => recovery.applyRecoveredBuffer?.()}
+                        className="px-3 py-1 text-sm font-medium rounded bg-accent text-accent-foreground hover:opacity-90 transition-all duration-200"
+                      >
+                        このバッファを使用
+                      </button>
+                      <button
+                        onClick={() => recovery.discardRecoveredBuffer?.()}
+                        className="px-3 py-1 text-sm font-medium rounded border border-border text-foreground hover:bg-hover transition-all duration-200"
+                      >
+                        破棄
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      recovery.setRecoveryExiting(true);
-                    }}
-                    className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
+                ) : (
+                  <div
+                    className={`fixed left-0 top-10 right-0 z-50 bg-background-elevated border-b border-border px-4 py-3 flex items-center justify-between shadow-lg ${recovery.recoveryExiting ? "animate-slide-out-up" : "animate-slide-in-down"}`}
                   >
-                    ✕
-                  </button>
-                </div>
-              )}
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-success rounded-full flex-shrink-0 animate-pulse-glow"></div>
+                      <p className="text-sm text-foreground">
+                        <span className="font-semibold text-foreground">
+                          ✓ 前回編集したファイルを復元しました：
+                        </span>{" "}
+                        <span className="font-mono text-success">{recovery.currentFileName}</span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        recovery.setRecoveryExiting(true);
+                      }}
+                      className="text-foreground-secondary hover:text-foreground hover:bg-hover text-lg font-medium flex-shrink-0 ml-4 w-8 h-8 rounded flex items-center justify-center transition-all duration-200 hover:scale-110"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
 
               <div className="flex-1 flex overflow-hidden">
                 <ActivityBar

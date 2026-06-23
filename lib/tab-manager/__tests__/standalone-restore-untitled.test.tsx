@@ -1,13 +1,14 @@
 /**
- * Electron スタンドアロン無題タブ復元のテスト（#1965 の安全サブセット）。
+ * Electron スタンドアロンタブ復元のテスト（#1965）。
  *
  * 背景: スタンドアロンは VFS ルート未設定で起動するため、保存済み file-backed タブを
  * `getProjectFileService().readFile(絶対パス)` で再読込しようとすると main 側
- * validateVFSPath が必ず失敗する。よってファイル本体復元は Phase 9 の IO 抽象まで据え置き、
- * ここでは **filePath を持たない無題/未保存タブのバッファのみ** を VFS 非依存で復元する。
+ * validateVFSPath が必ず失敗する。よって file-backed タブは VFS ではなく main プロセスの
+ * 承認済みパス再読込 IPC `window.electronAPI.readStandaloneFile` で復元する。無題/未保存
+ * タブは VFS 非依存でバッファ (unsavedContent) から復元する。
  *
- * 最重要(業務非破壊): file-backed タブに対して readFile を**呼ばない**こと
- *  = 毎起動の復元失敗エラーを誘発しないこと。
+ * 最重要(業務非破壊): file-backed タブに対して VFS の readFile を**呼ばない**こと
+ *  = 毎起動の validateVFSPath 失敗エラーを誘発しないこと。復元は readStandaloneFile 経由。
  *
  * REAL フックを createRoot + act で駆動（electron-gate テストと同じパターン）。
  */
@@ -28,6 +29,16 @@ const { fetchWindowStateMock, persistWindowStateMock, persistAppStateMock, loadA
   }));
 
 const { readFileSpy } = vi.hoisted(() => ({ readFileSpy: vi.fn(async () => "DISK") }));
+
+// #1965: main プロセスの承認済みパス再読込 IPC のモック。
+const { readStandaloneFileMock } = vi.hoisted(() => ({
+  readStandaloneFileMock: vi.fn(
+    async (filePath: string) =>
+      ({ success: true, path: filePath, content: "DISK" }) as
+        | { success: true; path: string; content: string }
+        | { success: false; code?: string; error?: string },
+  ),
+}));
 
 vi.mock("@/lib/services/notification-manager", () => ({
   notificationManager: { error: vi.fn(), warning: vi.fn(), info: vi.fn() },
@@ -77,6 +88,9 @@ function Harness({ tabs, activeTabId, windowKey, setTabs, setActiveTabId }: Harn
   const activeTabIdRef = useRef<TabId>(activeTabId);
   activeTabIdRef.current = activeTabId;
   const isProjectRef = useRef(false);
+  // 安定した promise（毎レンダー新規生成すると復元 effect の deps が変わり再実行される。
+  // 本番の vfsGate.promise は安定参照なので、テストでも安定させて挙動を一致させる）。
+  const vfsReadyPromiseRef = useRef(Promise.resolve());
 
   useTabPersistence({
     tabs,
@@ -88,7 +102,7 @@ function Harness({ tabs, activeTabId, windowKey, setTabs, setActiveTabId }: Harn
     isProjectRef,
     isElectron: true,
     skipAutoRestore: false,
-    vfsReadyPromise: Promise.resolve(),
+    vfsReadyPromise: vfsReadyPromiseRef.current,
     windowKey: windowKey ?? null,
   });
   return null;
@@ -127,6 +141,15 @@ beforeEach(() => {
   persistAppStateMock.mockResolvedValue(undefined);
   readFileSpy.mockReset();
   readFileSpy.mockResolvedValue("DISK");
+  readStandaloneFileMock.mockReset();
+  readStandaloneFileMock.mockImplementation(async (filePath: string) => ({
+    success: true,
+    path: filePath,
+    content: "DISK",
+  }));
+  (window as unknown as { electronAPI?: unknown }).electronAPI = {
+    readStandaloneFile: readStandaloneFileMock,
+  };
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -137,6 +160,7 @@ afterEach(async () => {
     root.unmount();
   });
   container.remove();
+  delete (window as unknown as { electronAPI?: unknown }).electronAPI;
   vi.useRealTimers();
 });
 
@@ -194,33 +218,17 @@ describe("#1965 — スタンドアロン無題タブの復元（安全サブセ
     expect(readFileSpy).not.toHaveBeenCalled();
   });
 
-  it("【業務非破壊】file-backed タブのみのときは復元せず readFile を呼ばない", async () => {
+  it("file-backed タブを readStandaloneFile 経由で復元する（VFS readFile は呼ばない）", async () => {
     loadAppStateMock.mockResolvedValue({
       openTabs: {
         tabs: [serialized({ filePath: "/abs/manuscript.mdi", fileName: "manuscript.mdi" })],
         activeIndex: 0,
       },
     });
-    const setTabs = vi.fn();
-    const setActiveTabId = vi.fn();
-
-    await mountAndSettle({ setTabs, setActiveTabId, windowKey: null });
-
-    // file-backed は据え置き → restore 由来の setTabs は呼ばれない。
-    expect(restoredTabsFrom(setTabs)).toBeNull();
-    // 毎起動エラー(validateVFSPath 失敗)を誘発しないことの保証。
-    expect(readFileSpy).not.toHaveBeenCalled();
-  });
-
-  it("file-backed + 無題 混在では無題のみ復元し activeIndex をクランプする", async () => {
-    loadAppStateMock.mockResolvedValue({
-      openTabs: {
-        tabs: [
-          serialized({ filePath: "/abs/a.mdi", fileName: "a.mdi" }),
-          serialized({ unsavedContent: "下書き", fileType: ".mdi" }),
-        ],
-        activeIndex: 0, // file-backed を指していても、復元後リストにクランプ。
-      },
+    readStandaloneFileMock.mockResolvedValue({
+      success: true,
+      path: "/abs/manuscript.mdi",
+      content: "本文ディスク内容",
     });
     const setTabs = vi.fn();
     const setActiveTabId = vi.fn();
@@ -229,10 +237,64 @@ describe("#1965 — スタンドアロン無題タブの復元（安全サブセ
 
     const restored = restoredTabsFrom(setTabs);
     expect(restored).toHaveLength(1);
-    expect(restored![0].content).toBe("下書き");
-    // setActiveTabId updater("") は復元済みリストの範囲内 id を返す（範囲外参照しない）。
+    expect(restored![0].file?.path).toBe("/abs/manuscript.mdi");
+    expect(restored![0].file?.name).toBe("manuscript.mdi");
+    expect(restored![0].content).toBe("本文ディスク内容");
+    expect(restored![0].isDirty).toBe(false);
+    expect(restored![0].fileSyncStatus).toBe("clean");
+    // 復元は承認済みパス IPC 経由。VFS の readFile は呼ばない（validateVFSPath 失敗回避）。
+    expect(readStandaloneFileMock).toHaveBeenCalledWith("/abs/manuscript.mdi");
+    expect(readFileSpy).not.toHaveBeenCalled();
+  });
+
+  it("読込失敗(移動/削除/未承認)の file-backed は復元せずエラーを通知する", async () => {
+    loadAppStateMock.mockResolvedValue({
+      openTabs: {
+        tabs: [serialized({ filePath: "/abs/gone.mdi", fileName: "gone.mdi" })],
+        activeIndex: 0,
+      },
+    });
+    readStandaloneFileMock.mockResolvedValue({ success: false, code: "ENOENT" });
+    const setTabs = vi.fn();
+    const setActiveTabId = vi.fn();
+
+    await mountAndSettle({ setTabs, setActiveTabId, windowKey: null });
+
+    // 復元できる対象が無いので restore 由来の setTabs は呼ばれない。
+    expect(restoredTabsFrom(setTabs)).toBeNull();
+    expect(readStandaloneFileMock).toHaveBeenCalledWith("/abs/gone.mdi");
+    expect(readFileSpy).not.toHaveBeenCalled();
+  });
+
+  it("file-backed + 無題 混在では両方を元の順序で復元する", async () => {
+    loadAppStateMock.mockResolvedValue({
+      openTabs: {
+        tabs: [
+          serialized({ filePath: "/abs/a.mdi", fileName: "a.mdi" }),
+          serialized({ unsavedContent: "下書き", fileType: ".mdi" }),
+        ],
+        activeIndex: 1,
+      },
+    });
+    readStandaloneFileMock.mockResolvedValue({
+      success: true,
+      path: "/abs/a.mdi",
+      content: "Aの本文",
+    });
+    const setTabs = vi.fn();
+    const setActiveTabId = vi.fn();
+
+    await mountAndSettle({ setTabs, setActiveTabId, windowKey: null });
+
+    const restored = restoredTabsFrom(setTabs);
+    expect(restored).toHaveLength(2);
+    expect(restored![0].file?.path).toBe("/abs/a.mdi");
+    expect(restored![0].content).toBe("Aの本文");
+    expect(restored![1].file).toBeNull();
+    expect(restored![1].content).toBe("下書き");
+    // activeIndex=1 は復元済みリスト範囲内の id を指す。
     const idUpdater = setActiveTabId.mock.calls[0][0] as (prev: TabId) => TabId;
-    expect(idUpdater("")).toBe(restored![0].id);
+    expect(idUpdater("")).toBe(restored![1].id);
     expect(readFileSpy).not.toHaveBeenCalled();
   });
 
@@ -288,13 +350,15 @@ describe("#1965 — スタンドアロン無題タブの復元（安全サブセ
 });
 
 describe("#1965 — 永続化ゲートは復元有無に関わらず開く（#1567 退行防止）", () => {
-  it("file-backed のみで復元なしでも、その後の空タブ状態を永続化できる", async () => {
+  it("file-backed の復元に失敗しても、その後の空タブ状態を永続化できる", async () => {
     loadAppStateMock.mockResolvedValue({
       openTabs: {
         tabs: [serialized({ filePath: "/abs/a.mdi", fileName: "a.mdi" })],
         activeIndex: 0,
       },
     });
+    // 復元失敗（移動/削除）でも永続化ゲートは開く（#1567）。
+    readStandaloneFileMock.mockResolvedValue({ success: false, code: "ENOENT" });
     const setTabs = vi.fn();
     const setActiveTabId = vi.fn();
 
