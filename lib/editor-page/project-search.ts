@@ -296,11 +296,10 @@ function createPlainProjection(content: string): SearchTextProjection {
 
 function createMarkdownProjection(content: string, excludeComments: boolean): SearchTextProjection {
   const projection: SearchTextProjection = { text: "", segments: [] };
-  const commentPattern = /<!--[\s\S]*?-->/g;
   let cursor = 0;
 
-  for (const match of content.matchAll(commentPattern)) {
-    const rawFrom = match.index;
+  for (const comment of iterateHtmlComments(content)) {
+    const rawFrom = comment.from;
     if (rawFrom > cursor) {
       appendProjectionSegment(
         projection,
@@ -314,14 +313,14 @@ function createMarkdownProjection(content: string, excludeComments: boolean): Se
     if (!excludeComments) {
       appendProjectionSegment(
         projection,
-        match[0].replace(/^<!--\s*|\s*-->$/g, ""),
+        stripHtmlCommentDelimiters(comment.raw),
         rawFrom,
-        rawFrom + match[0].length,
+        comment.to,
         "comment",
         false,
       );
     }
-    cursor = rawFrom + match[0].length;
+    cursor = comment.to;
   }
 
   if (cursor < content.length) {
@@ -380,7 +379,7 @@ function appendMdiToken(
     if (!excludeComments) {
       appendProjectionSegment(
         body,
-        token.replace(/^<!--\s*|\s*-->$/g, ""),
+        stripHtmlCommentDelimiters(token),
         rawFrom,
         rawTo,
         "comment",
@@ -427,6 +426,29 @@ function appendMdiToken(
   if (token === "[[blank]]" || token === "[[br]]") {
     appendProjectionSegment(body, "\n", rawFrom, rawTo, "mdibreak", false);
   }
+}
+
+function* iterateHtmlComments(
+  content: string,
+): Generator<{ raw: string; from: number; to: number }> {
+  let cursor = 0;
+  while (cursor < content.length) {
+    const from = content.indexOf("<!--", cursor);
+    if (from === -1) return;
+    const close = content.indexOf("-->", from + 4);
+    if (close === -1) return;
+    const to = close + 3;
+    yield { raw: content.slice(from, to), from, to };
+    cursor = to;
+  }
+}
+
+function stripHtmlCommentDelimiters(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("<!--") && trimmed.endsWith("-->")) {
+    return trimmed.slice(4, -3).trim();
+  }
+  return value;
 }
 
 function appendProjectionSegment(

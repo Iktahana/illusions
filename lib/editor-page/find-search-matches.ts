@@ -244,17 +244,25 @@ function createBodyProjection(
 function getCommentText(node: Node): string | null {
   if (node.type.name === "comment" || node.type.name === "htmlComment") {
     const value = node.attrs.value ?? node.attrs.text ?? node.textContent;
-    return typeof value === "string" ? value.replace(/^<!--\s*|\s*-->$/g, "") : "";
+    return typeof value === "string" ? stripHtmlCommentDelimiters(value) : "";
   }
   // Milkdown の commonmark preset は HTML 構文（<!-- ... --> を含む）を
   // attrs.value に生テキストを持つ "html" inline atom ノードとして格納する。
   if (node.type.name === "html") {
     const raw = typeof node.attrs.value === "string" ? (node.attrs.value as string).trim() : "";
-    if (/^<!--[\s\S]*-->$/.test(raw)) {
-      return raw.replace(/^<!--\s*|\s*-->$/g, "");
+    if (raw.startsWith("<!--") && raw.endsWith("-->")) {
+      return stripHtmlCommentDelimiters(raw);
     }
   }
   return null;
+}
+
+function stripHtmlCommentDelimiters(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("<!--") && trimmed.endsWith("-->")) {
+    return trimmed.slice(4, -3).trim();
+  }
+  return value;
 }
 
 function createRubyReadingProjections(
