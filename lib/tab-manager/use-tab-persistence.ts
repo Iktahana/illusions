@@ -179,7 +179,14 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       // backing, so this is their only data-safety path (mirrors project-mode #1868).
       // File-backed tabs are intentionally NOT duplicated: their content lives on
       // disk and is re-read on restore.
-      unsavedContent: !t.file?.path && t.isDirty ? t.content : undefined,
+      //
+      // Gate on the absence of ANY file descriptor (`!t.file`), not just a missing
+      // path. A browser File System Access tab has `file.path === null` but a
+      // non-null `file.handle`; using `!t.file?.path` would misclassify such a
+      // saved, handle-backed file as untitled and duplicate its full content into
+      // AppState (bloat + raises QuotaExceeded risk). Web file-backed tabs already
+      // recover via the editor-buffer path (Codex review).
+      unsavedContent: !t.file && t.isDirty ? t.content : undefined,
     }));
     const state: TabPersistenceState = {
       tabs: serializedTabs,
