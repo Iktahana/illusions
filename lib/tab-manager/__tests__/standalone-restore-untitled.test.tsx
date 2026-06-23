@@ -88,6 +88,9 @@ function Harness({ tabs, activeTabId, windowKey, setTabs, setActiveTabId }: Harn
   const activeTabIdRef = useRef<TabId>(activeTabId);
   activeTabIdRef.current = activeTabId;
   const isProjectRef = useRef(false);
+  // 安定した promise（毎レンダー新規生成すると復元 effect の deps が変わり再実行される。
+  // 本番の vfsGate.promise は安定参照なので、テストでも安定させて挙動を一致させる）。
+  const vfsReadyPromiseRef = useRef(Promise.resolve());
 
   useTabPersistence({
     tabs,
@@ -99,7 +102,7 @@ function Harness({ tabs, activeTabId, windowKey, setTabs, setActiveTabId }: Harn
     isProjectRef,
     isElectron: true,
     skipAutoRestore: false,
-    vfsReadyPromise: Promise.resolve(),
+    vfsReadyPromise: vfsReadyPromiseRef.current,
     windowKey: windowKey ?? null,
   });
   return null;

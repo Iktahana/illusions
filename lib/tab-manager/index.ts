@@ -158,6 +158,8 @@ export function useTabManager(options?: {
 
   const {
     wasAutoRecovered,
+    recoveredBuffer,
+    clearRecoveredBuffer,
     flushTabState: _flushTabState,
     restoreProjectTabs,
   } = useTabPersistence({
@@ -247,6 +249,8 @@ export function useTabManager(options?: {
     newFile,
     updateFileName: tabState.updateFileName,
     wasAutoRecovered,
+    recoveredBuffer,
+    clearRecoveredBuffer,
     onSystemFileOpen,
     _loadSystemFile: fileIO.loadSystemFile,
 

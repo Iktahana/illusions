@@ -55,9 +55,33 @@ export interface UseTabPersistenceParams extends TabManagerCore {
 // Return type
 // ---------------------------------------------------------------------------
 
+/**
+ * A persisted editor buffer whose crash-time content differs from the file on
+ * disk (#1966 H-5/H-6). Disk content is loaded by default; this lets the UI offer
+ * 「このバッファを使用」/「破棄」instead of silently discarding the buffer.
+ */
+export interface RecoveredBufferInfo {
+  /** The crash-time buffer content (differs from the loaded disk content). */
+  content: string;
+  /** Display name of the recovered file. */
+  fileName: string;
+}
+
 export interface UseTabPersistenceReturn {
   /** Whether the session was auto-recovered from a saved buffer. */
   wasAutoRecovered: boolean;
+  /**
+   * #1966 H-5/H-6: pending buffer-vs-disk recovery choice. Non-null only when a
+   * recovered file's persisted buffer differs from its on-disk content. Null when
+   * there is no conflict (the disk content was loaded as the safe default).
+   */
+  recoveredBuffer: RecoveredBufferInfo | null;
+  /**
+   * Clear the pending recovered-buffer choice and drop the persisted editor
+   * buffer. Called after the user picks 使用 (content already applied to the tab
+   * by the caller) or 破棄 (keep the disk content).
+   */
+  clearRecoveredBuffer: () => Promise<void>;
   /** Immediately flush pending tab state to storage (cancels debounce). */
   flushTabState: () => Promise<void>;
   /**
@@ -113,6 +137,24 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   windowKeyRef.current = windowKey ?? null;
 
   const [wasAutoRecovered, setWasAutoRecovered] = useState(false);
+
+  // #1966 H-5/H-6: pending buffer-vs-disk recovery choice (Web). The disk content
+  // is loaded by default; when the crash-time buffer differs, this state drives the
+  // 「このバッファを使用」/「破棄」banner. The fileKey is kept in a ref so the eventual
+  // clearEditorBuffer targets the right key without re-rendering.
+  const [recoveredBuffer, setRecoveredBuffer] = useState<RecoveredBufferInfo | null>(null);
+  const recoveredBufferKeyRef = useRef<string | null>(null);
+
+  const clearRecoveredBuffer = useCallback(async () => {
+    setRecoveredBuffer(null);
+    const key = recoveredBufferKeyRef.current;
+    recoveredBufferKeyRef.current = null;
+    try {
+      await getStorageService().clearEditorBuffer(key ?? undefined);
+    } catch (error) {
+      console.warn("回復バッファのクリアに失敗しました:", error);
+    }
+  }, []);
 
   // Gate persistence until after the initial restore has completed to
   // prevent the empty initial tabs state from overwriting saved tab data
@@ -370,6 +412,14 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
                 conflictDiskContent: null,
               };
               setWasAutoRecovered(true);
+              // #1966 H-5/H-6: disk is the safe default, but if the crash-time
+              // buffer differs from disk, surface a choice instead of silently
+              // discarding the unsaved buffer. Empty/identical buffers need no choice.
+              const bufferContent = buffer.content;
+              if (typeof bufferContent === "string" && bufferContent !== fileContent) {
+                recoveredBufferKeyRef.current = lastFileKey ?? null;
+                setRecoveredBuffer({ content: bufferContent, fileName: file.name });
+              }
             } catch (error) {
               // #1966 H-2: ディスクのファイルを再オープンできない（移動/削除/権限取消）。
               // 旧実装はバッファを黙って破棄し、未保存内容がサイレントに消えていた。
@@ -524,6 +574,8 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
             // ユーザーが待機中に開いたタブを上書きしないよう、空のときだけ反映する。
             setTabs((prev) => (prev.length > 0 ? prev : restored));
             setActiveTabId((prev) => (prev === "" ? restored[activeIdx].id : prev));
+            // #1966: Electron でも復元状態をバナーで提示する（旧実装は Web 限定で非表示）。
+            setWasAutoRecovered(true);
           }
 
           if (!cancelled && failedFileBacked > 0) {
@@ -547,5 +599,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
   }, [isElectron, skipAutoRestore, vfsReadyPromise, setTabs, setActiveTabId, setRestoreError]);
 
-  return { wasAutoRecovered, flushTabState, restoreProjectTabs };
+  return {
+    wasAutoRecovered,
+    recoveredBuffer,
+    clearRecoveredBuffer,
+    flushTabState,
+    restoreProjectTabs,
+  };
 }

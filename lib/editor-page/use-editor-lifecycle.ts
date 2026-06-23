@@ -18,6 +18,11 @@ interface UseEditorLifecycleParams {
   recoveryExiting: boolean;
   setDismissedRecovery: Dispatch<SetStateAction<boolean>>;
   setRecoveryExiting: Dispatch<SetStateAction<boolean>>;
+  /**
+   * #1966 H-5/H-6: true while the user has a pending 「このバッファを使用」/「破棄」
+   * choice. The recovery banner must stay visible (no auto-fadeout) until resolved.
+   */
+  recoveryActionPending?: boolean;
   editorViewInstance: EditorView | null;
   contentRef: MutableRefObject<string>;
   setContent: (content: string) => void;
@@ -42,6 +47,7 @@ export function useEditorLifecycle({
   recoveryExiting,
   setDismissedRecovery,
   setRecoveryExiting,
+  recoveryActionPending,
   editorViewInstance,
   contentRef,
   setContent,
@@ -80,7 +86,9 @@ export function useEditorLifecycle({
   // Phase 3: getPendingFile 経路は削除。Phase 8 で再導入する。
 
   useEffect(() => {
-    if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting) {
+    // #1966 H-5/H-6: バッファ選択待ちの間は自動フェードアウトしない（ユーザーの
+    // 明示的な「使用 / 破棄」操作を待つ）。
+    if (wasAutoRecovered && !dismissedRecovery && !recoveryExiting && !recoveryActionPending) {
       const fadeoutTimer = setTimeout(() => {
         setRecoveryExiting(true);
       }, 5000);
@@ -99,6 +107,7 @@ export function useEditorLifecycle({
     wasAutoRecovered,
     dismissedRecovery,
     recoveryExiting,
+    recoveryActionPending,
     setDismissedRecovery,
     setRecoveryExiting,
   ]);
