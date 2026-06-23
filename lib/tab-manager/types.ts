@@ -216,7 +216,26 @@ export function sanitizeMdiContent(
   return MdiDocument.fromEditorOutput(content, options).toRawText();
 }
 
+/**
+ * Web の IndexedDB / localStorage 容量超過は `QuotaExceededError`（`DOMException`）で
+ * 投げられる。`DOMException` は実行環境によって `instanceof Error` が false になる
+ * （Chromium 等では Error を継承しない）ため、Error 判定より前に name/code で判別する。
+ * legacy Firefox は `NS_ERROR_DOM_QUOTA_REACHED`、旧仕様は数値コード 22 を使う（#1967）。
+ */
+export function isQuotaExceededError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const e = error as { name?: unknown; code?: unknown };
+  return (
+    e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22
+  );
+}
+
 export function getErrorMessage(error: unknown): string {
+  // 容量不足はプラットフォーム横断（Web=DOMException / Electron=ENOSPC）で
+  // 専用メッセージにまとめる。DOMException は instanceof Error をすり抜けるため先に判定。
+  if (isQuotaExceededError(error)) {
+    return "保存容量が不足しています。不要なデータを削除するか、別の保存先をご利用ください。";
+  }
   if (!(error instanceof Error)) return "不明なエラー";
   let message = error.message;
   const errorCode = (error as NodeJS.ErrnoException).code;
