@@ -50,6 +50,10 @@ export interface UseTabManagerReturn {
   newFile: (fileType?: SupportedFileExtension) => void;
   updateFileName: (newName: string) => void;
   wasAutoRecovered?: boolean;
+  /** #1966 H-5/H-6: 復元バッファがディスクと食い違う場合の選択肢データ（無ければ null）。 */
+  recoveredBuffer?: { content: string; fileName: string } | null;
+  /** 復元バッファの選択を解消し永続バッファを破棄する（使用適用後 / 破棄時に呼ぶ）。 */
+  clearRecoveredBuffer?: () => Promise<void>;
   onSystemFileOpen?: (handler: (path: string, content: string) => void) => void;
   _loadSystemFile: (path: string, content: string) => void;
 
