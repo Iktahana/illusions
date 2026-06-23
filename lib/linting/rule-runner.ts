@@ -26,6 +26,19 @@ export class RuleRunner {
 
   /** Update the config for a specific rule. */
   setConfig(ruleId: string, config: LintRuleConfig): void {
+    // Preserve rule-specific `options` from the registered manifest defaultConfig
+    // when the caller omits them. The renderer's config pipeline only carries
+    // enabled/severity/skipDialogue (mode switching rebuilds the whole config
+    // map), so without this an option-driven rule — e.g. genji-out-of-dict's
+    // noun-only `includeVerbsAdjectives:false` — would revert to its internal
+    // default and over-detect verbs/adjectives after every mode switch (#1962).
+    if (config.options === undefined) {
+      const prev = this.configs.get(ruleId);
+      if (prev?.options !== undefined) {
+        this.configs.set(ruleId, { ...config, options: prev.options });
+        return;
+      }
+    }
     this.configs.set(ruleId, config);
   }
 

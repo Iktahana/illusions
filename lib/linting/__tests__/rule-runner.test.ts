@@ -109,6 +109,41 @@ describe("RuleRunner", () => {
       const runner = new RuleRunner();
       expect(runner.getConfig("nonexistent")).toBeUndefined();
     });
+
+    it("preserves manifest rule options when a later setConfig omits them (#1962)", () => {
+      // A rule registered with options (e.g. genji-out-of-dict noun-only scope).
+      class OptionRule extends AbstractLintRule {
+        readonly id = "opt-rule";
+        readonly name = "Opt";
+        readonly nameJa = "Opt";
+        readonly description = "";
+        readonly descriptionJa = "";
+        readonly level = "L2" as const;
+        readonly defaultConfig: LintRuleConfig = {
+          enabled: true,
+          severity: "info",
+          options: { includeVerbsAdjectives: false },
+        };
+        lint(): LintIssue[] {
+          return [];
+        }
+      }
+      const runner = new RuleRunner();
+      runner.registerRule(new OptionRule());
+
+      // The renderer pushes a mode config carrying only enabled/severity.
+      runner.setConfig("opt-rule", { enabled: true, severity: "info" });
+
+      // Options must survive — otherwise the rule reverts to its internal default.
+      expect(runner.getConfig("opt-rule")?.options).toEqual({ includeVerbsAdjectives: false });
+    });
+
+    it("lets an explicit options object override the preserved one (#1962)", () => {
+      const runner = new RuleRunner();
+      runner.setConfig("r", { enabled: true, severity: "info", options: { a: 1 } });
+      runner.setConfig("r", { enabled: true, severity: "info", options: { b: 2 } });
+      expect(runner.getConfig("r")?.options).toEqual({ b: 2 });
+    });
   });
 
   // -----------------------------------------------------------------------
