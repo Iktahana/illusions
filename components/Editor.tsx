@@ -53,6 +53,10 @@ interface EditorProps {
   onShowLintHint?: (issue: LintIssue) => void;
   // 校正無視コールバック
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
+  // ユーザー辞書追加コールバック（辞書外語の検出に対して）
+  onAddToUserDictionary?: (issue: LintIssue) => void;
+  /** 辞書追加を示唆するルール ID 集合（辞書系ルールのみメニュー表示） */
+  dictEntryRuleIds?: ReadonlySet<string>;
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
@@ -87,6 +91,8 @@ export default function NovelEditor({
   onOpenDictionary,
   onShowLintHint,
   onIgnoreCorrection,
+  onAddToUserDictionary,
+  dictEntryRuleIds,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
   externalContent,
@@ -550,6 +556,8 @@ export default function NovelEditor({
               onOpenDictionary={onOpenDictionary}
               onShowLintHint={onShowLintHint}
               onIgnoreCorrection={onIgnoreCorrection}
+              onAddToUserDictionary={onAddToUserDictionary}
+              dictEntryRuleIds={dictEntryRuleIds}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
               onStartSpeech={startSpeechFromCursor}

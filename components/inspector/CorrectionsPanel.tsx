@@ -47,6 +47,9 @@ interface CorrectionsPanelProps {
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
+  onAddToUserDictionary?: (issue: LintIssue) => void;
+  /** Rule ids whose detections support adding the flagged word to the user dictionary. */
+  dictEntryRuleIds?: ReadonlySet<string>;
   onRefreshLinting?: () => void;
   isLinting?: boolean;
   activeLintIssueIndex?: number | null;
@@ -91,6 +94,8 @@ export default function CorrectionsPanel({
   onNavigateToIssue,
   onApplyFix,
   onIgnoreCorrection,
+  onAddToUserDictionary,
+  dictEntryRuleIds,
   onRefreshLinting,
   isLinting = false,
   activeLintIssueIndex,
@@ -281,6 +286,8 @@ export default function CorrectionsPanel({
               onNavigateToIssue={onNavigateToIssue}
               onApplyFix={onApplyFix}
               onIgnoreCorrection={onIgnoreCorrection}
+              onAddToUserDictionary={onAddToUserDictionary}
+              canAddToUserDictionary={!!dictEntryRuleIds?.has(issue.ruleId)}
             />
           </div>
         );
@@ -344,6 +351,8 @@ export default function CorrectionsPanel({
                         onNavigateToIssue={onNavigateToIssue}
                         onApplyFix={onApplyFix}
                         onIgnoreCorrection={onIgnoreCorrection}
+                        onAddToUserDictionary={onAddToUserDictionary}
+                        canAddToUserDictionary={!!dictEntryRuleIds?.has(issue.ruleId)}
                       />
                     </div>
                   );

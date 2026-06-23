@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { EyeOff, Info, Lightbulb } from "lucide-react";
+import { BookmarkPlus, EyeOff, Info, Lightbulb } from "lucide-react";
 import clsx from "clsx";
 
 import { LINT_RULES_META } from "@/lib/linting/lint-presets";
@@ -48,6 +48,9 @@ export interface IssueCardProps {
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
+  onAddToUserDictionary?: (issue: LintIssue) => void;
+  /** Whether this issue's rule supports adding the flagged word to the user dictionary. */
+  canAddToUserDictionary?: boolean;
 }
 
 /** Renders a single issue card */
@@ -57,6 +60,8 @@ export default function IssueCard({
   onNavigateToIssue,
   onApplyFix,
   onIgnoreCorrection,
+  onAddToUserDictionary,
+  canAddToUserDictionary,
 }: IssueCardProps): React.JSX.Element {
   const enriched = issue as EnrichedLintIssue;
   const hasOriginal = !!enriched.originalText;
@@ -98,6 +103,32 @@ export default function IssueCard({
           >
             置換
           </span>
+        )}
+        {canAddToUserDictionary && onAddToUserDictionary && (
+          <InfoTooltip
+            content="この語をユーザー辞書に追加"
+            className="text-foreground-tertiary hover:text-foreground-secondary"
+          >
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="この語をユーザー辞書に追加"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToUserDictionary(issue);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onAddToUserDictionary(issue);
+                }
+              }}
+              className="inline-flex items-center p-0.5 rounded transition-colors cursor-pointer hover:bg-hover"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5" />
+            </span>
+          </InfoTooltip>
         )}
         {onIgnoreCorrection && (
           <InfoTooltip

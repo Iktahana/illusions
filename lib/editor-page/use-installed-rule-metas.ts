@@ -25,6 +25,7 @@ interface ManifestRule {
   ruleId: string;
   applicableModes?: string[];
   defaultConfig?: { enabled?: boolean; severity?: string; skipDialogue?: boolean };
+  suggestsDictionaryEntry?: boolean;
 }
 
 function getRulesetsAPI(): NonNullable<Window["electronAPI"]>["rulesets"] | undefined {
@@ -53,6 +54,7 @@ export async function loadInstalledRuleMetas(): Promise<ModeRuleMetaInput[]> {
           ruleId: rule.ruleId,
           applicableModes: rule.applicableModes,
           defaultConfig: rule.defaultConfig,
+          suggestsDictionaryEntry: rule.suggestsDictionaryEntry,
         });
       }
     }
