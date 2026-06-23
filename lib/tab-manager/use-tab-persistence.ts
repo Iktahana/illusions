@@ -7,8 +7,15 @@ import { fetchWindowState, persistWindowState } from "../storage/app-state-manag
 import type { TabState, SerializedTab, TabPersistenceState, EditorTabState } from "./tab-types";
 import { isEditorTab } from "./tab-types";
 import type { TabManagerCore } from "./types";
-import { TAB_PERSIST_DEBOUNCE, createNewTab, generateTabId, inferFileType } from "./types";
+import {
+  TAB_PERSIST_DEBOUNCE,
+  createNewTab,
+  generateTabId,
+  getErrorMessage,
+  inferFileType,
+} from "./types";
 import { getProjectFileService } from "../services/project-file-service";
+import { notificationManager } from "../services/notification-manager";
 import type { WorkspaceTab } from "../project/project-types";
 import {
   persistWorkspaceJson,
@@ -122,6 +129,11 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
 
   const tabPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // タブ状態の永続化が失敗した際、ユーザーに一度だけ通知するためのゲート。
+  // 永続化は debounce で頻繁に走るため、失敗が続く間トーストを連発しないよう
+  // 失敗ストリーク中は通知を抑制し、次に成功したら解除する（#1967）。
+  const persistErrorNotifiedRef = useRef(false);
+
   /** Build and persist the current tab state immediately. */
   const persistTabStateNow = useCallback(async () => {
     const currentTabs = tabsRef.current;
@@ -194,9 +206,20 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     }
 
     tabPersistTimerRef.current = setTimeout(() => {
-      void persistTabStateNow().catch((error) => {
-        console.error("タブ状態の保存に失敗しました:", error);
-      });
+      void persistTabStateNow()
+        .then(() => {
+          // 成功したら失敗ストリークを解除し、次の失敗で再び通知できるようにする。
+          persistErrorNotifiedRef.current = false;
+        })
+        .catch((error) => {
+          console.error("タブ状態の保存に失敗しました:", error);
+          // 容量不足等の永続化失敗は「保存できているはず」という誤認を招くため、
+          // ストリークの先頭で一度だけ通知する（#1967）。
+          if (!persistErrorNotifiedRef.current) {
+            persistErrorNotifiedRef.current = true;
+            notificationManager.error(`セッションの保存に失敗しました: ${getErrorMessage(error)}`);
+          }
+        });
     }, TAB_PERSIST_DEBOUNCE);
 
     return () => {
@@ -352,6 +375,13 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         }
       } catch (error) {
         console.error("ストレージの初期化に失敗しました:", error);
+        // DB がロック中（別プロセス起動など）/破損で初期化に失敗すると、空タブで
+        // 起動しつつセッションが読めなかったことをユーザーへ伝えていなかった（#1968 K-4-3）。
+        // バナー（setRestoreError）とトーストの両方で明示し、サイレント失敗を解消する。
+        setRestoreError?.(
+          "前回のセッションを読み込めませんでした。アプリが多重起動していないかを確認してください。",
+        );
+        notificationManager.error(`セッションの読み込みに失敗しました: ${getErrorMessage(error)}`);
         const errorTab = createNewTab();
         setTabs((prev) => (prev.length > 0 ? prev : [errorTab]));
         setActiveTabId((prev) => (prev === "" ? errorTab.id : prev));
@@ -363,7 +393,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     };
 
     void initializeStorage();
-  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId]);
+  }, [isElectron, skipAutoRestore, setTabs, setActiveTabId, setRestoreError]);
 
   // --- Standalone-mode restore from AppState (Electron only) -------------
   // This ONLY handles standalone mode (no project). In project mode,
