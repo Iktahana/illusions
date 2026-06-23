@@ -267,6 +267,14 @@ declare global {
       /** Check if OS-level encryption is available */
       isAvailable: () => Promise<boolean>;
     };
+    analytics?: {
+      /**
+       * Track an anonymous usage analytics event (Aptabase). Event name and
+       * props are whitelisted on the renderer side; consent enforcement and
+       * the actual send happen in main process.
+       */
+      trackEvent: (eventName: string, props?: Record<string, string | number>) => Promise<void>;
+    };
     power?: {
       /**
        * Listen for debounced power state changes from main process.

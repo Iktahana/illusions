@@ -44,6 +44,9 @@ await esbuild.build({
     // node-pty is a native module for terminal support
     "node-pty",
   ],
+  define: {
+    "process.env.APTABASE_APP_KEY": JSON.stringify(process.env.APTABASE_APP_KEY || ""),
+  },
   format: "cjs",
   minify: false, // Keep readable for debugging
   sourcemap: true,

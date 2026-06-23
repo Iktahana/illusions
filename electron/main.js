@@ -44,7 +44,18 @@ const { registerDictHandlers } = require("./ipc/dict-ipc");
 const { getDictManager } = require("./dict-manager");
 const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
 const { getRulesetsManager } = require("./rulesets-manager");
+const { registerAnalyticsHandlers } = require("./ipc/analytics-ipc");
 const { DICT_CHANNELS, POWER_CHANNELS, RULESETS_CHANNELS } = require("./lib/ipc-channels");
+
+// --- Aptabase（匿名使用統計）初期化 ---
+// initialize() は app.whenReady() より前に呼ぶ必要がある（内部でカスタムプロトコルを
+// privileged scheme として登録するため）。App Key はビルド時に esbuild の define で
+// 埋め込まれる（scripts/bundle-electron.mjs）。未設定（OSSビルド等）の場合は計測を無効化する。
+const APTABASE_APP_KEY = process.env.APTABASE_APP_KEY || "";
+if (APTABASE_APP_KEY) {
+  const { initialize: initializeAnalytics } = require("@aptabase/electron/main");
+  initializeAnalytics(APTABASE_APP_KEY);
+}
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -208,6 +219,22 @@ app.whenReady().then(async () => {
   registerEditorHandlers();
   registerDictHandlers();
   registerRulesetsHandlers();
+  registerAnalyticsHandlers({ hasAppKey: () => Boolean(APTABASE_APP_KEY) });
+
+  // 匿名使用統計：起動イベント（同意フラグ未設定時はデフォルト ON）
+  if (APTABASE_APP_KEY) {
+    try {
+      const appState = await getStorageManager().loadAppState();
+      if (appState?.usageAnalyticsConsent !== false) {
+        const { trackEvent } = require("@aptabase/electron/main");
+        void trackEvent("app_launched", { platform: process.platform }).catch((trackError) => {
+          console.warn("[Analytics] Failed to send app_launched event:", trackError);
+        });
+      }
+    } catch (err) {
+      console.warn("[Analytics] Failed to send app_launched event:", err);
+    }
+  }
 
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));

@@ -6,21 +6,41 @@
  * plugins). These tests only verify the shape of the registry.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+function MockSettingsTab(): null {
+  return null;
+}
+
+vi.mock("../AboutSection", () => ({ default: MockSettingsTab }));
+vi.mock("../AccountSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../AiApiSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../DictSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../KeymapSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../LintingSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../PosHighlightSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../PowerSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../PrivacySettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../SpeechSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../TerminalSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../TypographySettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../VerticalSettingsTab", () => ({ default: MockSettingsTab }));
 
 import { buildSettingsTabRegistry } from "../tab-registry";
 
 describe("buildSettingsTabRegistry — platform gating", () => {
-  it("includes terminal and power on Electron", () => {
+  it("includes Electron-only tabs on Electron", () => {
     const registry = buildSettingsTabRegistry({ isElectron: true });
     expect(registry.terminal).toBeDefined();
     expect(registry.power).toBeDefined();
+    expect(registry.privacy).toBeDefined();
   });
 
-  it("omits terminal and power on Web", () => {
+  it("omits Electron-only tabs on Web", () => {
     const registry = buildSettingsTabRegistry({ isElectron: false });
     expect(registry.terminal).toBeUndefined();
     expect(registry.power).toBeUndefined();
+    expect(registry.privacy).toBeUndefined();
   });
 });
 
