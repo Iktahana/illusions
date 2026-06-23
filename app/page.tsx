@@ -16,6 +16,7 @@ import {
   getWindowActivitySnapshot,
 } from "@/lib/editor-page/window-activity";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
+import { useUserDictionaryActions } from "@/lib/editor-page/use-user-dictionary-actions";
 import { useTabManager } from "@/lib/tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
 import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
@@ -213,6 +214,14 @@ export default function EditorPage() {
   // external rulesets). The inspector's correction-mode dropdown derives its
   // per-rule config map from these, mirroring the settings ModeSelector (#1817).
   const loadedRules = useInstalledRuleMetas();
+
+  // Rules whose detections can be resolved by adding the flagged word to the
+  // user dictionary (manifest `suggestsDictionaryEntry`). Drives the "辞書に追加"
+  // action on correction cards and the squiggle context menu.
+  const dictEntryRuleIds = useMemo(
+    () => new Set(loadedRules.filter((r) => r.suggestsDictionaryEntry).map((r) => r.ruleId)),
+    [loadedRules],
+  );
 
   // One-time recovery: re-derive the rule-config map from the current mode for
   // installs whose persisted config predates mode-aware derivation (fresh
@@ -1240,6 +1249,9 @@ export default function EditorPage() {
   // dictionary-matching lint rules must not flag as 辞書外語.
   const knownTerms = useKnownTerms(editorMode);
 
+  // Quick "add to user dictionary" action for 辞書外語 detections.
+  const { addWordToUserDictionary } = useUserDictionaryActions(editorMode);
+
   const ignoredCorrectionsContextValue = useMemo(
     () => ({
       items: ignoredCorrections,
@@ -1282,11 +1294,13 @@ export default function EditorPage() {
     handleNavigateToIssue,
     handleShowLintHint,
     handleIgnoreCorrection,
+    handleAddToUserDictionary,
     handleApplyFix,
   } = useLintHandlers({
     editorViewInstance,
     lintIssues,
     ignoreCorrection,
+    addWordToUserDictionary,
     triggerSwitchToCorrections,
   });
 
@@ -1565,6 +1579,8 @@ export default function EditorPage() {
     onNavigateToIssue: handleNavigateToIssue,
     onApplyFix: handleApplyFix,
     onIgnoreCorrection: handleIgnoreCorrection,
+    onAddToUserDictionary: handleAddToUserDictionary,
+    dictEntryRuleIds,
     onRefreshLinting: refreshLinting,
     isLinting,
     activeLintIssueIndex,
@@ -1725,6 +1741,8 @@ export default function EditorPage() {
           handleOpenDictionary,
           handleShowLintHint,
           handleIgnoreCorrection,
+          handleAddToUserDictionary,
+          dictEntryRuleIds,
           switchTab,
           updateTab,
           registerFlush,

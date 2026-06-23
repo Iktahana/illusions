@@ -8,6 +8,7 @@ interface UseLintHandlersOptions {
   editorViewInstance: EditorView | null;
   lintIssues: LintIssue[];
   ignoreCorrection: (ruleId: string, text: string, paragraphText?: string) => void;
+  addWordToUserDictionary: (word: string) => Promise<void>;
   triggerSwitchToCorrections: () => void;
 }
 
@@ -15,6 +16,7 @@ export function useLintHandlers({
   editorViewInstance,
   lintIssues,
   ignoreCorrection,
+  addWordToUserDictionary,
   triggerSwitchToCorrections,
 }: UseLintHandlersOptions) {
   // Enrich lint issues with original text from the document
@@ -120,6 +122,25 @@ export function useLintHandlers({
     [editorViewInstance, ignoreCorrection],
   );
 
+  /** Add the flagged word of a dictionary-membership issue to the user dictionary */
+  const handleAddToUserDictionary = useCallback(
+    (issue: LintIssue) => {
+      if (!editorViewInstance) return;
+      let issueText: string;
+      try {
+        issueText = editorViewInstance.state.doc.textBetween(
+          issue.from,
+          Math.min(issue.to, editorViewInstance.state.doc.content.size),
+        );
+      } catch {
+        return;
+      }
+      if (!issueText) return;
+      void addWordToUserDictionary(issueText);
+    },
+    [editorViewInstance, addWordToUserDictionary],
+  );
+
   /** Apply a lint fix by replacing the text range */
   const handleApplyFix = useCallback(
     (issue: LintIssue & { originalText?: string }) => {
@@ -146,6 +167,7 @@ export function useLintHandlers({
     handleNavigateToIssue,
     handleShowLintHint,
     handleIgnoreCorrection,
+    handleAddToUserDictionary,
     handleApplyFix,
   };
 }

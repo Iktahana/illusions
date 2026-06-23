@@ -11,6 +11,7 @@ import {
   ALargeSmall,
   Globe,
   BookOpen,
+  BookmarkPlus,
   AlertCircle,
   EyeOff,
   Play,
@@ -36,6 +37,7 @@ export type ContextMenuAction =
   | "show-lint-hint"
   | "ignore-correction"
   | "ignore-correction-all"
+  | "add-to-user-dict"
   | "start-speech";
 
 interface EditorContextMenuProps {
@@ -43,6 +45,8 @@ interface EditorContextMenuProps {
   onAction: (action: ContextMenuAction) => void;
   hasSelection?: boolean;
   lintIssueAtCursor?: LintIssue | null;
+  /** Whether the lint issue under the cursor supports adding its word to the user dictionary. */
+  canAddLintIssueToDict?: boolean;
   onContextMenuOpen?: (e: MouseEvent) => void;
   /** Whether MDI extensions (ruby / tcy) are enabled for this document */
   mdiExtensionsEnabled?: boolean;
@@ -87,6 +91,7 @@ export default function EditorContextMenu({
   onAction,
   hasSelection = false,
   lintIssueAtCursor,
+  canAddLintIssueToDict = false,
   onContextMenuOpen,
   mdiExtensionsEnabled = true,
   onStartSpeech,
@@ -130,6 +135,14 @@ export default function EditorContextMenu({
                 shortcut=""
                 onClick={() => onAction("ignore-correction-all")}
               />
+              {canAddLintIssueToDict && (
+                <MenuItem
+                  icon={<BookmarkPlus className="w-4 h-4" />}
+                  label="この語をユーザー辞書に追加"
+                  shortcut=""
+                  onClick={() => onAction("add-to-user-dict")}
+                />
+              )}
               <Separator />
             </>
           )}

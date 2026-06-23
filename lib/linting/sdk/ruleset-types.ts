@@ -90,6 +90,13 @@ export interface RulesetRuleMeta {
   /** Whether this rule honors the skipDialogue option. */
   supportsSkipDialogue?: boolean;
   /**
+   * Declares that issues from this rule can be resolved by adding the flagged
+   * word to the user dictionary. Pure data (no UI): the host renders an
+   * "add to dictionary" action and owns the write. Used by dictionary-membership
+   * rules such as `genji-out-of-dict`. Default (absent) = no such action.
+   */
+  suggestsDictionaryEntry?: boolean;
+  /**
    * Correction modes (校正モード) this rule opts into. When the user switches to
    * one of these modes, the rule is automatically enabled. An empty array means
    * the rule is never auto-enabled by any mode (manual toggle only).

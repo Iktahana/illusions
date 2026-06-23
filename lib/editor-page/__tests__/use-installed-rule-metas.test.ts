@@ -112,6 +112,35 @@ describe("loadInstalledRuleMetas", () => {
     expect(metas.map((m) => m.ruleId)).toEqual(["ok-1"]);
   });
 
+  it("carries the suggestsDictionaryEntry flag through to the metas (#1962 quick-add)", async () => {
+    setRulesetsApi({
+      listInstalled: vi.fn(async () => [{ id: "dict-pack", version: "1.0.0", tag: null }]),
+      readModule: vi.fn(async (id: string) => ({
+        ok: true,
+        id,
+        tag: null,
+        code: "",
+        manifest: {
+          rules: [
+            {
+              ruleId: "genji-out-of-dict",
+              applicableModes: ["novel"],
+              suggestsDictionaryEntry: true,
+            },
+            { ruleId: "double-kuten", applicableModes: ["novel"] }, // no flag
+          ],
+        },
+      })),
+    });
+
+    const metas = await loadInstalledRuleMetas();
+    const dictEntryRuleIds = new Set(
+      metas.filter((m) => m.suggestsDictionaryEntry).map((m) => m.ruleId),
+    );
+    expect(dictEntryRuleIds.has("genji-out-of-dict")).toBe(true);
+    expect(dictEntryRuleIds.has("double-kuten")).toBe(false);
+  });
+
   it("returns [] (never throws) when the API rejects", async () => {
     setRulesetsApi({
       listInstalled: vi.fn(async () => {

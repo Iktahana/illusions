@@ -37,6 +37,8 @@ export interface ModeRuleMetaInput {
   /** Modes this rule opts into. Missing/empty = never auto-enabled by a mode. */
   applicableModes?: readonly string[];
   defaultConfig?: { enabled?: boolean; severity?: string; skipDialogue?: boolean };
+  /** Declares that the rule's issues can be resolved by adding the word to the user dictionary. */
+  suggestsDictionaryEntry?: boolean;
 }
 
 const VALID_SEVERITIES = new Set<Severity>(["error", "warning", "info"]);
