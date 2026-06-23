@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onOpenFileFromSystem: eventChannel(FILE_CHANNELS.event.openFileFromSystem),
   onOpenAsProject: eventChannel(FILE_CHANNELS.event.openAsProject),
   getPendingFile: invokeChannel(FILE_CHANNELS.invoke.getPendingFile, { arity: 0 }),
+  // #1965: re-read a previously-opened standalone file for session restore.
+  readStandaloneFile: invokeChannel(FILE_CHANNELS.invoke.readStandaloneFile, { arity: 1 }),
   onPasteAsPlaintext: eventChannel(MENU_CHANNELS.event.pasteAsPlaintext, { arity: 0 }),
   showInFileManager: invokeChannel(SHELL_CHANNELS.invoke.showInFileManager, { arity: 1 }),
   revealInFileManager: invokeChannel(SHELL_CHANNELS.invoke.revealInFileManager, { arity: 1 }),

@@ -71,6 +71,7 @@ const FILE_CHANNELS = Object.freeze({
     openFile: "open-file",
     saveFile: "save-file",
     getPendingFile: "get-pending-file",
+    readStandaloneFile: "read-standalone-file",
   }),
   event: Object.freeze({
     openFileFromSystem: "open-file-from-system",
