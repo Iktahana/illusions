@@ -174,6 +174,19 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
       fileName: t.file?.name ?? "新規ファイル",
       isPreview: t.isPreview || undefined,
       fileType: t.fileType,
+      // #1965: persist the buffer of unsaved, non-file-backed (untitled) tabs so
+      // their content survives a restart. Standalone untitled tabs have no disk
+      // backing, so this is their only data-safety path (mirrors project-mode #1868).
+      // File-backed tabs are intentionally NOT duplicated: their content lives on
+      // disk and is re-read on restore.
+      //
+      // Gate on the absence of ANY file descriptor (`!t.file`), not just a missing
+      // path. A browser File System Access tab has `file.path === null` but a
+      // non-null `file.handle`; using `!t.file?.path` would misclassify such a
+      // saved, handle-backed file as untitled and duplicate its full content into
+      // AppState (bloat + raises QuotaExceeded risk). Web file-backed tabs already
+      // recover via the editor-buffer path (Codex review).
+      unsavedContent: !t.file && t.isDirty ? t.content : undefined,
     }));
     const state: TabPersistenceState = {
       tabs: serializedTabs,
@@ -400,33 +413,74 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   // restoreProjectTabs() is called explicitly by the project-open handler,
   // replacing the old mount-time restore that had a race condition with windowKey.
   //
-  // Phase 4-5: electronAPI.vfs は削除済みのため、Electron スタンドアロンの
-  // マウント時自動復元は Phase 9 で新 IO 抽象に再配線するまで停止中。
-  // 旧復元ロジック (fetchWindowState → vfs.readFile → setTabs) は git 履歴を参照。
+  // #1965: マウント時に保存済み openTabs を読み、**filePath を持たない無題/未保存タブ**の
+  // バッファのみを復元する。
   //
-  // 復元はスキップするが、永続化ゲート (storageInitializedRef) は旧実装の
-  // finally と同じタイミングで必ず開く。開かないと「全タブを閉じた」等の
-  // 空タブ状態が永続化されず、次回起動時に古いタブ状態が残留する (#1567)。
+  // なぜ file-backed タブを復元しないか:
+  //   Electron スタンドアロンは VFS ルート (allowedRoots) が未設定のまま起動するため、
+  //   `getProjectFileService().readFile(絶対パス)` は main 側の validateVFSPath で必ず
+  //   「ディレクトリが開かれていません」で失敗する (electron/ipc/vfs-ipc.js)。よって
+  //   再起動時にファイル本体を再読込する経路は存在せず、無理に呼ぶと毎起動エラーになる。
+  //   file-backed タブ本体の復元は main プロセス側の承認済みファイル再読込 (Phase 9 の
+  //   新 IO 抽象) を前提とするため据え置く。ファイル実体は auto-save でディスク保護される。
+  //
+  // 無題タブは VFS を一切使わずバッファ (unsavedContent) から復元できるため、ここで救済する。
+  // 復元有無に関わらず、永続化ゲート (storageInitializedRef) は旧実装の finally と同じ
+  // タイミングで必ず開く。開かないと「全タブを閉じた」等の空タブ状態が永続化されず、
+  // 次回起動時に古いタブ状態が残留する (#1567)。
 
   useEffect(() => {
     if (!isElectron || skipAutoRestore) return;
 
     let cancelled = false;
-    const openPersistenceGate = async (): Promise<void> => {
+    const restoreStandaloneTabs = async (): Promise<void> => {
       // 旧実装と同様に VFS 準備 (最大 5 秒) を待ってからゲートを開き、
       // マウント直後の空タブ状態が保存済みデータを上書きする競合を避ける。
       if (vfsReadyPromise) {
         await Promise.race([vfsReadyPromise, new Promise<void>((r) => setTimeout(r, 5000))]);
       }
       if (cancelled) return;
-      storageInitializedRef.current = true;
+
+      try {
+        const key = windowKeyRef.current;
+        const windowState = key ? await fetchWindowState(key) : null;
+        const appState = windowState ? null : await getStorageService().loadAppState();
+        const savedOpenTabs = windowState?.openTabs ?? appState?.openTabs;
+        if (cancelled) return;
+
+        if (savedOpenTabs && savedOpenTabs.tabs.length > 0) {
+          const restored: EditorTabState[] = [];
+          for (const saved of savedOpenTabs.tabs) {
+            // file-backed タブはここでは復元しない (上記の VFS 制約による)。
+            if (saved.filePath) continue;
+            const unsaved = saved.unsavedContent ?? "";
+            const tab = createNewTab(unsaved, saved.fileType ?? ".mdi");
+            // 内容を持つ無題タブは dirty として復元し、保存を促す。空なら clean。
+            restored.push(
+              unsaved.length > 0 ? { ...tab, isDirty: true, fileSyncStatus: "dirty" } : tab,
+            );
+          }
+
+          if (!cancelled && restored.length > 0) {
+            const activeIdx = Math.min(Math.max(0, savedOpenTabs.activeIndex), restored.length - 1);
+            // ユーザーが待機中に開いたタブを上書きしないよう、空のときだけ反映する。
+            setTabs((prev) => (prev.length > 0 ? prev : restored));
+            setActiveTabId((prev) => (prev === "" ? restored[activeIdx].id : prev));
+          }
+        }
+      } catch (error) {
+        // 復元失敗はゲートを塞がず空起動で継続する (データ自体は失われない)。
+        console.warn("スタンドアロンタブの復元に失敗しました:", error);
+      } finally {
+        if (!cancelled) storageInitializedRef.current = true;
+      }
     };
 
-    void openPersistenceGate();
+    void restoreStandaloneTabs();
     return () => {
       cancelled = true;
     };
-  }, [isElectron, skipAutoRestore, vfsReadyPromise]);
+  }, [isElectron, skipAutoRestore, vfsReadyPromise, setTabs, setActiveTabId]);
 
   return { wasAutoRecovered, flushTabState, restoreProjectTabs };
 }
