@@ -115,6 +115,15 @@ export interface SerializedTab {
   fileName: string;
   isPreview?: boolean;
   fileType?: SupportedFileExtension;
+  /**
+   * Editor buffer of an unsaved, non-file-backed (untitled) tab (#1965).
+   *
+   * Standalone-mode untitled tabs have no disk backing, so unless their buffer
+   * is persisted here it is permanently lost on restart. Mirrors the project-mode
+   * `WorkspaceTab.unsavedContent` mechanism (#1868). File-backed tabs are restored
+   * from disk instead, so their content is intentionally not duplicated here.
+   */
+  unsavedContent?: string;
 }
 
 /** Persisted state for open tabs (stored in AppState) */

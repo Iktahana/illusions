@@ -5,6 +5,7 @@ import { getProjectFileService } from "../services/project-file-service";
 import { notificationManager } from "../services/notification-manager";
 import { executeTabSave } from "./save-executor";
 import { isEditorTab } from "./tab-types";
+import { hasUnsavedEditorTabs } from "./unsaved-tabs";
 import { getErrorMessage } from "./types";
 import type { SnapshotType } from "../services/history-policy";
 import type { SupportedFileExtension } from "../project/project-types";
@@ -350,14 +351,32 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   useEffect(() => {
     if (isElectron) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      const anyDirty = tabsRef.current.some((t) => isEditorTab(t) && t.isDirty);
-      if (anyDirty) {
+      if (hasUnsavedEditorTabs(tabsRef.current)) {
         event.preventDefault();
         event.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isElectron, tabsRef]);
+
+  // Web: SPA 内のクライアントサイド history back(popstate)では beforeunload が発火しない。
+  // 将来 history エントリを push する画面遷移を追加したときにダーティ内容が無警告で
+  // 失われないよう、popstate でも保留中の状態を flush し、未保存があれば警告する(#1968 J-3)。
+  // ナビゲーション自体はブロックしない（単一ルート構成のため history 改変の副作用を避け、
+  // データ保全＝flush を最優先する）。
+  useEffect(() => {
+    if (isElectron) return;
+    const handlePopState = () => {
+      // まず保留中の debounce 状態を確実に永続化する（データ保全）。
+      void flushTabStateRef.current?.();
+      void flushLayoutStateRef.current?.();
+      if (hasUnsavedEditorTabs(tabsRef.current)) {
+        notificationManager.warning("未保存の変更があります。移動する前に保存してください。");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [isElectron, tabsRef]);
 
   // Web: flush tab/layout state when page becomes hidden (covers tab close, navigate away)
