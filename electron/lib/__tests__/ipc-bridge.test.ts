@@ -120,6 +120,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       openFile: "open-file",
       saveFile: "save-file",
       getPendingFile: "get-pending-file",
+      readStandaloneFile: "read-standalone-file",
     });
     expect(FILE_CHANNELS.event).toEqual({
       openFileFromSystem: "open-file-from-system",

@@ -53,6 +53,17 @@ declare global {
         | { type: "standalone"; path: string; content: string }
       >
     >;
+    /**
+     * #1965: re-read a previously-opened standalone file for session restore.
+     * Succeeds only for paths the user opened in standalone mode (persisted
+     * allowlist); a successful read re-approves the path for this window.
+     */
+    readStandaloneFile?: (
+      filePath: string,
+    ) => Promise<
+      | { success: true; path: string; content: string }
+      | { success: false; code?: string; error?: string }
+    >;
     onMenuNew?: (callback: () => void) => (() => void) | void;
     onMenuOpen?: (callback: () => void) => (() => void) | void;
     onMenuSave?: (callback: () => void) => (() => void) | void;

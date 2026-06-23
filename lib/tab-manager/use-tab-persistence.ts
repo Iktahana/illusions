@@ -426,18 +426,20 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
   // restoreProjectTabs() is called explicitly by the project-open handler,
   // replacing the old mount-time restore that had a race condition with windowKey.
   //
-  // #1965: マウント時に保存済み openTabs を読み、**filePath を持たない無題/未保存タブ**の
-  // バッファのみを復元する。
+  // #1965: マウント時に保存済み openTabs を読み、無題/未保存タブと file-backed タブの
+  // 両方を復元する。
   //
-  // なぜ file-backed タブを復元しないか:
-  //   Electron スタンドアロンは VFS ルート (allowedRoots) が未設定のまま起動するため、
-  //   `getProjectFileService().readFile(絶対パス)` は main 側の validateVFSPath で必ず
-  //   「ディレクトリが開かれていません」で失敗する (electron/ipc/vfs-ipc.js)。よって
-  //   再起動時にファイル本体を再読込する経路は存在せず、無理に呼ぶと毎起動エラーになる。
-  //   file-backed タブ本体の復元は main プロセス側の承認済みファイル再読込 (Phase 9 の
-  //   新 IO 抽象) を前提とするため据え置く。ファイル実体は auto-save でディスク保護される。
+  // file-backed タブの復元経路:
+  //   Electron スタンドアロンは VFS ルート (allowedRoots) 未設定で起動するため、
+  //   `getProjectFileService().readFile(絶対パス)` は main 側 validateVFSPath で必ず
+  //   失敗する (electron/ipc/vfs-ipc.js)。そこで main プロセスの承認済みパス再読込 IPC
+  //   `readStandaloneFile` を使う。これはユーザーがダイアログ/システムで実際に開いた
+  //   パス (永続 allowlist: electron/lib/standalone-files.js) のみを読み込み、成功時に
+  //   当該パスをウィンドウへ再承認するため、復元後の保存もダイアログ無しで行える。
+  //   読込失敗 (移動/削除/未承認) は failedFileBacked として通知し、サイレント欠落を防ぐ。
+  //   ファイル実体は auto-save でディスク保護される。
   //
-  // 無題タブは VFS を一切使わずバッファ (unsavedContent) から復元できるため、ここで救済する。
+  // 無題タブは VFS を一切使わずバッファ (unsavedContent) から復元する。
   // 復元有無に関わらず、永続化ゲート (storageInitializedRef) は旧実装の finally と同じ
   // タイミングで必ず開く。開かないと「全タブを閉じた」等の空タブ状態が永続化されず、
   // 次回起動時に古いタブ状態が残留する (#1567)。
@@ -462,10 +464,53 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
         if (cancelled) return;
 
         if (savedOpenTabs && savedOpenTabs.tabs.length > 0) {
+          // #1965: file-backed スタンドアロンタブは、main プロセスの承認済みパス
+          // 再読込 IPC (readStandaloneFile) で復元する。VFS (getProjectFileService)
+          // はスタンドアロンでは root 未設定で必ず失敗するため使えず、これが唯一の
+          // 安全な復元経路。ユーザーがダイアログ/システムで開いたパスのみ読み込める。
+          const readStandaloneFile = window.electronAPI?.readStandaloneFile;
           const restored: EditorTabState[] = [];
+          let failedFileBacked = 0;
           for (const saved of savedOpenTabs.tabs) {
-            // file-backed タブはここでは復元しない (上記の VFS 制約による)。
-            if (saved.filePath) continue;
+            if (cancelled) return;
+            if (saved.filePath) {
+              if (!readStandaloneFile) {
+                failedFileBacked++;
+                continue;
+              }
+              try {
+                const res = await readStandaloneFile(saved.filePath);
+                if (cancelled) return;
+                if (res?.success) {
+                  restored.push({
+                    tabKind: "editor",
+                    id: generateTabId(),
+                    file: { path: res.path, handle: null, name: saved.fileName },
+                    content: res.content,
+                    lastSavedContent: res.content,
+                    isDirty: false,
+                    lastSavedTime: Date.now(),
+                    lastSaveWasAuto: false,
+                    isSaving: false,
+                    isPreview: saved.isPreview ?? false,
+                    fileType: saved.fileType ?? inferFileType(saved.fileName),
+                    fileSyncStatus: "clean",
+                    conflictDiskContent: null,
+                  });
+                } else {
+                  // 未承認 / 移動・削除 / 読込失敗。ファイル実体は失われていない
+                  // （auto-save 済み）が、このセッションでは個別復元できない。
+                  failedFileBacked++;
+                }
+              } catch (error) {
+                console.warn(
+                  `スタンドアロン file-backed タブの復元に失敗しました (${saved.filePath}):`,
+                  error,
+                );
+                failedFileBacked++;
+              }
+              continue;
+            }
             const unsaved = saved.unsavedContent ?? "";
             const tab = createNewTab(unsaved, saved.fileType ?? ".mdi");
             // 内容を持つ無題タブは dirty として復元し、保存を促す。空なら clean。
@@ -480,6 +525,13 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
             setTabs((prev) => (prev.length > 0 ? prev : restored));
             setActiveTabId((prev) => (prev === "" ? restored[activeIdx].id : prev));
           }
+
+          if (!cancelled && failedFileBacked > 0) {
+            // 一部の file-backed タブが復元できなかったことを明示（サイレント欠落を防ぐ）。
+            setRestoreError?.(
+              "前回開いていた一部のファイルを復元できませんでした。ファイルが移動または削除された可能性があります。",
+            );
+          }
         }
       } catch (error) {
         // 復元失敗はゲートを塞がず空起動で継続する (データ自体は失われない)。
@@ -493,7 +545,7 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
     return () => {
       cancelled = true;
     };
-  }, [isElectron, skipAutoRestore, vfsReadyPromise, setTabs, setActiveTabId]);
+  }, [isElectron, skipAutoRestore, vfsReadyPromise, setTabs, setActiveTabId, setRestoreError]);
 
   return { wasAutoRecovered, flushTabState, restoreProjectTabs };
 }
