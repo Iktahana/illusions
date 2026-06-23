@@ -371,7 +371,20 @@ export function useTabPersistence(params: UseTabPersistenceParams): UseTabPersis
               };
               setWasAutoRecovered(true);
             } catch (error) {
+              // #1966 H-2: ディスクのファイルを再オープンできない（移動/削除/権限取消）。
+              // 旧実装はバッファを黙って破棄し、未保存内容がサイレントに消えていた。
+              // バッファに残る内容を無題タブとして救済し、損失をユーザーへ通知する。
               console.warn("前回のファイルを復元できませんでした:", error);
+              const bufferedContent = buffer.content ?? "";
+              if (bufferedContent.length > 0) {
+                const rescued = createNewTab(bufferedContent, inferFileType(lastFileKey ?? ""));
+                initialTab = { ...rescued, isDirty: true, fileSyncStatus: "dirty" };
+                notificationManager.warning(
+                  "前回開いていたファイルを再オープンできなかったため、未保存の内容を無題タブとして復元しました。保存先を指定して保存してください。",
+                );
+              } else {
+                notificationManager.info("前回開いていたファイルを再オープンできませんでした。");
+              }
               await storage.clearEditorBuffer(lastFileKey ?? undefined);
             }
           }
