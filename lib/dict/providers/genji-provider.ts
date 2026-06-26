@@ -67,36 +67,37 @@ export class GenjiProvider implements IDictProvider {
   }
 
   async query(term: string, limit = DEFAULT_LIMIT): Promise<DictEntry[]> {
-    // Try local backend first (Electron with installed dict)
+    // When the local dict is installed it is authoritative: return its result
+    // even when empty. A zero-hit lookup means "no such entry", NOT "ask the
+    // network" — falling through to remote on every miss spams the console
+    // with `Failed to fetch` for the many words absent from the dict.
     if (isElectronDict()) {
       try {
         if (await isLocalAvailable()) {
-          const results = await getElectronDictAPI().query(term, limit);
-          if (results.length > 0) return results;
+          return await getElectronDictAPI().query(term, limit);
         }
       } catch {
-        // Fall through to remote
+        // Local backend errored — fall through to remote.
       }
     }
 
-    // Remote fallback
+    // Remote fallback (web, or Electron without the local dict installed).
     return GenjiApiBackend.queryByEntry(term, limit);
   }
 
   async queryByReading(reading: string, limit = DEFAULT_LIMIT): Promise<DictEntry[]> {
-    // Try local backend first
+    // Local dict authoritative when installed (see query() for rationale).
     if (isElectronDict()) {
       try {
         if (await isLocalAvailable()) {
-          const results = await getElectronDictAPI().queryByReading(reading, limit);
-          if (results.length > 0) return results;
+          return await getElectronDictAPI().queryByReading(reading, limit);
         }
       } catch {
-        // Fall through to remote
+        // Local backend errored — fall through to remote.
       }
     }
 
-    // Remote fallback
+    // Remote fallback (web, or Electron without the local dict installed).
     return GenjiApiBackend.queryByReading(reading, limit);
   }
 }

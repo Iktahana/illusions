@@ -82,6 +82,11 @@ export interface AppState {
     string,
     { enabled: boolean; severity: Severity; skipDialogue?: boolean }
   >;
+  /**
+   * One-time migration marker for mode-derived rule config recovery.
+   * undefined / 0 = never migrated. See `use-mode-config-migration.ts`.
+   */
+  lintingModeConfigVersion?: number;
 
   // オンラインAI API設定
   aiApiKey?: string;
@@ -188,6 +193,15 @@ export interface AppState {
   // アップデート設定
   /** ベータ版（プレリリース）アップデートを受け取る（デフォルト: false） */
   allowBetaUpdates?: boolean;
+  /** 起動時に校正ルールセットの更新を自動で適用する（デフォルト: true） */
+  rulesetAutoUpdate?: boolean;
+
+  // プライバシー設定
+  /**
+   * 匿名使用統計（Aptabase）の送信に同意する（デフォルト: true）。
+   * 本文・ファイル名・パス・検索語など内容に関わる情報は送信対象に含まれない。
+   */
+  usageAnalyticsConsent?: boolean;
 }
 
 /**
@@ -346,6 +360,13 @@ export interface IStorageService {
    * Remove a value by key.
    */
   removeItem(key: string): Promise<void>;
+
+  /**
+   * Return every key in the generic KV store that begins with `prefix`.
+   * Used for bulk operations over a namespaced key family (e.g. clearing
+   * all per-file standalone data sharing a prefix).
+   */
+  getKeysByPrefix(prefix: string): Promise<string[]>;
 
   /**
    * すべてのデータを削除する。取り扱い注意。

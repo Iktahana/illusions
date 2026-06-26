@@ -53,6 +53,10 @@ interface EditorProps {
   onShowLintHint?: (issue: LintIssue) => void;
   // 校正無視コールバック
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
+  // ユーザー辞書追加コールバック（辞書外語の検出に対して）
+  onAddToUserDictionary?: (issue: LintIssue) => void;
+  /** 辞書追加を示唆するルール ID 集合（辞書系ルールのみメニュー表示） */
+  dictEntryRuleIds?: ReadonlySet<string>;
   // Editor mode controls
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
@@ -60,6 +64,8 @@ interface EditorProps {
   externalContent?: string | null;
   /** Called after externalContent has been applied and scroll restored (best-effort). */
   onExternalContentApplied?: () => void;
+  /** Register an on-demand live-content flush used by save flows (#1840). */
+  registerFlush?: (flush: (() => string | null) | null) => void;
 }
 
 /** 検索を配線しない NovelEditor 用途向けの安定 no-op。 */
@@ -85,10 +91,13 @@ export default function NovelEditor({
   onOpenDictionary,
   onShowLintHint,
   onIgnoreCorrection,
+  onAddToUserDictionary,
+  dictEntryRuleIds,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
   externalContent,
   onExternalContentApplied,
+  registerFlush,
 }: EditorProps) {
   const { fontScale, lineHeight, fontFamily, charsPerLine, autoCharsPerLine } =
     useTypographySettings();
@@ -547,6 +556,8 @@ export default function NovelEditor({
               onOpenDictionary={onOpenDictionary}
               onShowLintHint={onShowLintHint}
               onIgnoreCorrection={onIgnoreCorrection}
+              onAddToUserDictionary={onAddToUserDictionary}
+              dictEntryRuleIds={dictEntryRuleIds}
               mdiExtensionsEnabled={mdiExtensionsEnabled}
               gfmEnabled={gfmEnabled}
               onStartSpeech={startSpeechFromCursor}
@@ -554,6 +565,7 @@ export default function NovelEditor({
               externalContent={externalContent}
               onExternalContentApplied={onExternalContentApplied}
               onLayoutReady={handleLayoutReady}
+              registerFlush={registerFlush}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>

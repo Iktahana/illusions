@@ -113,7 +113,10 @@ export function findSearchMatches(
     if (!node.isTextblock) return;
 
     const isHeading = node.type.name === "heading";
-    if (!isHeading) paragraphNumber += 1;
+    // blankParagraph (MDI [[blank]]) は CSS counter-increment: paragraph から除外
+    // されているため、UI 側の段落番号と一致させるためここでも数えない。
+    const isBlankParagraph = node.type.name === "blankParagraph";
+    if (!isHeading && !isBlankParagraph) paragraphNumber += 1;
 
     const bodyProjection = createBodyProjection(node, pos + 1, options.excludeComments);
     const metadata = {
@@ -239,9 +242,27 @@ function createBodyProjection(
 }
 
 function getCommentText(node: Node): string | null {
-  if (node.type.name !== "comment" && node.type.name !== "htmlComment") return null;
-  const value = node.attrs.value ?? node.attrs.text ?? node.textContent;
-  return typeof value === "string" ? value.replace(/^<!--\s*|\s*-->$/g, "") : "";
+  if (node.type.name === "comment" || node.type.name === "htmlComment") {
+    const value = node.attrs.value ?? node.attrs.text ?? node.textContent;
+    return typeof value === "string" ? stripHtmlCommentDelimiters(value) : "";
+  }
+  // Milkdown の commonmark preset は HTML 構文（<!-- ... --> を含む）を
+  // attrs.value に生テキストを持つ "html" inline atom ノードとして格納する。
+  if (node.type.name === "html") {
+    const raw = typeof node.attrs.value === "string" ? (node.attrs.value as string).trim() : "";
+    if (raw.startsWith("<!--") && raw.endsWith("-->")) {
+      return stripHtmlCommentDelimiters(raw);
+    }
+  }
+  return null;
+}
+
+function stripHtmlCommentDelimiters(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("<!--") && trimmed.endsWith("-->")) {
+    return trimmed.slice(4, -3).trim();
+  }
+  return value;
 }
 
 function createRubyReadingProjections(

@@ -1,7 +1,7 @@
 "use client";
 
 import { Monitor } from "lucide-react";
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 import DesktopAppDownloadButton from "@/components/DesktopAppDownloadButton";
 
 interface DesktopOnlyDialogProps {

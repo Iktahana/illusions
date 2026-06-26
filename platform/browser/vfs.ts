@@ -1,0 +1,588 @@
+/**
+ * Web File System Access API implementation of the Virtual File System.
+ *
+ * Uses the File System Access API (Chrome 86+) to provide file operations
+ * in the browser environment. Requires user interaction to open a directory
+ * via showDirectoryPicker() before most operations can be used.
+ */
+
+import type {
+  VFSDirectoryHandle,
+  VFSEntry,
+  VFSFileHandle,
+  VFSFileMetadata,
+  VirtualFileSystem,
+} from "@/lib/vfs/types";
+import { joinPath } from "@/lib/vfs/path-utils";
+import { readTextWithEncoding } from "@/shared/lib/text-codec";
+
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+
+/**
+ * Split a path string into non-empty segments.
+ * e.g. "/foo/bar/baz.txt" -> ["foo", "bar", "baz.txt"]
+ */
+function splitPath(path: string): string[] {
+  return path.split("/").filter((segment) => segment.length > 0);
+}
+
+/**
+ * Type guard for checking if showDirectoryPicker is available.
+ */
+function hasShowDirectoryPicker(w: Window): w is Window & {
+  showDirectoryPicker: (options?: { mode?: string }) => Promise<FileSystemDirectoryHandle>;
+} {
+  return "showDirectoryPicker" in w;
+}
+
+/**
+ * Navigate from a root FileSystemDirectoryHandle down to a subdirectory
+ * specified by an array of path segments.
+ *
+ * @param root - The starting directory handle
+ * @param segments - Path segments to traverse
+ * @param create - Whether to create missing directories along the way
+ * @returns The resolved FileSystemDirectoryHandle
+ */
+async function resolveDirectoryHandle(
+  root: FileSystemDirectoryHandle,
+  segments: string[],
+  create = false,
+): Promise<FileSystemDirectoryHandle> {
+  let current = root;
+  for (const segment of segments) {
+    current = await current.getDirectoryHandle(segment, { create });
+  }
+  return current;
+}
+
+/**
+ * Navigate from a root handle to a file specified by a full path.
+ * The path is split into directory segments + filename.
+ *
+ * @param root - The starting directory handle
+ * @param path - Full file path (e.g. "subdir/file.txt")
+ * @param create - Whether to create missing directories and file
+ * @returns The resolved FileSystemFileHandle
+ */
+async function resolveFileHandle(
+  root: FileSystemDirectoryHandle,
+  path: string,
+  create = false,
+): Promise<FileSystemFileHandle> {
+  const segments = splitPath(path);
+  if (segments.length === 0) {
+    throw new Error("Cannot resolve file handle: empty path");
+  }
+  const fileName = segments.pop()!;
+  const dirHandle = await resolveDirectoryHandle(root, segments, create);
+  return dirHandle.getFileHandle(fileName, { create });
+}
+
+// -----------------------------------------------------------------------
+// WebVFSFileHandle
+// -----------------------------------------------------------------------
+
+/**
+ * Web implementation of VFSFileHandle.
+ * Wraps a native FileSystemFileHandle.
+ */
+export class WebVFSFileHandle implements VFSFileHandle {
+  readonly name: string;
+  readonly path: string;
+  readonly nativeFileHandle: FileSystemFileHandle;
+  private readonly handle: FileSystemFileHandle;
+
+  constructor(handle: FileSystemFileHandle, path: string) {
+    this.handle = handle;
+    this.nativeFileHandle = handle;
+    this.name = handle.name;
+    this.path = path;
+  }
+
+  async getFile(): Promise<File> {
+    return this.handle.getFile();
+  }
+
+  async exists(): Promise<boolean> {
+    try {
+      await this.handle.getFile();
+      return true;
+    } catch (err) {
+      // Only an actually-missing file means "does not exist". Any other failure
+      // (permission, transient I/O) must propagate — otherwise callers doing
+      // read-modify-write (e.g. PersistedJsonListStore) would mistake a read
+      // failure for an absent file and overwrite user data with an empty list.
+      if (err instanceof DOMException && err.name === "NotFoundError") {
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  async read(): Promise<string> {
+    const file = await this.handle.getFile();
+    // #1888: decode through the shared strict codec (BOM strip + fatal UTF-8)
+    // instead of File.text(), which silently replaces invalid bytes with
+    // U+FFFD. This handle's read() backs ProjectService.readProjectContent —
+    // the project main-file content path — so a non-UTF-8 (Shift_JIS/EUC-JP/
+    // UTF-16) manuscript must be refused here rather than opened lossy and then
+    // saved back over the original file.
+    const buf = await file.arrayBuffer();
+    return readTextWithEncoding(new Uint8Array(buf)).text;
+  }
+
+  async write(content: string): Promise<void> {
+    // FileSystemFileHandle.createWritable() is not in the base TS types,
+    // but is available in browsers that support File System Access API.
+
+    const writable = await (
+      this.handle as unknown as {
+        createWritable(): Promise<
+          WritableStream & { write(data: string): Promise<void>; close(): Promise<void> }
+        >;
+      }
+    ).createWritable();
+    await writable.write(content);
+    await writable.close();
+  }
+}
+
+// -----------------------------------------------------------------------
+// WebVFSDirectoryHandle
+// -----------------------------------------------------------------------
+
+/**
+ * Web implementation of VFSDirectoryHandle.
+ * Wraps a native FileSystemDirectoryHandle.
+ */
+class WebVFSDirectoryHandle implements VFSDirectoryHandle {
+  readonly name: string;
+  readonly path: string;
+  readonly nativeDirectoryHandle: FileSystemDirectoryHandle;
+  private readonly handle: FileSystemDirectoryHandle;
+
+  constructor(handle: FileSystemDirectoryHandle, path: string) {
+    this.handle = handle;
+    this.nativeDirectoryHandle = handle;
+    this.name = handle.name;
+    this.path = path;
+  }
+
+  async getFileHandle(name: string, options?: { create?: boolean }): Promise<VFSFileHandle> {
+    const nativeHandle = await this.handle.getFileHandle(name, {
+      create: options?.create ?? false,
+    });
+    const filePath = joinPath(this.path, name);
+    return new WebVFSFileHandle(nativeHandle, filePath);
+  }
+
+  async getDirectoryHandle(
+    name: string,
+    options?: { create?: boolean },
+  ): Promise<VFSDirectoryHandle> {
+    const nativeHandle = await this.handle.getDirectoryHandle(name, {
+      create: options?.create ?? false,
+    });
+    const dirPath = joinPath(this.path, name);
+    return new WebVFSDirectoryHandle(nativeHandle, dirPath);
+  }
+
+  async removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> {
+    // FileSystemDirectoryHandle.removeEntry is part of the File System Access API
+
+    await (
+      this.handle as unknown as {
+        removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>;
+      }
+    ).removeEntry(name, {
+      recursive: options?.recursive ?? false,
+    });
+  }
+
+  async *entries(): AsyncIterable<[string, VFSEntry]> {
+    // FileSystemDirectoryHandle is an AsyncIterable in supporting browsers
+
+    const iterable = this.handle as unknown as AsyncIterable<
+      [string, FileSystemHandle & { kind: "file" | "directory" }]
+    >;
+    for await (const [entryName, entryHandle] of iterable) {
+      const entryPath = joinPath(this.path, entryName);
+      const entry: VFSEntry = {
+        name: entryName,
+        kind: entryHandle.kind,
+        path: entryPath,
+      };
+      yield [entryName, entry];
+    }
+  }
+}
+
+// -----------------------------------------------------------------------
+// WebVFS
+// -----------------------------------------------------------------------
+
+/**
+ * Web implementation of the VirtualFileSystem interface.
+ * Uses the File System Access API for all operations.
+ *
+ * Usage flow:
+ * 1. Call openDirectory() to let the user pick a root directory
+ * 2. Use readFile/writeFile/etc. with paths relative to that root
+ */
+export class WebVFS implements VirtualFileSystem {
+  private rootHandle: FileSystemDirectoryHandle | null = null;
+
+  /**
+   * Open a native file picker dialog for a single .txt file.
+   * Returns the file path (or name), display name, and raw bytes.
+   * Use text-codec.ts readTextWithEncoding() to handle BOM and EOL detection.
+   *
+   * @param opts - Optional options including fileTypes (e.g. ["txt"])
+   * @returns Object with path, name, and raw byte buffer, or null if cancelled
+   * @throws Error if File System Access API is not supported
+   */
+  async openFile(opts?: {
+    fileTypes?: string[];
+  }): Promise<{ path: string; name: string; buf: Uint8Array } | null> {
+    if (!("showOpenFilePicker" in window)) {
+      throw new Error(
+        "File System Access API は、このブラウザでサポートされていません。Chrome 86 以降をご使用ください。",
+      );
+    }
+
+    const extensions = opts?.fileTypes?.length ? opts.fileTypes.map((e) => `.${e}`) : [".txt"];
+
+    try {
+      const [fileHandle] = await (
+        window as unknown as {
+          showOpenFilePicker: (options: {
+            types: Array<{ description: string; accept: Record<string, string[]> }>;
+            multiple: boolean;
+          }) => Promise<FileSystemFileHandle[]>;
+        }
+      ).showOpenFilePicker({
+        types: [
+          {
+            description: "テキスト",
+            accept: { "text/plain": extensions },
+          },
+        ],
+        multiple: false,
+      });
+
+      const file = await fileHandle.getFile();
+      const arrayBuffer = await file.arrayBuffer();
+      const buf = new Uint8Array(arrayBuffer);
+
+      return {
+        path: file.name,
+        name: file.name,
+        buf,
+      };
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") {
+        return null;
+      }
+      throw new Error(
+        `ファイルを開けませんでした: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Open a directory picker dialog and store the root handle.
+   * @throws Error if the File System Access API is not supported
+   * @throws Error if the user cancels the picker
+   */
+  async openDirectory(): Promise<VFSDirectoryHandle> {
+    if (!hasShowDirectoryPicker(window)) {
+      throw new Error(
+        "File System Access API is not supported in this browser. " +
+          "Please use Chrome 86+ or a Chromium-based browser.",
+      );
+    }
+
+    try {
+      const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+      this.rootHandle = handle;
+      return new WebVFSDirectoryHandle(handle, "");
+    } catch (error) {
+      if ((error as { name?: string }).name === "AbortError") {
+        throw new Error("Directory picker was cancelled by the user.");
+      }
+      throw new Error(
+        `Failed to open directory: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Get a directory handle by navigating from the root.
+   * @param path - Path relative to the opened root directory
+   * @throws Error if no root directory has been opened
+   */
+  async getDirectoryHandle(path: string): Promise<VFSDirectoryHandle> {
+    const root = this.ensureRoot();
+    const segments = splitPath(path);
+
+    if (segments.length === 0) {
+      return new WebVFSDirectoryHandle(root, "");
+    }
+
+    try {
+      const handle = await resolveDirectoryHandle(root, segments);
+      return new WebVFSDirectoryHandle(handle, path);
+    } catch (error) {
+      throw new Error(
+        `Failed to get directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Read a file as UTF-8 text.
+   * @param path - File path relative to root
+   */
+  async readFile(path: string): Promise<string> {
+    const root = this.ensureRoot();
+    try {
+      const fileHandle = await resolveFileHandle(root, path);
+      const file = await fileHandle.getFile();
+      // #1888: decode through the shared strict codec instead of File.text(),
+      // which silently replaces invalid bytes with U+FFFD. The shared codec
+      // strips a UTF-8 BOM, normalizes EOL, rejects non-UTF-8 BOMs, and
+      // fatally rejects invalid byte sequences — so a non-UTF-8 manuscript is
+      // refused here rather than opened lossy and saved back over the original.
+      const buf = await file.arrayBuffer();
+      return readTextWithEncoding(new Uint8Array(buf)).text;
+    } catch (error) {
+      // readTextWithEncoding throws the Japanese non-UTF-8 message directly for
+      // both non-UTF-8 BOMs and invalid byte sequences; re-throw it unchanged.
+      if (
+        error instanceof Error &&
+        error.message === "UTF-8 以外のファイルは現在サポートされていません"
+      ) {
+        throw error;
+      }
+      throw new Error(
+        `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Write UTF-8 text content to a file, creating directories as needed.
+   * @param path - File path relative to root
+   * @param content - Text content to write
+   */
+  async writeFile(path: string, content: string): Promise<void> {
+    const root = this.ensureRoot();
+    try {
+      const fileHandle = await resolveFileHandle(root, path, true);
+
+      const writable = await (
+        fileHandle as unknown as {
+          createWritable(): Promise<
+            WritableStream & { write(data: string): Promise<void>; close(): Promise<void> }
+          >;
+        }
+      ).createWritable();
+      await writable.write(content);
+      await writable.close();
+    } catch (error) {
+      throw new Error(
+        `Failed to write file "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Delete a file.
+   * @param path - File path relative to root
+   */
+  async deleteFile(path: string): Promise<void> {
+    const root = this.ensureRoot();
+    const segments = splitPath(path);
+    if (segments.length === 0) {
+      throw new Error("Cannot delete file: empty path");
+    }
+
+    const fileName = segments.pop()!;
+
+    try {
+      const parentHandle = await resolveDirectoryHandle(root, segments);
+
+      await (parentHandle as unknown as { removeEntry(name: string): Promise<void> }).removeEntry(
+        fileName,
+      );
+    } catch (error) {
+      throw new Error(
+        `Failed to delete file "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Rename (move) a file or directory.
+   * Web FS API has no native rename, so this copies → deletes.
+   * For directories, recursively copies all contents to the new path.
+   * @param oldPath - Current path relative to root
+   * @param newPath - Desired new path relative to root
+   */
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    const root = this.ensureRoot();
+    try {
+      const isDir = await this.isDirectory(root, oldPath);
+      if (isDir) {
+        await this.copyDirectoryRecursive(oldPath, newPath);
+        await this.removeDirectoryRecursive(oldPath);
+      } else {
+        const content = await this.readFile(oldPath);
+        await this.writeFile(newPath, content);
+        await this.deleteFile(oldPath);
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Check whether a path refers to a directory.
+   */
+  private async isDirectory(root: FileSystemDirectoryHandle, path: string): Promise<boolean> {
+    const segments = splitPath(path);
+    if (segments.length === 0) return true;
+    try {
+      await resolveDirectoryHandle(root, segments);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Recursively copy a directory and all its contents to a new path.
+   */
+  private async copyDirectoryRecursive(srcPath: string, destPath: string): Promise<void> {
+    const entries = await this.listDirectory(srcPath);
+    for (const entry of entries) {
+      const srcEntryPath = joinPath(srcPath, entry.name);
+      const destEntryPath = joinPath(destPath, entry.name);
+      if (entry.kind === "directory") {
+        await this.copyDirectoryRecursive(srcEntryPath, destEntryPath);
+      } else {
+        const content = await this.readFile(srcEntryPath);
+        await this.writeFile(destEntryPath, content);
+      }
+    }
+  }
+
+  /**
+   * Recursively remove a directory and all its contents.
+   */
+  private async removeDirectoryRecursive(path: string): Promise<void> {
+    const root = this.ensureRoot();
+    const segments = splitPath(path);
+    if (segments.length === 0) {
+      throw new Error("Cannot remove root directory");
+    }
+    const dirName = segments.pop()!;
+    const parentHandle = await resolveDirectoryHandle(root, segments);
+
+    await (
+      parentHandle as unknown as {
+        removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>;
+      }
+    ).removeEntry(dirName, { recursive: true });
+  }
+
+  /**
+   * Get metadata about a file.
+   * @param path - File path relative to root
+   */
+  async getFileMetadata(path: string): Promise<VFSFileMetadata> {
+    const root = this.ensureRoot();
+    try {
+      const fileHandle = await resolveFileHandle(root, path);
+      const file = await fileHandle.getFile();
+      return {
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified,
+        type: file.type,
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get metadata for "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * List all entries in a directory.
+   * @param path - Directory path relative to root
+   */
+  async listDirectory(path: string): Promise<VFSEntry[]> {
+    const root = this.ensureRoot();
+    const segments = splitPath(path);
+
+    try {
+      const dirHandle = segments.length === 0 ? root : await resolveDirectoryHandle(root, segments);
+
+      const entries: VFSEntry[] = [];
+
+      const iterable = dirHandle as unknown as AsyncIterable<
+        [string, FileSystemHandle & { kind: "file" | "directory" }]
+      >;
+      for await (const [entryName, entryHandle] of iterable) {
+        entries.push({
+          name: entryName,
+          kind: entryHandle.kind,
+          path: joinPath(path, entryName),
+        });
+      }
+      return entries;
+    } catch (error) {
+      throw new Error(
+        `Failed to list directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  // watchFile is not implemented for Web - browsers do not support FS watching
+
+  getRootPath(): string | null {
+    return null;
+  }
+
+  isRootOpen(): boolean {
+    return this.rootHandle !== null;
+  }
+
+  /**
+   * Set the root directory from an existing FileSystemDirectoryHandle.
+   * Used to restore a project from IndexedDB without re-showing the directory picker.
+   *
+   * IndexedDB から復元した FileSystemDirectoryHandle をルートとして設定する。
+   * ディレクトリピッカーを再表示せずにプロジェクトを復元する際に使用。
+   */
+  setRootHandle(handle: FileSystemDirectoryHandle): void {
+    this.rootHandle = handle;
+  }
+
+  /**
+   * Ensure the root directory handle has been set via openDirectory().
+   * @throws Error if no root directory is available
+   */
+  private ensureRoot(): FileSystemDirectoryHandle {
+    if (!this.rootHandle) {
+      throw new Error("No root directory has been opened. Call openDirectory() first.");
+    }
+    return this.rootHandle;
+  }
+}

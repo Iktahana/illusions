@@ -8,6 +8,7 @@ import { notificationManager } from "@/lib/services/notification-manager";
 
 import type { ProjectMode, StandaloneMode, WorkspaceTab } from "@/lib/project/project-types";
 import { ensureProjectFiles, readFileHandle } from "./project-file-utils";
+import { isProjectNotFoundError } from "./project-open-errors";
 
 interface UseFileOpeningParams {
   isElectron: boolean;
@@ -112,6 +113,15 @@ export function useFileOpening({
       if (error instanceof DOMException && error.name === "AbortError") return;
       if (error instanceof Error && error.message.includes("キャンセル")) return;
       console.error("Failed to open file:", error);
+      // #1888: non-UTF-8 manuscript — refuse to open (no editable tab) and tell
+      // the user to convert it first, instead of silently loading lossy U+FFFD
+      // content that a later save would write back over the original file.
+      if (error instanceof Error && error.message.includes("UTF-8 以外")) {
+        notificationManager.error(
+          "UTF-8 以外の文字コードのため開けませんでした。UTF-8 へ変換してから開いてください。",
+        );
+        return;
+      }
       notificationManager.error("ファイルを開けませんでした。");
     }
   }, [setStandaloneMode, tabLoadSystemFile, incrementEditorKey]);
@@ -202,22 +212,23 @@ export function useFileOpening({
             console.error("Failed to load project:", error);
             console.error("Project path:", project.rootPath);
 
-            const isFileNotFound =
-              error &&
-              typeof error === "object" &&
-              "code" in error &&
-              (error as { code: string }).code === "ENOENT";
+            // set-root rejects across the Electron IPC boundary, which strips
+            // custom error props like `.code`; the helper detects the ENOENT
+            // marker in the message too so a missing/stale project folder is
+            // still classified as "not found" and offers recovery (#1965).
+            const isFileNotFound = isProjectNotFoundError(error);
 
             const message = isFileNotFound
               ? `プロジェクトが見つかりませんでした。\n\nパス: ${project.rootPath}\n\nフォルダが移動または削除された可能性があります。\n最近のプロジェクト一覧から削除しますか?`
               : "このプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。";
 
-            if (!isAutoRestoringRef.current) {
-              if (isFileNotFound) {
-                setConfirmRemoveRecent({ projectId, message });
-              } else {
-                notificationManager.error(message);
-              }
+            // A not-found project must offer removal even during auto-restore —
+            // otherwise the stale recent entry re-triggers the same failure on
+            // every launch and the app appears unable to open any project (#1965).
+            if (isFileNotFound) {
+              setConfirmRemoveRecent({ projectId, message });
+            } else if (!isAutoRestoringRef.current) {
+              notificationManager.error(message);
             }
             return false;
           }

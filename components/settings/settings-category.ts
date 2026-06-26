@@ -13,6 +13,7 @@ export type SettingsCategory =
   | "terminal"
   | "power"
   | "dictionary"
+  | "privacy"
   | "about";
 
 /**
@@ -25,7 +26,10 @@ export function resolveLegacyCategory(
   options: { isElectron: boolean } = { isElectron: true },
 ): SettingsCategory {
   const normalized: SettingsCategory = category ?? "typography";
-  if (!options.isElectron && (normalized === "terminal" || normalized === "power")) {
+  if (
+    !options.isElectron &&
+    (normalized === "terminal" || normalized === "power" || normalized === "privacy")
+  ) {
     return "account";
   }
   return normalized;

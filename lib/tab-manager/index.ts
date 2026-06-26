@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, type MutableRefObject } from "react";
 import type { UseTabManagerReturn } from "./types";
+import { applyTabDelete, applyTabRename, findTabsUnderPath } from "./tab-path-sync";
+import type { AffectedTab } from "./tab-path-sync";
 import { useTabState } from "./use-tab-state";
 import { useFileIO } from "./use-file-io";
 import { useAutoSave } from "./use-auto-save";
@@ -39,6 +41,12 @@ export function useTabManager(options?: {
   windowKey?: string | null;
   /** Callback to trigger editor remount when external file changes are detected. */
   onEditorRemountNeeded?: () => void;
+  /**
+   * Ref holding the active editor's on-demand live-content flush (#1840).
+   * Save flows call it before persisting to avoid writing debounce-lagged
+   * content. Populated by the mounted MilkdownEditor via `registerFlush`.
+   */
+  flushActiveEditorRef?: MutableRefObject<(() => string | null) | null>;
 }): UseTabManagerReturn {
   const skipAutoRestore = options?.skipAutoRestore ?? false;
   const autoSaveEnabled = options?.autoSave ?? true;
@@ -60,6 +68,9 @@ export function useTabManager(options?: {
     isElectron: tabState.isElectron,
     updateTab: tabState.updateTab,
     findTabByPath: tabState.findTabByPath,
+    forceCloseTab: tabState.forceCloseTab,
+    closeTab: tabState.closeTab,
+    flushActiveEditorRef: options?.flushActiveEditorRef,
   });
 
   // --- Close dialog (depends on file I/O for save-then-close) -------------
@@ -76,6 +87,7 @@ export function useTabManager(options?: {
     pendingCloseTabId: tabState.pendingCloseTabId,
     setPendingCloseTabId: tabState.setPendingCloseTabId,
     forceCloseTab: tabState.forceCloseTab,
+    flushActiveEditorRef: options?.flushActiveEditorRef,
     tryCreateSnapshot: fileIO.tryCreateSnapshot,
   });
 
@@ -120,6 +132,7 @@ export function useTabManager(options?: {
     loadSystemFile: fileIO.loadSystemFile,
     updateTab: tabState.updateTab,
     systemFileOpenHandlerRef,
+    flushActiveEditorRef: options?.flushActiveEditorRef,
     flushTabState: flushTabStateRef.current,
     flushLayoutState: options?.flushLayoutState,
     tryCreateSnapshot: fileIO.tryCreateSnapshot,
@@ -145,6 +158,8 @@ export function useTabManager(options?: {
 
   const {
     wasAutoRecovered,
+    recoveredBuffer,
+    clearRecoveredBuffer,
     flushTabState: _flushTabState,
     restoreProjectTabs,
   } = useTabPersistence({
@@ -163,6 +178,48 @@ export function useTabManager(options?: {
 
   // Update the ref so useElectronMenuBindings can access flushTabState
   flushTabStateRef.current = _flushTabState;
+
+  // --- Explorer file-system mutation sync (#1868) -------------------------
+  // Keep open tabs in sync when a project file/folder is renamed, moved, or
+  // deleted from the explorer (or inspector, #1870). Without this the tab keeps
+  // a stale `file.path`, and the next save resurrects the old path.
+
+  const { setTabs, tabsRef } = tabState;
+
+  /**
+   * Notify the tab manager that a file/folder was renamed or moved from
+   * `oldPath` to `newPath` (both VFS-relative). Atomically rewrites the
+   * path/name (and fileType) of the affected tab and every tab nested under a
+   * renamed directory. The file watcher self-corrects to the new path on the
+   * next render (watcherPaths mismatch).
+   */
+  const notifyFileRenamed = useCallback(
+    (oldPath: string, newPath: string): void => {
+      setTabs((prev) => applyTabRename(prev, oldPath, newPath).tabs);
+    },
+    [setTabs],
+  );
+
+  /**
+   * List the open editor tabs at or under `deletedPath` (VFS-relative). The
+   * explorer uses this to confirm dirty tabs before deleting.
+   */
+  const findTabsAffectedByDelete = useCallback(
+    (deletedPath: string): AffectedTab[] => findTabsUnderPath(tabsRef.current, deletedPath),
+    [tabsRef],
+  );
+
+  /**
+   * Notify the tab manager that a file/folder at `deletedPath` (VFS-relative)
+   * was deleted. Detaches the descriptor of every affected tab so no save flow
+   * can recreate the old path; the tab survives as an untitled dirty buffer.
+   */
+  const notifyFileDeleted = useCallback(
+    (deletedPath: string): void => {
+      setTabs((prev) => applyTabDelete(prev, deletedPath).tabs);
+    },
+    [setTabs],
+  );
 
   // --- Backward compat alias: newFile === newTab --------------------------
   const newFile = tabState.newTab;
@@ -187,10 +244,13 @@ export function useTabManager(options?: {
     lastSaveWasAuto: tabState.lastSaveWasAuto,
     openFile: fileIO.openFile,
     saveFile: fileIO.saveFile,
+    saveAllDirtyTabs: fileIO.saveAllDirtyTabs,
     saveAsFile: fileIO.saveAsFile,
     newFile,
     updateFileName: tabState.updateFileName,
     wasAutoRecovered,
+    recoveredBuffer,
+    clearRecoveredBuffer,
     onSystemFileOpen,
     _loadSystemFile: fileIO.loadSystemFile,
 
@@ -211,6 +271,7 @@ export function useTabManager(options?: {
     openDiffTab: tabState.openDiffTab,
     forceCloseTab: tabState.forceCloseTab,
     updateTab: tabState.updateTab,
+    setTabContent: tabState.setTabContent,
 
     // Close-tab dialog
     pendingCloseTabId: tabState.pendingCloseTabId,
@@ -224,5 +285,10 @@ export function useTabManager(options?: {
 
     // Project tab restore
     restoreProjectTabs,
+
+    // Explorer file-system mutation sync (#1868)
+    notifyFileRenamed,
+    findTabsAffectedByDelete,
+    notifyFileDeleted,
   };
 }

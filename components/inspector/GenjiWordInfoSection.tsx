@@ -53,9 +53,19 @@ export default function GenjiWordInfoSection({
 
       {state.status === "found" && (
         <div className="space-y-2">
+          {/* 完全一致がない（前方一致のみヒット）場合の注記。誤って「選択語が辞書にある」と
+              読めてしまうのを防ぐ（例：「青い」を選択 → 見出し「青い鳥」が前方一致でヒット）。 */}
+          {!state.viewModel.isExactMatch && (
+            <p className="text-xs text-foreground-tertiary">
+              「{state.viewModel.word}
+              」に完全一致する項目はありません。前方一致する見出しを表示しています。
+            </p>
+          )}
           {/* 見出し・読み・品詞 */}
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-sm font-semibold text-foreground">{state.viewModel.word}</span>
+            <span className="text-sm font-semibold text-foreground">
+              {state.viewModel.matchedHeadword}
+            </span>
             {state.viewModel.reading && (
               <span className="text-xs text-foreground-secondary">{state.viewModel.reading}</span>
             )}
@@ -71,8 +81,24 @@ export default function GenjiWordInfoSection({
             )}
           </div>
 
-          {/* 語義 */}
-          {state.viewModel.glosses.length > 0 && (
+          {/* 異表記（旧字体・歴史的仮名遣い）: 選択語が異表記としてこの見出しに吸収されている場合に表示（#1958） */}
+          {state.viewModel.variantWritings.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-xs text-foreground-tertiary shrink-0">異表記：</span>
+              {state.viewModel.variantWritings.map((v, i) => (
+                <span
+                  key={i}
+                  className="text-xs px-1.5 py-0.5 rounded bg-foreground-muted/10 text-foreground-secondary"
+                >
+                  {v}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 語義: 生成済みなら一覧表示。スケルトン（語義未生成）なら準備中を明示し、
+              実在語であることは見出し・読み・品詞で示す（#1958）。 */}
+          {state.viewModel.glosses.length > 0 ? (
             <ol className="list-decimal list-inside space-y-0.5 pl-0.5">
               {state.viewModel.glosses.map((gloss, i) => (
                 <li key={i} className="text-xs text-foreground-secondary leading-relaxed">
@@ -80,6 +106,10 @@ export default function GenjiWordInfoSection({
                 </li>
               ))}
             </ol>
+          ) : (
+            state.viewModel.needsGloss && (
+              <p className="text-xs text-foreground-tertiary italic">語義は準備中です</p>
+            )
           )}
 
           {/* 類義語 */}

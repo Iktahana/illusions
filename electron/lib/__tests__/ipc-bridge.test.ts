@@ -44,6 +44,7 @@ const {
   EDITOR_CHANNELS,
   NLP_CHANNELS,
   PTY_CHANNELS,
+  RULESETS_CHANNELS,
 } = channels;
 
 const { createIpcBridge } = require("../../../electron/lib/ipc-bridge") as {
@@ -93,6 +94,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       setItem: "storage:set-item",
       getItem: "storage:get-item",
       removeItem: "storage:remove-item",
+      getKeysByPrefix: "storage:get-keys-by-prefix",
     });
     expect(STORAGE_CHANNELS.event).toEqual({});
   });
@@ -118,6 +120,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       openFile: "open-file",
       saveFile: "save-file",
       getPendingFile: "get-pending-file",
+      readStandaloneFile: "read-standalone-file",
     });
     expect(FILE_CHANNELS.event).toEqual({
       openFileFromSystem: "open-file-from-system",
@@ -154,6 +157,10 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       setDirty: "set-dirty",
       saveBeforeCloseDone: "save-before-close-done",
       newWindow: "new-window",
+    });
+    expect(SYSTEM_CHANNELS.send).toEqual({
+      // #1839: renderer → main close-aborted signal
+      closeAborted: "close-aborted",
     });
     expect(SYSTEM_CHANNELS.event).toEqual({
       requestSaveBeforeClose: "electron-request-save-before-close",
@@ -237,6 +244,10 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
     });
     expect(POWER_CHANNELS.event).toEqual({
       stateChanged: "power:state-changed",
+      // #1841: suspend/resume/lock-screen power events
+      resumed: "power:resumed",
+      suspended: "power:suspended",
+      lockScreen: "power:lock-screen",
     });
   });
 
@@ -280,6 +291,20 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       exit: "pty:exit",
     });
   });
+
+  it("rulesets invoke channels keep their historical string values", () => {
+    expect(RULESETS_CHANNELS.invoke).toEqual({
+      listInstalled: "rulesets:list-installed",
+      sync: "rulesets:sync",
+      checkUpdate: "rulesets:check-update",
+      readModule: "rulesets:read-module",
+      uninstall: "rulesets:uninstall",
+    });
+    expect(RULESETS_CHANNELS.event).toEqual({
+      syncProgress: "rulesets:sync-progress",
+      changed: "rulesets:changed",
+    });
+  });
 });
 
 describe("ipc bridge: preload ↔ main handler registration cannot drift", () => {
@@ -315,6 +340,7 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
     { constName: "EDITOR_CHANNELS", group: EDITOR_CHANNELS, mainFile: "ipc/editor-ipc.js" },
     { constName: "NLP_CHANNELS", group: NLP_CHANNELS, mainFile: "ipc/nlp-ipc.js" },
     { constName: "PTY_CHANNELS", group: PTY_CHANNELS, mainFile: "ipc/pty-ipc.js" },
+    { constName: "RULESETS_CHANNELS", group: RULESETS_CHANNELS, mainFile: "ipc/rulesets-ipc.js" },
   ];
 
   it.each(invokeRegistrations)(
@@ -367,6 +393,8 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
     { constName: "NLP_CHANNELS", key: "tokenizeProgress", senderFile: "ipc/nlp-ipc.js" },
     { constName: "PTY_CHANNELS", key: "data", senderFile: "ipc/pty-ipc.js" },
     { constName: "PTY_CHANNELS", key: "exit", senderFile: "ipc/pty-ipc.js" },
+    { constName: "RULESETS_CHANNELS", key: "syncProgress", senderFile: "ipc/rulesets-ipc.js" },
+    { constName: "RULESETS_CHANNELS", key: "changed", senderFile: "ipc/rulesets-ipc.js" },
   ];
 
   it.each(eventSenders)(

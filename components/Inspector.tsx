@@ -61,6 +61,8 @@ export default function Inspector({
   onNavigateToIssue,
   onApplyFix,
   onIgnoreCorrection,
+  onAddToUserDictionary,
+  dictEntryRuleIds,
   onRefreshLinting,
   isLinting = false,
   activeLintIssueIndex,
@@ -376,6 +378,8 @@ export default function Inspector({
             onNavigateToIssue={onNavigateToIssue}
             onApplyFix={onApplyFix}
             onIgnoreCorrection={onIgnoreCorrection}
+            onAddToUserDictionary={onAddToUserDictionary}
+            dictEntryRuleIds={dictEntryRuleIds}
             onRefreshLinting={onRefreshLinting}
             isLinting={isLinting}
             activeLintIssueIndex={activeLintIssueIndex}

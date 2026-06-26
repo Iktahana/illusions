@@ -47,6 +47,18 @@ export interface DictEntry {
   inflections?: string[];
   definitions: DictDefinition[];
   relationships: DictRelationships;
+  /**
+   * Variant writings (異表記) absorbed into this entry — old kanji / historical
+   * kana that resolve to this headword, e.g. 居る ← ゐる, 来 ← 來 (#1958).
+   * From `meta.variant_writings` in the source data.
+   */
+  variantWritings?: string[];
+  /**
+   * Skeleton entry whose gloss is not yet generated (reading / part-of-speech /
+   * Aozora citations only). The word is real and recognized; UIs should skip
+   * empty-gloss display rather than treat it as missing (#1958).
+   */
+  needsGloss?: boolean;
   /** Provider that returned this entry */
   source: string;
 }
@@ -147,4 +159,10 @@ export interface DictLookup {
   register?: string;
   /** Frequency rank (smaller = more common) — used for vocabulary difficulty. */
   freqRank?: number;
+  /**
+   * Skeleton entry without a generated gloss (#1958). The word is a real,
+   * recognized headword — analysis/lint must treat it as `found`, only the
+   * gloss is pending.
+   */
+  needsGloss?: boolean;
 }

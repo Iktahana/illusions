@@ -15,23 +15,30 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 
-import { LINT_RULE_CATEGORIES } from "@/lib/linting/lint-presets";
 import { CORRECTION_MODE_IDS, CORRECTION_MODES } from "@/lib/linting/correction-modes";
+import { useRuleSourceMap } from "@/lib/editor-page/use-rule-source-map";
+import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
 import InfoTooltip from "./InfoTooltip";
 import IssueCard from "./IssueCard";
+import IgnoredCorrectionsDialog from "./IgnoredCorrectionsDialog";
 import {
   useLintingSettings,
   usePosHighlightSettings,
   usePowerSettings,
 } from "@/contexts/EditorSettingsContext";
+import { useIgnoredCorrectionsContext } from "@/contexts/IgnoredCorrectionsContext";
 
 import type { LintIssue, Severity } from "@/lib/linting";
 import type { SeverityFilter, EnrichedLintIssue } from "./types";
 
 /** Sort mode for the issue list */
-type SortMode = "position" | "severity" | "category";
+type SortMode = "position" | "severity" | "source";
+
+/** Group id used when a rule's owning ruleset cannot be determined. */
+const OTHER_GROUP_ID = "other";
+const OTHER_GROUP_NAME = "その他";
 
 interface CorrectionsPanelProps {
   onOpenPosHighlightSettings?: () => void;
@@ -40,6 +47,9 @@ interface CorrectionsPanelProps {
   onNavigateToIssue?: (issue: LintIssue) => void;
   onApplyFix?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
+  onAddToUserDictionary?: (issue: LintIssue) => void;
+  /** Rule ids whose detections support adding the flagged word to the user dictionary. */
+  dictEntryRuleIds?: ReadonlySet<string>;
   onRefreshLinting?: () => void;
   isLinting?: boolean;
   activeLintIssueIndex?: number | null;
@@ -54,15 +64,10 @@ const SEVERITY_ORDER: Record<Severity, number> = {
   info: 2,
 };
 
-/** Find which category a rule belongs to */
-function getCategoryForRule(ruleId: string): (typeof LINT_RULE_CATEGORIES)[number] | undefined {
-  return LINT_RULE_CATEGORIES.find((cat) => cat.rules.includes(ruleId));
-}
-
-/** Grouped issues by category */
+/** Issues grouped by their owning ruleset (出典). */
 interface IssueGroup {
-  categoryId: string;
-  categoryName: string;
+  groupId: string;
+  groupName: string;
   ruleIds: string[];
   issues: (LintIssue | EnrichedLintIssue)[];
 }
@@ -89,6 +94,8 @@ export default function CorrectionsPanel({
   onNavigateToIssue,
   onApplyFix,
   onIgnoreCorrection,
+  onAddToUserDictionary,
+  dictEntryRuleIds,
   onRefreshLinting,
   isLinting = false,
   activeLintIssueIndex,
@@ -106,9 +113,12 @@ export default function CorrectionsPanel({
   const { lintingEnabled, lintingRuleConfigs, onLintingEnabledChange, onLintingRuleConfigChange } =
     useLintingSettings();
   const { powerSaveMode, onTemporarilyDisablePowerSave } = usePowerSettings();
+  const ignoredCorrections = useIgnoredCorrectionsContext();
+  const ruleSourceMap = useRuleSourceMap();
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
-  const [sortMode, setSortMode] = useState<SortMode>("category");
+  const [sortMode, setSortMode] = useState<SortMode>("source");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [showIgnoredDialog, setShowIgnoredDialog] = useState(false);
   const issueListRef = useRef<HTMLDivElement>(null);
 
   const filteredIssues = useMemo(() => {
@@ -129,34 +139,34 @@ export default function CorrectionsPanel({
           (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || a.from - b.from,
         );
         break;
-      case "category":
-        // Sorted by category order, then by position within each category
+      case "source":
+        // Grouped by owning ruleset (出典), then by position within each source.
         sorted.sort((a, b) => {
-          const catA = LINT_RULE_CATEGORIES.findIndex((c) => c.rules.includes(a.ruleId));
-          const catB = LINT_RULE_CATEGORIES.findIndex((c) => c.rules.includes(b.ruleId));
-          if (catA !== catB) return catA - catB;
+          const srcA = ruleSourceMap.get(a.ruleId)?.id ?? OTHER_GROUP_ID;
+          const srcB = ruleSourceMap.get(b.ruleId)?.id ?? OTHER_GROUP_ID;
+          if (srcA !== srcB) return srcA.localeCompare(srcB);
           return a.from - b.from;
         });
         break;
     }
     return sorted;
-  }, [filteredIssues, sortMode]);
+  }, [filteredIssues, sortMode, ruleSourceMap]);
 
-  /** Group issues by category */
+  /** Group issues by their owning ruleset (出典) */
   const groupedIssues = useMemo((): IssueGroup[] => {
-    if (sortMode !== "category") return [];
+    if (sortMode !== "source") return [];
 
     const groupMap = new Map<string, IssueGroup>();
 
     for (const issue of sortedIssues) {
-      const category = getCategoryForRule(issue.ruleId);
-      const catId = category?.id ?? "other";
-      const catName = category?.nameJa ?? "その他";
+      const source = ruleSourceMap.get(issue.ruleId);
+      const groupId = source?.id ?? OTHER_GROUP_ID;
+      const groupName = source?.nameJa ?? OTHER_GROUP_NAME;
 
-      let group = groupMap.get(catId);
+      let group = groupMap.get(groupId);
       if (!group) {
-        group = { categoryId: catId, categoryName: catName, ruleIds: [], issues: [] };
-        groupMap.set(catId, group);
+        group = { groupId, groupName, ruleIds: [], issues: [] };
+        groupMap.set(groupId, group);
       }
       if (!group.ruleIds.includes(issue.ruleId)) {
         group.ruleIds.push(issue.ruleId);
@@ -164,22 +174,21 @@ export default function CorrectionsPanel({
       group.issues.push(issue);
     }
 
-    // Maintain the LINT_RULE_CATEGORIES order
-    const ordered: IssueGroup[] = [];
-    for (const cat of LINT_RULE_CATEGORIES) {
-      const group = groupMap.get(cat.id);
-      if (group) ordered.push(group);
-    }
-    const other = groupMap.get("other");
-    if (other) ordered.push(other);
+    // 出典名の昇順で並べ、"その他" は常に末尾に置く。
+    const groups = [...groupMap.values()];
+    groups.sort((a, b) => {
+      if (a.groupId === OTHER_GROUP_ID) return 1;
+      if (b.groupId === OTHER_GROUP_ID) return -1;
+      return a.groupName.localeCompare(b.groupName, "ja");
+    });
 
-    return ordered;
-  }, [sortedIssues, sortMode]);
+    return groups;
+  }, [sortedIssues, sortMode, ruleSourceMap]);
 
   // Build a global index map so we can find the active issue across groups
   const issueIndexMap = useMemo(() => {
     const map = new Map<LintIssue | EnrichedLintIssue, number>();
-    const list = sortMode === "category" ? groupedIssues.flatMap((g) => g.issues) : sortedIssues;
+    const list = sortMode === "source" ? groupedIssues.flatMap((g) => g.issues) : sortedIssues;
     list.forEach((issue, i) => map.set(issue, i));
     return map;
   }, [sortMode, groupedIssues, sortedIssues]);
@@ -211,33 +220,32 @@ export default function CorrectionsPanel({
 
   // Auto-expand group containing active issue
   useEffect(() => {
-    if (!activeIssue || sortMode !== "category") return;
-    const category = getCategoryForRule(activeIssue.ruleId);
-    const catId = category?.id ?? "other";
-    if (collapsedGroups.has(catId)) {
+    if (!activeIssue || sortMode !== "source") return;
+    const groupId = ruleSourceMap.get(activeIssue.ruleId)?.id ?? OTHER_GROUP_ID;
+    if (collapsedGroups.has(groupId)) {
       setCollapsedGroups((prev) => {
         const next = new Set(prev);
-        next.delete(catId);
+        next.delete(groupId);
         return next;
       });
     }
     // Only react to activeIssue changes, not collapsedGroups
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIssue, sortMode]);
+  }, [activeIssue, sortMode, ruleSourceMap]);
 
-  const toggleGroup = useCallback((categoryId: string) => {
+  const toggleGroup = useCallback((groupId: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
+      if (next.has(groupId)) {
+        next.delete(groupId);
       } else {
-        next.add(categoryId);
+        next.add(groupId);
       }
       return next;
     });
   }, []);
 
-  /** Disable all rules in a category via settings */
+  /** Disable all rules in a source group via settings */
   const handleDisableGroup = useCallback(
     (group: IssueGroup) => {
       if (!onLintingRuleConfigChange) return;
@@ -257,6 +265,10 @@ export default function CorrectionsPanel({
     { value: "info", label: "情報", icon: <Info className="w-3.5 h-3.5" /> },
   ];
 
+  // Web 版には校正ルールが供給されない（ルールセットはデスクトップ版のみ）。
+  // 0 件を「問題なし」と誤認させないよう、空状態で desktop-only を明示する (#1833)。
+  const isElectron = isElectronRenderer();
+
   /** Render a flat list of issue cards */
   const renderFlatList = (): React.JSX.Element => (
     <div ref={issueListRef} className="space-y-1.5">
@@ -274,6 +286,8 @@ export default function CorrectionsPanel({
               onNavigateToIssue={onNavigateToIssue}
               onApplyFix={onApplyFix}
               onIgnoreCorrection={onIgnoreCorrection}
+              onAddToUserDictionary={onAddToUserDictionary}
+              canAddToUserDictionary={!!dictEntryRuleIds?.has(issue.ruleId)}
             />
           </div>
         );
@@ -281,18 +295,18 @@ export default function CorrectionsPanel({
     </div>
   );
 
-  /** Render grouped (by category) and collapsible issue list */
+  /** Render grouped (by 出典/ruleset) and collapsible issue list */
   const renderGroupedList = (): React.JSX.Element => (
     <div ref={issueListRef} className="space-y-2">
       {groupedIssues.map((group) => {
-        const isCollapsed = collapsedGroups.has(group.categoryId);
+        const isCollapsed = collapsedGroups.has(group.groupId);
         return (
-          <div key={group.categoryId} className="border border-border rounded-lg overflow-hidden">
+          <div key={group.groupId} className="border border-border rounded-lg overflow-hidden">
             {/* Group header */}
             <div className="flex items-center bg-background-secondary">
               <button
                 type="button"
-                onClick={() => toggleGroup(group.categoryId)}
+                onClick={() => toggleGroup(group.groupId)}
                 className="flex-1 flex items-center gap-1.5 px-3 py-2 text-left hover:bg-hover transition-colors"
               >
                 {isCollapsed ? (
@@ -301,20 +315,20 @@ export default function CorrectionsPanel({
                   <ChevronDown className="w-3.5 h-3.5 text-foreground-tertiary shrink-0" />
                 )}
                 <span className="text-xs font-medium text-foreground-secondary">
-                  {group.categoryName}
+                  {group.groupName}
                 </span>
                 <span className="text-xs text-foreground-tertiary">{group.issues.length}件</span>
               </button>
               {/* Disable entire group */}
               <InfoTooltip
-                content={`「${group.categoryName}」のルールをすべて無効にする`}
+                content={`「${group.groupName}」のルールをすべて無効にする`}
                 className="text-foreground-tertiary hover:text-foreground-secondary"
               >
                 <button
                   type="button"
                   onClick={() => handleDisableGroup(group)}
                   className="p-1.5 mr-1 text-foreground-tertiary hover:text-foreground-secondary hover:bg-hover rounded transition-colors"
-                  aria-label={`${group.categoryName}をすべて無効にする`}
+                  aria-label={`${group.groupName}をすべて無効にする`}
                 >
                   <EyeOff className="w-3.5 h-3.5" />
                 </button>
@@ -337,6 +351,8 @@ export default function CorrectionsPanel({
                         onNavigateToIssue={onNavigateToIssue}
                         onApplyFix={onApplyFix}
                         onIgnoreCorrection={onIgnoreCorrection}
+                        onAddToUserDictionary={onAddToUserDictionary}
+                        canAddToUserDictionary={!!dictEntryRuleIds?.has(issue.ruleId)}
                       />
                     </div>
                   );
@@ -505,7 +521,7 @@ export default function CorrectionsPanel({
                 className="text-xs px-1.5 py-0.5 border border-border-secondary rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
                 title="並び替え"
               >
-                <option value="category">種類別</option>
+                <option value="source">出典別</option>
                 <option value="position">出現順</option>
                 <option value="severity">重要度順</option>
               </select>
@@ -560,15 +576,48 @@ export default function CorrectionsPanel({
 
           {/* Issue list */}
           {filteredIssues.length === 0 ? (
-            <div className="pt-4 text-center">
-              <p className="text-sm text-foreground-tertiary">問題は検出されませんでした</p>
-            </div>
-          ) : sortMode === "category" ? (
+            !isElectron ? (
+              <div className="pt-4 text-center">
+                <p className="text-sm text-foreground-secondary">
+                  校正ルールはデスクトップ版で利用できます
+                </p>
+                <p className="mt-1 text-xs text-foreground-tertiary">
+                  Web
+                  版には校正ルールセットが含まれていません。デスクトップ版で公式ルールセットをインストールすると校正が利用できます。
+                </p>
+              </div>
+            ) : (
+              <div className="pt-4 text-center">
+                <p className="text-sm text-foreground-tertiary">問題は検出されませんでした</p>
+              </div>
+            )
+          ) : sortMode === "source" ? (
             renderGroupedList()
           ) : (
             renderFlatList()
           )}
+
+          {/* Ignored corrections entry point */}
+          {ignoredCorrections && (
+            <div className="pt-3 text-center">
+              <button
+                type="button"
+                onClick={() => setShowIgnoredDialog(true)}
+                className="text-xs text-accent transition-colors hover:text-accent-hover hover:underline"
+              >
+                無視された指摘
+                {ignoredCorrections.items.length > 0 && `（${ignoredCorrections.items.length}件）`}
+              </button>
+            </div>
+          )}
         </>
+      )}
+
+      {ignoredCorrections && (
+        <IgnoredCorrectionsDialog
+          isOpen={showIgnoredDialog}
+          onClose={() => setShowIgnoredDialog(false)}
+        />
       )}
     </div>
   );

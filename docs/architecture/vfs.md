@@ -25,13 +25,13 @@ The Virtual File System (VFS) provides a unified API for file operations across 
 
 ### Key Files
 
-| File                           | Purpose                                                |
-| ------------------------------ | ------------------------------------------------------ |
-| `lib/vfs/types.ts`             | Core interfaces and type definitions                   |
-| `lib/vfs/index.ts`             | Factory function `getVFS()` and environment detection  |
-| `lib/electron-vfs.ts`          | Electron renderer-side VFS implementation (IPC client) |
-| `lib/vfs/web-vfs.ts`           | Web VFS implementation (File System Access API)        |
-| `electron-vfs-ipc-handlers.js` | Electron main process IPC handlers                     |
+| File                                | Purpose                                                |
+| ----------------------------------- | ------------------------------------------------------ |
+| `lib/vfs/types.ts`                  | Core interfaces and type definitions                   |
+| `lib/vfs/index.ts`                  | Factory function `getVFS()` and environment detection  |
+| `platform/electron-renderer/vfs.ts` | Electron renderer-side VFS implementation (IPC client) |
+| `platform/browser/vfs.ts`           | Web VFS implementation (File System Access API)        |
+| `electron/ipc/vfs-ipc.js`           | Electron main process IPC handlers                     |
 
 ---
 
@@ -57,7 +57,8 @@ The Virtual File System (VFS) provides a unified API for file operations across 
      ▼                    │        ▼                         │
 ┌──────────────────────┐  │  ┌──────────────────────────┐    │
 │  ElectronVFS         │  │  │  WebVFS                  │    │
-│  (electron-vfs.ts)   │  │  │  (web-vfs.ts)            │    │
+│  (platform/electron- │  │  │  (platform/browser/      │    │
+│   renderer/vfs.ts)   │  │  │   vfs.ts)                 │    │
 │                      │  │  │                          │    │
 │  ipcRenderer.invoke  │  │  │  File System Access API  │    │
 │  for all operations  │  │  │  (showDirectoryPicker,   │    │
@@ -68,7 +69,7 @@ The Virtual File System (VFS) provides a unified API for file operations across 
            ▼              │                                   │
 ┌──────────────────────────────────────────────┐              │
 │  Electron Main Process                       │              │
-│  (electron-vfs-ipc-handlers.js)              │              │
+│  (electron/ipc/vfs-ipc.js)                    │              │
 │                                              │              │
 │  ┌────────────────────────────────────────┐  │              │
 │  │  IPC Handlers (vfs:* channels)        │  │              │
@@ -268,7 +269,7 @@ Approved roots are also persisted to `approved-vfs-paths.json` (in the app's use
 
 ### Text Encoding (`.txt` / `.md` / `.mdi`)
 
-Text files are read and written through `lib/utils/text-codec.ts`:
+Text files are read and written through `shared/lib/text-codec.ts`:
 
 - Decoded as UTF-8. Non-UTF-8 BOMs (UTF-16 LE/BE, UTF-32) are rejected with a Japanese error.
 - A UTF-8 BOM (`EF BB BF`) is stripped on read and not restored on write.

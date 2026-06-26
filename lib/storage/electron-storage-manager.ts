@@ -203,13 +203,61 @@ export class ElectronStorageManager {
   }
 
   /**
+   * 破損 JSON レコードを削除する前に、生データを corrupt_records へ隔離する
+   * （Codex F-06）。特に editor_buffer はクラッシュ回復用の未保存下書きであり、
+   * 末尾の余分な 1 文字などで JSON.parse が失敗しても本文は復旧可能なことが多い。
+   * 復旧の最後の砦を消さないよう、削除と隔離を同一トランザクションで行う。
+   *
+   * sourceTable は自コード内のリテラル（app_state / recent_files / editor_buffer /
+   * recent_projects）のみを渡す前提（外部入力ではないため SQL 連結は安全）。
+   */
+  private quarantineAndDelete(sourceTable: string, recordId: string, rawData: string): void {
+    const db = this.ensureInitialized();
+    try {
+      db.exec(
+        `CREATE TABLE IF NOT EXISTS corrupt_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source_table TEXT NOT NULL,
+          record_id TEXT,
+          data TEXT NOT NULL,
+          quarantined_at INTEGER NOT NULL
+        )`,
+      );
+      runInTransaction(db, () => {
+        db.prepare(
+          "INSERT INTO corrupt_records (source_table, record_id, data, quarantined_at) VALUES (?, ?, ?, ?)",
+        ).run(sourceTable, recordId, rawData, Date.now());
+        db.prepare(`DELETE FROM ${sourceTable} WHERE id = ?`).run(recordId);
+      });
+    } catch (err) {
+      console.error(
+        `[ElectronStorageManager] 破損レコードの隔離に失敗しました (${sourceTable}/${recordId}):`,
+        err,
+      );
+    }
+  }
+
+  /**
    * アプリ状態を読み込む
    */
   loadAppState(): AppState | null {
     const db = this.ensureInitialized();
     const stmt = db.prepare("SELECT data FROM app_state WHERE id = ?");
     const row = stmt.get("app_state") as { data: string } | undefined;
-    return row ? JSON.parse(row.data) : null;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.data) as AppState;
+    } catch (err) {
+      // Corrupt app_state record: quarantine then delete so every subsequent
+      // startup starts clean without destroying the raw data (Codex F-06).
+      // app_state が破損している場合は隔離してから削除しセルフヒールする。
+      console.warn(
+        "[ElectronStorageManager] app_state の JSON が破損しています。隔離してデフォルト状態に戻します。",
+        err,
+      );
+      this.quarantineAndDelete("app_state", "app_state", row.data);
+      return null;
+    }
   }
 
   /**
@@ -252,9 +300,23 @@ export class ElectronStorageManager {
    */
   getRecentFiles(): RecentFile[] {
     const db = this.ensureInitialized();
-    const stmt = db.prepare("SELECT data FROM recent_files ORDER BY updated_at DESC LIMIT 10");
-    const rows = stmt.all() as { data: string }[];
-    return rows.map((row) => JSON.parse(row.data));
+    const stmt = db.prepare("SELECT id, data FROM recent_files ORDER BY updated_at DESC LIMIT 10");
+    const rows = stmt.all() as { id: string; data: string }[];
+    const results: RecentFile[] = [];
+    for (const row of rows) {
+      try {
+        results.push(JSON.parse(row.data) as RecentFile);
+      } catch (err) {
+        // Corrupt recent_files row: quarantine then remove (Codex F-06).
+        // 破損した recent_files 行を隔離してから削除しセルフヒールする。
+        console.warn(
+          `[ElectronStorageManager] recent_files(id=${row.id}) の JSON が破損しています。隔離して削除します。`,
+          err,
+        );
+        this.quarantineAndDelete("recent_files", row.id, row.data);
+      }
+    }
+    return results;
   }
 
   /**
@@ -294,7 +356,21 @@ export class ElectronStorageManager {
     const db = this.ensureInitialized();
     const stmt = db.prepare("SELECT data FROM editor_buffer WHERE id = ?");
     const row = stmt.get("editor_buffer") as { data: string } | undefined;
-    return row ? JSON.parse(row.data) : null;
+    if (!row) return null;
+    try {
+      return JSON.parse(row.data) as EditorBuffer;
+    } catch (err) {
+      // Corrupt editor_buffer = unsaved crash-recovery draft. Quarantine the raw
+      // data BEFORE deleting so a recoverable body isn't destroyed (Codex F-06).
+      // editor_buffer はクラッシュ回復用の未保存下書き。本文を失わないよう、削除前に
+      // 生データを隔離する。
+      console.warn(
+        "[ElectronStorageManager] editor_buffer の JSON が破損しています。生データを隔離してから削除します。",
+        err,
+      );
+      this.quarantineAndDelete("editor_buffer", "editor_buffer", row.data);
+      return null;
+    }
   }
 
   /**
@@ -357,9 +433,25 @@ export class ElectronStorageManager {
     name: string;
   }> {
     const db = this.ensureInitialized();
-    const stmt = db.prepare("SELECT data FROM recent_projects ORDER BY updated_at DESC LIMIT 10");
-    const rows = stmt.all() as { data: string }[];
-    return rows.map((row) => JSON.parse(row.data));
+    const stmt = db.prepare(
+      "SELECT id, data FROM recent_projects ORDER BY updated_at DESC LIMIT 10",
+    );
+    const rows = stmt.all() as { id: string; data: string }[];
+    const results: Array<{ id: string; rootPath: string; name: string }> = [];
+    for (const row of rows) {
+      try {
+        results.push(JSON.parse(row.data) as { id: string; rootPath: string; name: string });
+      } catch (err) {
+        // Corrupt recent_projects row: quarantine then remove (Codex F-06).
+        // 破損した recent_projects 行を隔離してから削除しセルフヒールする。
+        console.warn(
+          `[ElectronStorageManager] recent_projects(id=${row.id}) の JSON が破損しています。隔離して削除します。`,
+          err,
+        );
+        this.quarantineAndDelete("recent_projects", row.id, row.data);
+      }
+    }
+    return results;
   }
 
   /**
@@ -395,6 +487,19 @@ export class ElectronStorageManager {
     const db = this.ensureInitialized();
     const stmt = db.prepare("DELETE FROM kv_store WHERE key = ?");
     stmt.run(key);
+  }
+
+  /**
+   * Return every kv_store key that begins with `prefix`.
+   * The LIKE special characters (% _ \) in the prefix are escaped so the
+   * match is a true literal prefix; the trailing `%` is the wildcard.
+   */
+  getKeysByPrefix(prefix: string): string[] {
+    const db = this.ensureInitialized();
+    const escaped = prefix.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+    const stmt = db.prepare("SELECT key FROM kv_store WHERE key LIKE ? ESCAPE '\\'");
+    const rows = stmt.all(`${escaped}%`) as { key: string }[];
+    return rows.map((r) => r.key);
   }
 
   /**

@@ -62,7 +62,7 @@ export default function Outline({
   );
 
   return (
-    <aside className={clsx("h-full bg-background border-r border-border flex flex-col", className)}>
+    <aside className={clsx("h-full bg-background flex flex-col", className)}>
       {/* ヘッダー */}
       <div className="h-12 border-b border-border flex items-center px-4">
         <h2 className="text-sm font-medium text-foreground flex-1">アウトライン</h2>

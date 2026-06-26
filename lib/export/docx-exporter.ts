@@ -22,6 +22,7 @@ import {
   replaceMdiWithRubyText,
   MDI_BREAK_RE,
   isMdiBlankParagraphLine,
+  promoteBlankRunsToMarkers,
 } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import type { ExportMetadata } from "./types";
 import {
@@ -34,6 +35,8 @@ import {
   lineSpacingToTwips,
   sanitizeSettings,
 } from "./docx-export-settings";
+
+import { fullwidthIndentCount, fullwidthIndentPrefix } from "./fullwidth-indent";
 
 import type { DocxExportSettings, DocxFontConfig } from "./docx-export-settings";
 
@@ -66,10 +69,14 @@ function buildDocxDocument(content: string, options: DocxExportOptions): Documen
   //   `fromRawText` so NO editor-HTML normalization runs — literal `<br />`,
   //   `<p>x</p>`, `\[\[blank]]` are preserved verbatim (DATA-LOSS guard).
   const fileType = options.fileType ?? ".mdi";
-  const normalized =
+  const rawNormalized =
     fileType === ".mdi"
       ? MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toRawText()
       : MdiDocument.fromRawText(content).toRawText();
+  // Promote author-intentional blank lines into [[blank]] markers so the
+  // paragraph loop emits empty <w:p> for them instead of collapsing — TXT
+  // parity (#1826). Scoped to ".mdi" (see mdi-to-html.ts for rationale).
+  const normalized = fileType === ".mdi" ? promoteBlankRunsToMarkers(rawNormalized) : rawNormalized;
   const paragraphs = parseMarkdownToDocxParagraphs(normalized, settings, fontConfig);
 
   // Page dimensions (swap for landscape)
@@ -306,10 +313,22 @@ function createParagraph(
   settings: DocxExportSettings,
   fontConfig: DocxFontConfig,
 ): Paragraph {
+  // Full-width-space 字下げ: prepend literal U+3000 characters to the paragraph
+  // text and suppress the Word `firstLine` indent (count from textIndent, rounded)
+  // so the two indentation mechanisms never stack.
+  const fullwidthCount = settings.fullwidthSpaceIndent
+    ? fullwidthIndentCount(settings.textIndent)
+    : 0;
+  const effectiveText = fullwidthCount > 0 ? fullwidthIndentPrefix(fullwidthCount) + text : text;
+  // "Replace" semantics: the toggle always suppresses the Word firstLine indent
+  // (even if the count rounds to 0), so the two mechanisms never stack.
+  const firstLineTwips = settings.fullwidthSpaceIndent
+    ? 0
+    : emToTwips(settings.textIndent, settings.fontSize);
   return new Paragraph({
     spacing: { before: 0, after: 120 },
-    indent: { firstLine: emToTwips(settings.textIndent, settings.fontSize) },
-    children: parseInlineFormatting(text, fontConfig),
+    indent: { firstLine: firstLineTwips },
+    children: parseInlineFormatting(effectiveText, fontConfig),
   });
 }
 

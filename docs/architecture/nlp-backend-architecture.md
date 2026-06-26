@@ -34,9 +34,8 @@ This eliminates UI blocking and significantly improves performance.
 │                                                              │
 │  NLP Client Abstraction:                                     │
 │  - lib/nlp-client/nlp-client.ts (factory)                   │
-│  - lib/nlp-client/electron-nlp-client.ts (IPC)              │
-│  - lib/nlp-client/web-nlp-client.ts (HTTP)                  │
-│  - lib/nlp-client/nlp-cache.ts (LRU cache)                  │
+│  - platform/electron-renderer/nlp-client.ts (IPC)           │
+│  - platform/browser/nlp-client.ts (HTTP)                    │
 └──────────────────────┬──────────────────┬───────────────────┘
                        │                  │
               Electron Mode          Web Mode
@@ -45,13 +44,17 @@ This eliminates UI blocking and significantly improves performance.
 ┌────────────────────────────┐   ┌────────────────────────────┐
 │    Electron Main Process    │   │   Next.js API Routes       │
 ├────────────────────────────┤   ├────────────────────────────┤
-│ nlp-service/               │   │ app/api/nlp/               │
-│ ├─ tokenizer-service.js    │   │ ├─ tokenize/route.ts       │
-│ ├─ nlp-cache.js            │   │ ├─ batch/route.ts          │
-│ └─ nlp-ipc-handlers.js     │   │ ├─ frequency/route.ts      │
-│                            │   │ └─ shared/                 │
-│ IPC Channels:              │   │     ├─ tokenizer-service.ts│
-│ - nlp:init                 │   │     └─ server-cache.ts     │
+│ electron/ipc/nlp-ipc.js    │   │ app/api/nlp/               │
+│            │               │   │ ├─ tokenize/route.ts       │
+│            ▼               │   │ ├─ batch/route.ts          │
+│ lib/nlp-backend/           │   │ └─ frequency/route.ts      │
+│ ├─ nlp-processor.ts        │   │            │               │
+│ └─ nlp-cache.ts            │   │            ▼               │
+│                            │   │ lib/nlp-backend/           │
+│                            │   │ ├─ nlp-processor.ts        │
+│                            │   │ └─ nlp-cache.ts            │
+│ IPC Channels:              │   │                            │
+│ - nlp:init                 │   │                            │
 │ - nlp:tokenize-paragraph   │   │                            │
 │ - nlp:tokenize-document    │   │ HTTP Endpoints:            │
 │ - nlp:analyze-word-frequency│  │ - POST /api/nlp/tokenize   │
@@ -77,7 +80,7 @@ const nlpClient = getNlpClient();
 const tokens = await nlpClient.tokenizeParagraph(text);
 ```
 
-#### 2. Electron NLP Client (`lib/nlp-client/electron-nlp-client.ts`)
+#### 2. Electron NLP Client (`platform/electron-renderer/nlp-client.ts`)
 
 - Uses `window.electronAPI.nlp.*` for IPC communication
 - Supports progress callbacks for large documents
@@ -86,7 +89,7 @@ const tokens = await nlpClient.tokenizeParagraph(text);
   - `tokenizeDocument(paragraphs, onProgress)` - Batch processing
   - `analyzeWordFrequency(text)` - Word frequency analysis
 
-#### 3. Web NLP Client (`lib/nlp-client/web-nlp-client.ts`)
+#### 3. Web NLP Client (`platform/browser/nlp-client.ts`)
 
 - Uses `fetch()` to call Next.js API routes
 - Same interface as Electron client
@@ -95,30 +98,18 @@ const tokens = await nlpClient.tokenizeParagraph(text);
   - `POST /api/nlp/batch` - Multiple paragraphs
   - `POST /api/nlp/frequency` - Frequency analysis
 
-#### 4. Frontend Cache (`lib/nlp-client/nlp-cache.ts`)
-
-- LRU cache with 500 entry limit
-- Reduces redundant IPC/API calls
-- Uses MD5 hash of text as cache key
-
 ### Backend Layer - Electron
 
-#### 1. Tokenizer Service (`nlp-service/tokenizer-service.js`)
+#### 1. Shared processor (`lib/nlp-backend/nlp-processor.ts`)
 
-- Singleton kuromoji tokenizer instance
-- Initializes once per main process
-- Uses local dictionary files from `/dict`
+- Single kuromoji processor used by Electron IPC and Next.js routes
+- Initializes once per process and preserves source-text character positions
+- Uses `lib/nlp-backend/nlp-cache.ts` for the 1000-entry MD5-keyed LRU cache
 
-#### 2. Server Cache (`nlp-service/nlp-cache.js`)
-
-- LRU cache with 1000 entry limit
-- Caches tokenization results
-- Significantly improves performance
-
-#### 3. IPC Handlers (`nlp-service/nlp-ipc-handlers.js`)
+#### 2. IPC handlers (`electron/ipc/nlp-ipc.js`)
 
 - Registers all NLP-related IPC channels
-- Integrates tokenizer service and cache
+- Delegates tokenization and frequency analysis to the shared processor
 - Emits progress events for batch operations
 
 **Registered Channels:**
@@ -130,19 +121,9 @@ const tokens = await nlpClient.tokenizeParagraph(text);
 
 ### Backend Layer - Web
 
-#### 1. Tokenizer Service (`app/api/nlp/shared/tokenizer-service.ts`)
+#### API routes
 
-- Singleton kuromoji tokenizer instance per Next.js worker
-- Uses `public/dict/` dictionary files
-- Same interface as Electron tokenizer
-
-#### 2. Server Cache (`app/api/nlp/shared/server-cache.ts`)
-
-- LRU cache with 1000 entry limit
-- Shared across API route handlers
-- MD5-based cache keys
-
-#### 3. API Routes
+Each route initializes and calls the same `lib/nlp-backend/nlp-processor.ts` used by Electron. Web initialization points it at `public/dict/`.
 
 **`POST /api/nlp/tokenize`** - Single paragraph tokenization
 

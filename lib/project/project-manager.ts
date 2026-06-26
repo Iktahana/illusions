@@ -16,9 +16,9 @@
  * 復元したハンドルの権限が失効する場合があり、再要求が必要になる。
  */
 
-import { getWebStorageDatabase } from "../storage/web-storage";
+import { getWebStorageDatabase } from "@/platform/browser/storage";
 import { PermissionManager, getPermissionManager } from "../services/permission-manager";
-import type { StoredProjectHandle } from "../storage/web-storage";
+import type { StoredProjectHandle } from "@/platform/browser/storage";
 import type { PermissionStatus } from "../services/permission-manager";
 
 /**

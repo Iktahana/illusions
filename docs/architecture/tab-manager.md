@@ -137,35 +137,13 @@ const TAB_PERSIST_DEBOUNCE = 1000; // Debounce tab persistence by 1 second
 import { useTabManager } from "@/lib/tab-manager";
 
 function EditorLayout() {
-  const {
-    tabs,
-    activeTabId,
-    addTab,
-    removeTab,
-    setActiveTab,
-    updateTabContent,
-    openFile,
-    saveFile,
-  } = useTabManager();
+  const { tabs, activeTabId, switchTab, closeTab, updateTab, openFile, saveFile } = useTabManager();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
-  return (
-    <div>
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onSelect={setActiveTab}
-        onClose={removeTab}
-      />
-      {activeTab && (
-        <Editor
-          content={activeTab.content}
-          onChange={(content) => updateTabContent(activeTab.id, content)}
-        />
-      )}
-    </div>
-  );
+  // Dockview renders the tab header and panels. Consumers manipulate the
+  // tab model through the composed manager instead of rendering a second tab bar.
+  return { activeTab, switchTab, closeTab, updateTab, openFile, saveFile };
 }
 ```
 

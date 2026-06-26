@@ -99,6 +99,55 @@ describe("content size validation — Buffer.byteLength vs .length", () => {
 });
 
 // -----------------------------------------------------------------------
+// UTF-8 BOM stripping (#1842)
+//
+// fs.readFile(path, "utf-8") does NOT strip a leading UTF-8 BOM (U+FEFF).
+// The .txt read path (readTextWithEncoding in text-codec.ts) strips it.
+// file-ipc.js gets the same behaviour via readFileStrictUtf8() (#1888), which
+// BOM-strips after a strict decode. The pure unit below pins the BOM semantics.
+//
+// file-ipc.js is a CommonJS Electron main-process module and cannot be
+// imported directly in vitest, so:
+//   1. The stripBom() logic is re-implemented here as a pure unit and tested
+//      against BOM/non-BOM inputs.
+//   2. A source-text regression guard verifies the helper is present and
+//      applied at every fs.readFile call site in the file.
+// -----------------------------------------------------------------------
+
+/** Mirror of the stripBom() helper in file-ipc.js */
+function stripBom(s: string): string {
+  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
+}
+
+describe("UTF-8 BOM stripping — stripBom() invariants", () => {
+  it("strips a leading BOM from a string that has one", () => {
+    const withBom = "﻿hello";
+    expect(stripBom(withBom)).toBe("hello");
+  });
+
+  it("does not modify a string without a BOM", () => {
+    const noBom = "hello";
+    expect(stripBom(noBom)).toBe("hello");
+  });
+
+  it("strips only the leading BOM, not BOMs elsewhere", () => {
+    const midBom = "abc﻿def";
+    expect(stripBom(midBom)).toBe("abc﻿def");
+  });
+
+  it("returns an empty string unchanged", () => {
+    expect(stripBom("")).toBe("");
+  });
+
+  it("strips BOM from a realistic .mdi snippet", () => {
+    const content = "﻿# 吾輩は猫である\n\n吾輩は猫である。";
+    const result = stripBom(content);
+    expect(result.startsWith("#")).toBe(true);
+    expect(result.charCodeAt(0)).not.toBe(0xfeff);
+  });
+});
+
+// -----------------------------------------------------------------------
 // Source-based regression guard: file-ipc.js cannot be imported in vitest
 // (CommonJS Electron main-process module), so assert on its source text that
 // every MAX_CONTENT_BYTES comparison measures UTF-8 bytes, not code units.
@@ -118,5 +167,25 @@ describe("file-ipc.js source regression guard", () => {
 
   it("does not compare content.length against MAX_CONTENT_BYTES", () => {
     expect(source).not.toMatch(/\.length\s*>\s*MAX_CONTENT_BYTES/);
+  });
+
+  // Strict UTF-8 read regression guard (#1888, supersedes the #1842 stripBom guard)
+  //
+  // Content reads now go through readFileStrictUtf8() (electron/lib/text-decode.js),
+  // which BOM-strips AND rejects non-UTF-8 bytes instead of decoding them lossily
+  // into U+FFFD that a later save would write back over the original file.
+  it("imports the strict UTF-8 read helper", () => {
+    expect(source).toContain('require("../lib/text-decode")');
+    expect(source).toContain("readFileStrictUtf8");
+  });
+
+  it("reads document content via readFileStrictUtf8, never lossy fs.readFile(..., utf-8)", () => {
+    // The lossy string read is the bug (#1888): it must not return content.
+    expect(source).not.toMatch(/fs\.readFile\([^)]*["']utf-8["']\)/);
+
+    // Every manuscript-open site uses the strict helper. There are three:
+    // system open, dialog open, and pending-file drain.
+    const strictReads = source.match(/readFileStrictUtf8\(/g) ?? [];
+    expect(strictReads.length).toBeGreaterThanOrEqual(3);
   });
 });

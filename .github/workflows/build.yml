@@ -33,7 +33,7 @@ jobs:
       desktop_changed: ${{ steps.filter.outputs.desktop_changed }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -73,7 +73,7 @@ jobs:
       branch: ${{ steps.version.outputs.branch }}
     steps:
       - name: Checkout (with tags for version computation)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           sparse-checkout: package.json
@@ -112,17 +112,23 @@ jobs:
 
           # main: use computed version as-is
           # beta: append timestamped prerelease suffix so every beta build gets a
-          #   unique, monotonically-increasing version (vX.Y.Z-beta.YYYYMMDD.HHMMSS).
+          #   unique, monotonically-increasing version (vX.Y.Z-beta.YYYYMMDD.<seconds>).
           #   BASE_VERSION already equals the next stable patch (beta tags are
           #   excluded by the ^[0-9]+$ filter above), so the X.Y.Z prefix matches
           #   the version this beta will be promoted to on main.
+          #   NOTE: semver forbids leading zeros in numeric prerelease identifiers, and
+          #   electron-builder normalizes "043021" → "43021". We pre-strip the leading
+          #   zeros from the HHMMSS component (10# = force base-10) so the git tag, the
+          #   GitHub release, and the in-app version stay identical and valid.
           # alpha|dev: append branch name as a plain prerelease suffix
           case "$BRANCH_NAME" in
             main)
               FULL_VERSION="${BASE_VERSION}"
               ;;
             beta)
-              FULL_VERSION="${BASE_VERSION}-beta.$(date -u +%Y%m%d.%H%M%S)"
+              BETA_DATE=$(date -u +%Y%m%d)
+              BETA_TIME=$(date -u +%H%M%S)
+              FULL_VERSION="${BASE_VERSION}-beta.${BETA_DATE}.$((10#$BETA_TIME))"
               ;;
             alpha|dev)
               FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
@@ -160,10 +166,11 @@ jobs:
               exit 1
             fi
           else
-            # beta uses a timestamped identifier (X.Y.Z-beta.YYYYMMDD.HHMMSS);
+            # beta uses a timestamped identifier (X.Y.Z-beta.YYYYMMDD.<seconds>) where the
+            # trailing seconds component is leading-zero-stripped (valid semver numeric id);
             # alpha/dev use a bare channel suffix (X.Y.Z-alpha / X.Y.Z-dev).
-            if ! echo "$FULL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(alpha|dev|beta\.[0-9]{8}\.[0-9]{6})$'; then
-              echo "::error::Prerelease full version '${FULL}' has invalid format (expected X.Y.Z-(alpha|dev) or X.Y.Z-beta.YYYYMMDD.HHMMSS)"
+            if ! echo "$FULL" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+-(alpha|dev|beta\.[0-9]{8}\.[0-9]+)$'; then
+              echo "::error::Prerelease full version '${FULL}' has invalid format (expected X.Y.Z-(alpha|dev) or X.Y.Z-beta.YYYYMMDD.N)"
               exit 1
             fi
           fi
@@ -238,12 +245,13 @@ jobs:
       TEAM_ID: ${{ vars.TEAM_ID }}
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -330,12 +338,13 @@ jobs:
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -426,12 +435,13 @@ jobs:
       matrix:
         arch: [x64, arm64]
     env:
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -550,12 +560,13 @@ jobs:
     outputs:
       version: ${{ needs.compute-version.outputs.full }}
     env:
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -665,12 +676,13 @@ jobs:
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ubuntu-latest
     env:
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6

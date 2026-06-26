@@ -1,0 +1,473 @@
+/**
+ * Electron implementation of the Virtual File System.
+ *
+ * Uses IPC calls to the Electron main process via window.electronAPI.vfs.*
+ * for all file operations. The main process handlers must be registered
+ * separately (see electron main process setup).
+ */
+
+import type {
+  VFSDirectoryHandle,
+  VFSEntry,
+  VFSFileHandle,
+  VFSFileMetadata,
+  VFSWatchEvent,
+  VFSWatcher,
+  VirtualFileSystem,
+} from "@/lib/vfs/types";
+import { basename, dirname, joinPath } from "@/lib/vfs/path-utils";
+
+// -----------------------------------------------------------------------
+// Type declarations for the Electron VFS IPC bridge
+// -----------------------------------------------------------------------
+
+/**
+ * Shape of the VFS IPC API exposed by the Electron preload script.
+ * These methods map to IPC handlers in the main process.
+ */
+interface ElectronVFSBridge {
+  /** Open a native directory picker dialog */
+  openDirectory: () => Promise<{ path: string; name: string } | null>;
+  /** Open a native file picker dialog; returns path, name, and raw bytes */
+  openFile: (opts?: {
+    filters?: Array<{ name: string; extensions: string[] }>;
+  }) => Promise<{ path: string; name: string; buf: Uint8Array } | null>;
+  /** Read file content as UTF-8 text */
+  readFile: (filePath: string) => Promise<string>;
+  /** Write UTF-8 text content to a file */
+  writeFile: (filePath: string, content: string) => Promise<void>;
+  /** Read directory entries */
+  readDirectory: (dirPath: string) => Promise<Array<{ name: string; kind: "file" | "directory" }>>;
+  /** Get file stats */
+  stat: (filePath: string) => Promise<{ size: number; lastModified: number; type: string }>;
+  /** Check whether a path exists without throwing on ENOENT */
+  exists: (filePath: string) => Promise<boolean>;
+  /** Create a directory (with parents) */
+  mkdir: (dirPath: string) => Promise<void>;
+  /** Delete a file or directory */
+  delete: (targetPath: string, options?: { recursive?: boolean }) => Promise<void>;
+  /** Rename (move) a file or directory */
+  rename: (oldPath: string, newPath: string) => Promise<void>;
+  /** Watch a file for changes (optional) */
+  watch?: (filePath: string, callback: (event: VFSWatchEvent) => void) => { stop: () => void };
+}
+
+// -----------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------
+
+/**
+ * Get the Electron VFS bridge from window.electronAPI.
+ * @throws Error if the bridge is not available
+ */
+function getVFSBridge(): ElectronVFSBridge {
+  const api = window.electronAPI;
+  if (!api) {
+    throw new Error("Electron API is not available (window.electronAPI is undefined).");
+  }
+
+  // Access the vfs sub-object on electronAPI.
+  // electronAPI is typed by electron.d.ts but its vfs shape differs from
+  // ElectronVFSBridge, so we cast through unknown to get the stricter type.
+  const vfsBridge = (api as unknown as { vfs?: ElectronVFSBridge }).vfs;
+  if (!vfsBridge) {
+    throw new Error(
+      "Electron VFS API is not available (window.electronAPI.vfs is undefined). " +
+        "Ensure the preload script exposes VFS IPC methods.",
+    );
+  }
+  return vfsBridge;
+}
+
+// -----------------------------------------------------------------------
+// ElectronVFSFileHandle
+// -----------------------------------------------------------------------
+
+/**
+ * Electron implementation of VFSFileHandle.
+ * Uses IPC to read/write files by absolute path.
+ */
+class ElectronVFSFileHandle implements VFSFileHandle {
+  readonly name: string;
+  readonly path: string;
+  private readonly absolutePath: string;
+
+  constructor(absolutePath: string, relativePath: string) {
+    this.absolutePath = absolutePath;
+    this.path = relativePath;
+    this.name = basename(absolutePath);
+  }
+
+  async getFile(): Promise<File> {
+    const bridge = getVFSBridge();
+    const content = await bridge.readFile(this.absolutePath);
+    const stat = await bridge.stat(this.absolutePath);
+    return new File([content], this.name, {
+      type: stat.type,
+      lastModified: stat.lastModified,
+    });
+  }
+
+  async exists(): Promise<boolean> {
+    const bridge = getVFSBridge();
+    return bridge.exists(this.absolutePath);
+  }
+
+  async read(): Promise<string> {
+    const bridge = getVFSBridge();
+    return bridge.readFile(this.absolutePath);
+  }
+
+  async write(content: string): Promise<void> {
+    const bridge = getVFSBridge();
+    return bridge.writeFile(this.absolutePath, content);
+  }
+}
+
+// -----------------------------------------------------------------------
+// ElectronVFSDirectoryHandle
+// -----------------------------------------------------------------------
+
+/**
+ * Electron implementation of VFSDirectoryHandle.
+ * Uses IPC to interact with the filesystem by absolute path.
+ */
+class ElectronVFSDirectoryHandle implements VFSDirectoryHandle {
+  readonly name: string;
+  readonly path: string;
+  private readonly absolutePath: string;
+
+  constructor(absolutePath: string, relativePath: string) {
+    this.absolutePath = absolutePath;
+    this.path = relativePath;
+    this.name = basename(absolutePath);
+  }
+
+  async getFileHandle(name: string, options?: { create?: boolean }): Promise<VFSFileHandle> {
+    const filePath = joinPath(this.absolutePath, name);
+    const relPath = this.path ? joinPath(this.path, name) : name;
+
+    if (options?.create) {
+      // Ensure the parent directory exists, then write an empty file if needed.
+      // Use a non-throwing existence check so Electron does not log the expected
+      // ENOENT as a handler error on first creation.
+      const bridge = getVFSBridge();
+      if (!(await bridge.exists(filePath))) {
+        await bridge.writeFile(filePath, "");
+      }
+    }
+
+    return new ElectronVFSFileHandle(filePath, relPath);
+  }
+
+  async getDirectoryHandle(
+    name: string,
+    options?: { create?: boolean },
+  ): Promise<VFSDirectoryHandle> {
+    const dirPath = joinPath(this.absolutePath, name);
+    const relPath = this.path ? joinPath(this.path, name) : name;
+
+    if (options?.create) {
+      const bridge = getVFSBridge();
+      await bridge.mkdir(dirPath);
+    }
+
+    return new ElectronVFSDirectoryHandle(dirPath, relPath);
+  }
+
+  async removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> {
+    const bridge = getVFSBridge();
+    const targetPath = joinPath(this.absolutePath, name);
+    await bridge.delete(targetPath, { recursive: options?.recursive ?? false });
+  }
+
+  async *entries(): AsyncIterable<[string, VFSEntry]> {
+    const bridge = getVFSBridge();
+    const dirEntries = await bridge.readDirectory(this.absolutePath);
+
+    for (const entry of dirEntries) {
+      const entryPath = this.path ? joinPath(this.path, entry.name) : entry.name;
+
+      const vfsEntry: VFSEntry = {
+        name: entry.name,
+        kind: entry.kind,
+        path: entryPath,
+      };
+      yield [entry.name, vfsEntry];
+    }
+  }
+}
+
+// -----------------------------------------------------------------------
+// ElectronVFS
+// -----------------------------------------------------------------------
+
+/**
+ * Electron implementation of the VirtualFileSystem interface.
+ * Uses IPC calls via window.electronAPI.vfs.* for all operations.
+ *
+ * Unlike WebVFS, this implementation uses absolute filesystem paths
+ * and does not require a prior openDirectory() call for path-based operations
+ * (though openDirectory() provides the directory picker UI).
+ */
+export class ElectronVFS implements VirtualFileSystem {
+  private rootPath: string | null = null;
+
+  /**
+   * Open a native file picker dialog for a single file.
+   * Returns the file path, name, and raw bytes so the caller can decode.
+   * Use text-codec.ts readTextWithEncoding() to handle BOM and EOL detection.
+   *
+   * @param opts - Optional dialog options including file type filters
+   * @returns Object with path, name, and raw byte buffer, or null if cancelled
+   * @throws Error if the Electron VFS API is not available
+   */
+  async openFile(opts?: {
+    fileTypes?: string[];
+  }): Promise<{ path: string; name: string; buf: Uint8Array } | null> {
+    const bridge = getVFSBridge();
+    const filters =
+      opts?.fileTypes && opts.fileTypes.length > 0
+        ? [{ name: "テキスト", extensions: opts.fileTypes }]
+        : [{ name: "テキスト", extensions: ["txt"] }];
+
+    const result = await bridge.openFile({ filters });
+    if (!result) return null;
+
+    // Bridge may return a plain object from IPC serialization; ensure Uint8Array
+    return {
+      path: result.path,
+      name: result.name,
+      buf:
+        result.buf instanceof Uint8Array
+          ? result.buf
+          : new Uint8Array(Object.values(result.buf as Record<string, number>)),
+    };
+  }
+
+  /**
+   * Open a native directory picker dialog.
+   * @throws Error if the Electron VFS API is not available
+   * @throws Error if the user cancels the dialog
+   */
+  async openDirectory(): Promise<VFSDirectoryHandle> {
+    const bridge = getVFSBridge();
+    const result = await bridge.openDirectory();
+
+    if (!result) {
+      throw new Error("Directory picker was cancelled by the user.");
+    }
+
+    this.rootPath = result.path;
+    return new ElectronVFSDirectoryHandle(result.path, "");
+  }
+
+  /**
+   * Get a directory handle for a given path.
+   * If the path is relative, it is resolved against the opened root directory.
+   * If the path is absolute (starts with "/"), it is used directly.
+   * @param path - Directory path
+   */
+  async getDirectoryHandle(path: string): Promise<VFSDirectoryHandle> {
+    const absolutePath = this.resolvePath(path);
+    return new ElectronVFSDirectoryHandle(absolutePath, path);
+  }
+
+  /**
+   * Read a file as UTF-8 text.
+   * @param path - File path (absolute or relative to root)
+   */
+  async readFile(path: string): Promise<string> {
+    const bridge = getVFSBridge();
+    const absolutePath = this.resolvePath(path);
+
+    try {
+      return await bridge.readFile(absolutePath);
+    } catch (error) {
+      throw new Error(
+        `Failed to read file "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Write UTF-8 text content to a file, creating parent directories as needed.
+   * @param path - File path (absolute or relative to root)
+   * @param content - Text content to write
+   */
+  async writeFile(path: string, content: string): Promise<void> {
+    const bridge = getVFSBridge();
+    const absolutePath = this.resolvePath(path);
+
+    try {
+      // Ensure parent directory exists
+      const parentDir = dirname(absolutePath);
+      await bridge.mkdir(parentDir);
+      await bridge.writeFile(absolutePath, content);
+    } catch (error) {
+      throw new Error(
+        `Failed to write file "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Delete a file.
+   * @param path - File path (absolute or relative to root)
+   */
+  async deleteFile(path: string): Promise<void> {
+    const bridge = getVFSBridge();
+    const absolutePath = this.resolvePath(path);
+
+    try {
+      await bridge.delete(absolutePath);
+    } catch (error) {
+      throw new Error(
+        `Failed to delete file "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Rename (move) a file or directory.
+   * @param oldPath - Current path (absolute or relative to root)
+   * @param newPath - Desired new path (absolute or relative to root)
+   */
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    const bridge = getVFSBridge();
+    const absoluteOld = this.resolvePath(oldPath);
+    const absoluteNew = this.resolvePath(newPath);
+
+    try {
+      await bridge.rename(absoluteOld, absoluteNew);
+    } catch (error) {
+      throw new Error(
+        `Failed to rename "${oldPath}" to "${newPath}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Get metadata about a file.
+   * @param path - File path (absolute or relative to root)
+   */
+  async getFileMetadata(path: string): Promise<VFSFileMetadata> {
+    const bridge = getVFSBridge();
+    const absolutePath = this.resolvePath(path);
+
+    try {
+      const stat = await bridge.stat(absolutePath);
+      return {
+        name: basename(absolutePath),
+        size: stat.size,
+        lastModified: stat.lastModified,
+        type: stat.type,
+      };
+    } catch (error) {
+      throw new Error(
+        `Failed to get metadata for "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * List all entries in a directory.
+   * @param path - Directory path (absolute or relative to root)
+   */
+  async listDirectory(path: string): Promise<VFSEntry[]> {
+    const bridge = getVFSBridge();
+    const absolutePath = this.resolvePath(path);
+
+    try {
+      const dirEntries = await bridge.readDirectory(absolutePath);
+      return dirEntries.map((entry) => ({
+        name: entry.name,
+        kind: entry.kind,
+        path: path ? joinPath(path, entry.name) : entry.name,
+      }));
+    } catch (error) {
+      throw new Error(
+        `Failed to list directory "${path}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Watch a file for changes.
+   * Only available if the Electron main process supports it.
+   * @param path - File path to watch
+   * @param callback - Called when the file changes
+   */
+  watchFile(path: string, callback: (event: VFSWatchEvent) => void): VFSWatcher {
+    const bridge = getVFSBridge();
+    if (!bridge.watch) {
+      throw new Error("File watching is not supported by this Electron build.");
+    }
+
+    const absolutePath = this.resolvePath(path);
+    return bridge.watch(absolutePath, callback);
+  }
+
+  /**
+   * Explicitly set the root path without opening a directory picker.
+   * Used for recovering VFS root after page reload (Electron).
+   * Also updates the main process allowed root for path validation.
+   * @param rootPath - Absolute path to the project root directory
+   * @param projectId - Optional project ID for project-scoped approval persistence (#1476)
+   */
+  async setRootPath(rootPath: string, projectId?: string): Promise<void> {
+    // Await the main process root update before updating local state,
+    // so this.rootPath is never set to a value the main process rejected.
+    try {
+      const bridge = getVFSBridge();
+      if ("setRoot" in bridge) {
+        // #1476: rehydration — pass projectId for project-scoped persistence
+        await (bridge as { setRoot: (p: string, projectId?: string) => Promise<unknown> }).setRoot(
+          rootPath,
+          projectId,
+        );
+      }
+    } catch (error: unknown) {
+      // Bridge may not be available during early initialization — that's expected.
+      // But security/validation errors from the main process must propagate.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("bridge") && !message.includes("not available")) {
+        throw error;
+      }
+    }
+    // Only update local rootPath after the main process has accepted it.
+    this.rootPath = rootPath;
+  }
+
+  getRootPath(): string | null {
+    return this.rootPath;
+  }
+
+  isRootOpen(): boolean {
+    return this.rootPath !== null;
+  }
+
+  /**
+   * Resolve a path to an absolute path.
+   * Handles POSIX absolute ("/"), Windows drive-letter ("C:/", "C:\"),
+   * and UNC ("\\\\server\\share") paths without joining them to rootPath.
+   * Backslashes in absolute paths are normalized to forward slashes for
+   * consistent IPC communication.
+   * @throws Error if no root path is available and path is relative
+   */
+  private resolvePath(inputPath: string): string {
+    // Check for POSIX absolute, Windows drive-letter (C:/ or C:\), or UNC (\\server)
+    const isAbsolute =
+      inputPath.startsWith("/") ||
+      /^[a-zA-Z]:[/\\]/.test(inputPath) ||
+      inputPath.startsWith("\\\\");
+    if (isAbsolute) {
+      // Normalize backslashes to forward slashes for consistent IPC
+      return inputPath.replace(/\\/g, "/");
+    }
+    if (!this.rootPath) {
+      throw new Error("Cannot resolve relative path without an open directory");
+    }
+    return joinPath(this.rootPath, inputPath);
+  }
+}

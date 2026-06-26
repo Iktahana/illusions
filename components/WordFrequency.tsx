@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, memo, useRef } from "react";
 import { RefreshCw, LoaderCircle, ChevronRight, ChevronDown } from "lucide-react";
 import clsx from "clsx";
 
-import ContextMenu from "@/components/ContextMenu";
+import ContextMenu from "@/shared/ui/ContextMenu";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { getProjectFileService } from "@/lib/services/project-file-service";
@@ -24,13 +24,22 @@ import type { GenjiVocabularySummary } from "@/lib/utils/vocabulary-genji";
  * on-disk caches are discarded instead of being served verbatim.
  * v2: #1640 strips serializer-escaped `\[\[blank]]` markers — pre-v2 caches
  *     still contain spurious "blank" tokens (#1639).
+ * v3: #1890 makes the cache content-addressed via `contentHash`. Disk
+ *     metadata (mtime/size) is no longer authoritative for cache validity,
+ *     so a dirty (unsaved) buffer can never hit a disk-keyed cache.
  */
-const CACHE_SCHEMA_VERSION = 2;
+const CACHE_SCHEMA_VERSION = 3;
 
 /** Cache file schema for word frequency results */
 interface WordFrequencyCache {
   /** Schema version; missing/older => cache is stale and re-analyzed. */
   schemaVersion?: number;
+  /**
+   * Stable hash of the live `content` that produced these words (#1890).
+   * Authoritative validity key: a cache is only valid when this matches
+   * the hash of the content currently being analyzed. Missing => stale.
+   */
+  contentHash?: string;
   lastModified: number;
   fileSize: number;
   words: WordEntry[];
@@ -86,6 +95,59 @@ function getCachePath(filePath: string): string {
   const basename = filePath.split("/").pop() ?? filePath;
   const hash = hashPath(filePath);
   return `.illusions/word_count/${basename}_${hash}.json`;
+}
+
+/**
+ * Stable djb2-style 32-bit hash of the live analysis content (#1890).
+ *
+ * The word-frequency cache is content-addressed: the real analysis input is
+ * the live React `content` prop (which includes the unsaved buffer), NOT the
+ * on-disk file. Hashing the content lets us invalidate the cache whenever the
+ * buffer changes — even when disk mtime/size are unchanged — and revalidate it
+ * after a save or external reload restores the original content.
+ *
+ * Returns an 8-char lowercase hex string. Cheap enough to run on large docs;
+ * disk mtime/size are kept only as a secondary guard.
+ */
+export function hashContent(content: string): string {
+  let hash = 5381;
+  for (let i = 0; i < content.length; i++) {
+    hash = ((hash << 5) + hash) ^ content.charCodeAt(i);
+    hash = hash >>> 0; // keep unsigned 32-bit
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/** Minimal disk metadata used as a secondary cache guard. */
+interface WordCacheMeta {
+  lastModified: number;
+  size: number;
+}
+
+/**
+ * Pure validity predicate for a persisted word-frequency cache (#1890).
+ *
+ * The cache is valid only when ALL of the following hold:
+ * 1. `schemaVersion` matches the current output schema (analysis format).
+ * 2. `contentHash` matches the hash of the content currently being analyzed.
+ *    This is the authoritative key — a dirty/unsaved buffer therefore never
+ *    matches a cache keyed to the previously-analyzed (e.g. on-disk) content.
+ * 3. Disk metadata (mtime + size) still matches, kept as a cheap secondary
+ *    guard against external file mutations.
+ *
+ * Extracted so the validity logic is unit-testable without React/VFS.
+ */
+export function isWordCacheValid(
+  cache: WordFrequencyCache,
+  meta: WordCacheMeta,
+  content: string,
+): boolean {
+  return (
+    cache.schemaVersion === CACHE_SCHEMA_VERSION &&
+    cache.contentHash === hashContent(content) &&
+    cache.lastModified === meta.lastModified &&
+    cache.fileSize === meta.size
+  );
 }
 
 function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) {
@@ -187,11 +249,10 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
           const cache = JSON.parse(cacheText) as WordFrequencyCache;
           const meta = await vfs.getFileMetadata(filePath);
 
-          if (
-            cache.schemaVersion === CACHE_SCHEMA_VERSION &&
-            cache.lastModified === meta.lastModified &&
-            cache.fileSize === meta.size
-          ) {
+          // #1890: cache is content-addressed. A dirty (unsaved) buffer never
+          // matches a disk-keyed cache because contentHash is part of the gate,
+          // so recording `content` as analyzed below is now always accurate.
+          if (isWordCacheValid(cache, meta, content)) {
             // Discard stale result if a newer analysis was started (#1078)
             if (genRef.current !== myGen) return;
             setWords(cache.words);
@@ -227,6 +288,10 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
           const totalWords = wordEntries.reduce((sum, w) => sum + w.count, 0);
           const cacheData: WordFrequencyCache = {
             schemaVersion: CACHE_SCHEMA_VERSION,
+            // #1890: source of truth is the live content that produced these
+            // words. A later discard/external-reload changes the content hash
+            // and naturally invalidates this cache, even if mtime/size revert.
+            contentHash: hashContent(content),
             lastModified: meta.lastModified,
             fileSize: meta.size,
             words: wordEntries,

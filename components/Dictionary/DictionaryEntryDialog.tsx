@@ -1,6 +1,6 @@
 "use client";
 
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 import type { UserDictionaryEntry } from "@/lib/project/project-types";
 
 // Predefined POS values matching PosType

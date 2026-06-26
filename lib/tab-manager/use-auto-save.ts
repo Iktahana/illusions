@@ -143,11 +143,21 @@ export function useAutoSave(params: UseAutoSaveParams): void {
      * (Re-)arm the timer for the interval the power policy decides for the
      * given activity state. No-op when the interval is unchanged so repeated
      * notifications never reset the countdown unnecessarily.
+     *
+     * M-4: when the interval INCREASES (e.g. 5s→20s on entering power-save /
+     * background), run one immediate save BEFORE installing the longer timer so
+     * the data-loss window does not silently quadruple. The guard
+     * `currentIntervalMs !== null` prevents the very first arm (initial mount)
+     * from triggering a spurious early save.
      */
     let currentIntervalMs: number | null = null;
     const arm = (activity: WindowActivityState): void => {
       const intervalMs = getAutoSaveIntervalMs(activity, { powerSaveMode });
       if (intervalMs === currentIntervalMs) return;
+      // M-4: flush before widening the interval (skip on initial mount).
+      if (currentIntervalMs !== null && intervalMs > currentIntervalMs) {
+        runAutoSave();
+      }
       currentIntervalMs = intervalMs;
       if (autoSaveTimerRef.current) {
         clearInterval(autoSaveTimerRef.current);
@@ -160,8 +170,43 @@ export function useAutoSave(params: UseAutoSaveParams): void {
     arm(getWindowActivitySnapshot());
     const unsubscribe = subscribeWindowActivity(arm);
 
+    // M-1/M-2: system resume — re-arm the timer with the current activity
+    // state and immediately flush dirty tabs. Sleep can freeze a running
+    // setInterval, so the resume event is an explicit re-arm signal independent
+    // of the focus/blur path (though both may fire together).
+    let unsubscribeResume: (() => void) | null = null;
+    const powerAPI = typeof window !== "undefined" ? window.electronAPI?.power : undefined;
+    if (powerAPI?.onResume) {
+      unsubscribeResume = powerAPI.onResume(() => {
+        arm(getWindowActivitySnapshot());
+        runAutoSave();
+      });
+    }
+
+    // M-5: lock-screen — flush immediately so data is safe before the OS
+    // locks. Only fires on macOS/Windows; no-op on Linux/web.
+    let unsubscribeLockScreen: (() => void) | null = null;
+    if (powerAPI?.onLockScreen) {
+      unsubscribeLockScreen = powerAPI.onLockScreen(() => {
+        runAutoSave();
+      });
+    }
+
+    // M-3 (Codex F-08): suspend — main も suspend を broadcast しているので購読し、
+    // スリープ直前に dirty タブを即フラッシュする。スリープ中の電源断/強制再起動で
+    // 最後の自動保存以降の入力が失われるのを防ぐ。
+    let unsubscribeSuspend: (() => void) | null = null;
+    if (powerAPI?.onSuspend) {
+      unsubscribeSuspend = powerAPI.onSuspend(() => {
+        runAutoSave();
+      });
+    }
+
     return () => {
       unsubscribe();
+      unsubscribeResume?.();
+      unsubscribeLockScreen?.();
+      unsubscribeSuspend?.();
       if (autoSaveTimerRef.current) {
         clearInterval(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;

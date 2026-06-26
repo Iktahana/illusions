@@ -8,7 +8,7 @@
  * TOCTOU レースコンディションと部分上書きを防止する。
  */
 
-import { AsyncMutex } from "@/lib/utils/async-mutex";
+import { AsyncMutex } from "@/shared/lib/async-mutex";
 import { getProjectFileService } from "@/lib/services/project-file-service";
 import { isAbsolutePath, joinPath } from "@/lib/vfs/path-utils";
 import type { WorkspaceState } from "./project-types";

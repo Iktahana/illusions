@@ -13,7 +13,7 @@
  */
 
 import { getProjectFileService } from "@/lib/services/project-file-service";
-import { AsyncMutex } from "@/lib/utils/async-mutex";
+import { AsyncMutex } from "@/shared/lib/async-mutex";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
 import type { VFSDirectoryHandle } from "@/lib/vfs/types";
@@ -73,9 +73,47 @@ export class HistoryStore {
       return createDefaultHistoryIndex();
     }
 
-    // Parse separately so JSON corruption throws and propagates to caller
-    // rather than silently returning an empty index that would overwrite data.
-    return JSON.parse(content) as HistoryIndex;
+    // Detect corrupt index.json: back it up then regenerate so history self-heals.
+    // index.json が破損している場合: バックアップを作成してからデフォルト値で再生成する。
+    let parsed: HistoryIndex;
+    try {
+      parsed = JSON.parse(content) as HistoryIndex;
+    } catch (err) {
+      console.warn(
+        "[HistoryStore] index.json が破損しています。バックアップ成功時のみデフォルト値で再生成します。",
+        err,
+      );
+      // Codex F-07: バックアップに失敗したら元 index.json を上書きしない。上書きすると
+      // snapshot メタデータが完全に失われ、ファイルが残っても履歴 UI から復元不能になる。
+      // 世代を残すため timestamp 付きバックアップ名を使う。
+      let backedUp = false;
+      try {
+        const historyDir = await this.getHistoryDirectory();
+        const backupHandle = await historyDir.getFileHandle(
+          `${HISTORY_INDEX_FILENAME}.corrupt.${Date.now()}.bak`,
+          { create: true },
+        );
+        await backupHandle.write(content);
+        backedUp = true;
+      } catch (backupErr) {
+        console.error(
+          "[HistoryStore] index.json のバックアップに失敗しました。破損 index は上書きせず保持します:",
+          backupErr,
+        );
+      }
+      const defaultIndex = createDefaultHistoryIndex();
+      // バックアップ成功時のみ既存 index を default で再生成（自己修復）。失敗時は
+      // 破損 index をディスクに残し（手動復旧用）、当セッションはメモリ上の default で動く。
+      if (backedUp) {
+        try {
+          await this.saveIndex(defaultIndex);
+        } catch (saveErr) {
+          console.error("[HistoryStore] デフォルト index.json の保存に失敗しました:", saveErr);
+        }
+      }
+      return defaultIndex;
+    }
+    return parsed;
   }
 
   /**
@@ -155,9 +193,18 @@ export class HistoryStore {
       return new Set();
     }
 
-    // Parse separately so JSON corruption propagates rather than silently clearing bookmarks.
-    const ids = JSON.parse(content) as string[];
-    return new Set(ids);
+    // Detect corrupt bookmarks file: log and return empty Set (bookmarks are non-critical).
+    // ブックマークファイルが破損している場合はログに残して空の Set を返す。
+    try {
+      const ids = JSON.parse(content) as string[];
+      return new Set(ids);
+    } catch (err) {
+      console.warn(
+        "[HistoryStore] .history_bookmarks.json が破損しています。ブックマークをリセットします。",
+        err,
+      );
+      return new Set();
+    }
   }
 
   /**

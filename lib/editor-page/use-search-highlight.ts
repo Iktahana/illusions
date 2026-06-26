@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Decoration, type EditorView } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
@@ -24,6 +24,13 @@ interface UseSearchHighlightParams {
   /** いずれかの検索 UI（フローティング窓 or サイドパネル）が表示中か。
    *  false になったら（＝両方とも非表示）ハイライトを消す。 */
   isSearchVisible: boolean;
+  /**
+   * #1857: 次へ/前へ/結果クリックなど明示的なユーザーナビゲーションのたびに
+   * インクリメントされるカウンター。このカウンターが変化した時のみ
+   * TextSelection とスクロールを実行する。コンテンツ編集で matches が
+   * 再計算されても navigationNonce は変わらないため、カーソル誤移動が起きない。
+   */
+  navigationNonce: number;
 }
 
 /**
@@ -34,7 +41,9 @@ interface UseSearchHighlightParams {
  * 責務:
  *  1. `isEditorViewAlive` で破棄済み view をガード（#1507）
  *  2. 検索 UI が非表示 or 検索語が空 → decorations を空 dispatch してクリア
- *  3. それ以外 → 全マッチをハイライト（current は強調クラス）＋現在マッチへスクロール
+ *  3. それ以外 → 全マッチをハイライト（current は強調クラス）
+ *  4. #1857: TextSelection とスクロールは navigationNonce が変化した時のみ実行
+ *     （コンテンツ編集で matches が再計算されてもカーソル位置を上書きしない）
  */
 export function useSearchHighlight({
   editorView,
@@ -42,7 +51,14 @@ export function useSearchHighlight({
   currentMatchIndex,
   searchTerm,
   isSearchVisible,
+  navigationNonce,
 }: UseSearchHighlightParams): void {
+  // navigationNonce が最後に処理されたときの値を追跡する。
+  // 初期値を -1 にして最初の明示的ナビゲーションを確実に捕捉する。
+  const lastNavigationNonceRef = useRef(-1);
+
+  // Effect 1: デコレーション更新。matches/searchTerm/可視状態が変わるたびに実行。
+  // TextSelection とスクロールは実行しない（#1857）。
   useEffect(() => {
     if (!isEditorViewAlive(editorView)) return;
     const { state, dispatch } = editorView;
@@ -69,21 +85,31 @@ export function useSearchHighlight({
     } catch {
       // #1507: view が検索中に破棄された — decorations も一緒に消える
     }
-
-    // 現在のマッチを画面中央へ。選択も移動して連続ナビを自然にする。
-    const current = matches[currentMatchIndex];
-    if (current) {
-      try {
-        const view = editorView;
-        view.dispatch(
-          view.state.tr.setSelection(
-            TextSelection.create(view.state.doc, current.from, current.from),
-          ),
-        );
-        centerEditorPosition(view, current.from);
-      } catch {
-        // 破棄済み view ではスクロール不要
-      }
-    }
   }, [editorView, matches, currentMatchIndex, searchTerm, isSearchVisible]);
+
+  // Effect 2: 明示的ナビゲーション時のみ選択移動＋スクロール（#1857）。
+  // navigationNonce が変化した時だけ実行される。コンテンツ編集で matches が
+  // 再計算されても nonce は変わらないため、カーソルが誤位置へ飛ばない。
+  // matches と currentMatchIndex は deps に含めるが、lastNavigationNonceRef
+  // ガードにより nonce が変化した時のみ実際に処理される。
+  useEffect(() => {
+    if (navigationNonce === lastNavigationNonceRef.current) return;
+    lastNavigationNonceRef.current = navigationNonce;
+
+    if (!isEditorViewAlive(editorView)) return;
+
+    const current = matches[currentMatchIndex];
+    if (!current) return;
+
+    try {
+      editorView.dispatch(
+        editorView.state.tr.setSelection(
+          TextSelection.create(editorView.state.doc, current.from, current.from),
+        ),
+      );
+      centerEditorPosition(editorView, current.from);
+    } catch {
+      // 破棄済み view ではスクロール不要
+    }
+  }, [navigationNonce, editorView, matches, currentMatchIndex]);
 }

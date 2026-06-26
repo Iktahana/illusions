@@ -13,7 +13,7 @@ import { useTerminalTabContext } from "@/contexts/TerminalTabContext";
 import { useDiffTabContext } from "@/contexts/DiffTabContext";
 import RealTerminalPanel from "@/components/TerminalPanel";
 import DiffView from "@/components/DiffView";
-import ContextMenu from "@/components/ContextMenu";
+import ContextMenu from "@/shared/ui/ContextMenu";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,6 @@
-/* eslint-disable no-console */
 // File-related IPC handlers: open, save, export, and file security utilities
 
-const { ipcMain, dialog } = require("electron");
+const { ipcMain, dialog, app } = require("electron");
 const path = require("path");
 const fs = require("fs/promises");
 const log = require("electron-log");
@@ -9,6 +8,32 @@ const { createApprovedPathRegistry } = require("../lib/approved-paths");
 const { normalizeSeparators } = require("../lib/path-utils");
 const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
 const { FILE_CHANNELS, EXPORT_CHANNELS } = require("../lib/ipc-channels");
+const { readFileStrictUtf8 } = require("../lib/text-decode");
+const { addStandalonePath, hasStandalonePath } = require("../lib/standalone-files");
+
+/**
+ * Absolute path to the persisted standalone-opened-paths allowlist (#1965).
+ * Resolved lazily so tests/headless contexts without an Electron `app` don't
+ * crash at module load.
+ * @returns {string}
+ */
+function getStandalonePathsFile() {
+  return path.join(app.getPath("userData"), "approved-standalone-paths.json");
+}
+
+/**
+ * Record a standalone-opened file in the persisted allowlist so it can be
+ * re-read on the next launch (session restore). Failures are non-fatal: opening
+ * the file must still succeed even if the allowlist write fails.
+ * @param {string} resolvedPath - Already path.resolve()'d absolute path
+ */
+async function rememberStandalonePath(resolvedPath) {
+  try {
+    await addStandalonePath(getStandalonePathsFile(), resolvedPath);
+  } catch (err) {
+    log.warn("standalone パスの永続化に失敗しました:", err);
+  }
+}
 
 // --- save-file path security validation ---
 // Tracks file paths that have been approved via native dialog or system file association,
@@ -180,8 +205,14 @@ async function handleMdiFileOpen(filePath) {
       // Open as standalone file
       log.info("Opening as standalone file:", filePath);
       // Approve system-opened file path for future saves, scoped to the target window
-      approveDialogPath(targetWindow.webContents.id, path.resolve(filePath));
-      const content = await fs.readFile(filePath, "utf-8");
+      const resolved = path.resolve(filePath);
+      approveDialogPath(targetWindow.webContents.id, resolved);
+      // Persist to the standalone allowlist so it can be restored after a restart (#1965).
+      await rememberStandalonePath(resolved);
+      // Read as strict UTF-8: non-UTF-8 manuscripts throw instead of opening
+      // with lossy U+FFFD that would later be saved back over the original (#1888).
+      // BOM is stripped inside readFileStrictUtf8 (#1842).
+      const content = await readFileStrictUtf8(filePath);
       targetWindow.webContents.send(FILE_CHANNELS.event.openFileFromSystem, {
         path: filePath,
         content,
@@ -222,9 +253,44 @@ function registerFileHandlers() {
     const filePath = filePaths[0];
     // Approve opened file path so it can be saved back without a new dialog.
     // Scoped to the requesting window to prevent cross-window reuse.
-    approveDialogPath(event.sender.id, path.resolve(filePath));
-    const content = await fs.readFile(filePath, "utf-8");
+    const resolved = path.resolve(filePath);
+    approveDialogPath(event.sender.id, resolved);
+    // Persist to the standalone allowlist so it can be restored after a restart (#1965).
+    await rememberStandalonePath(resolved);
+    // Read as strict UTF-8: non-UTF-8 files throw (surfaced to the renderer as
+    // a "UTF-8 へ変換してから開いてください" notice) instead of opening with
+    // lossy U+FFFD that a later save would write back over the original (#1888).
+    // BOM is stripped inside readFileStrictUtf8 (#1842).
+    const content = await readFileStrictUtf8(filePath);
     return { path: filePath, content };
+  });
+
+  // Re-read a standalone file for session restore (#1965). Unlike `open-file`
+  // (which prompts a dialog) this reads silently — but ONLY for paths the user
+  // previously opened in standalone mode (persisted allowlist). This is the safe
+  // restore path for Electron standalone, where `vfs:read-file` always fails
+  // because no VFS root is set. A successful read re-approves the path for the
+  // requesting window so subsequent saves work without a fresh dialog.
+  ipcMain.handle(FILE_CHANNELS.invoke.readStandaloneFile, async (event, filePath) => {
+    if (typeof filePath !== "string" || !filePath) {
+      return { success: false, code: "INVALID_INPUT", error: "Invalid file path" };
+    }
+    const resolved = path.resolve(filePath);
+    // Gate on the persisted allowlist: never read a path the user did not open.
+    if (!(await hasStandalonePath(getStandalonePathsFile(), resolved))) {
+      return { success: false, code: "NOT_APPROVED", error: "未承認のパスです" };
+    }
+    try {
+      // BOM is stripped inside readFileStrictUtf8 (#1842); non-UTF-8 throws (#1888).
+      const content = await readFileStrictUtf8(resolved);
+      // Re-approve for this window so the restored tab can be saved back.
+      approveDialogPath(event.sender.id, resolved);
+      return { success: true, path: resolved, content };
+    } catch (err) {
+      const code = err && err.code ? String(err.code) : "READ_FAILED";
+      log.warn(`standalone ファイルの復元読み込みに失敗しました (${resolved}):`, err);
+      return { success: false, code, error: String((err && err.message) || err) };
+    }
   });
 
   ipcMain.handle(FILE_CHANNELS.invoke.saveFile, async (event, filePath, content, fileType) => {
@@ -345,7 +411,11 @@ function registerFileHandlers() {
         } else {
           // Standalone file: approve path for future saves, scoped to the requesting window
           approveDialogPath(event.sender.id, path.resolve(filePath));
-          const content = await fs.readFile(filePath, "utf-8");
+          // Read as strict UTF-8: non-UTF-8 files throw (caught per-file below,
+          // so no lossy tab is created) instead of opening with U+FFFD that a
+          // later save would write back over the original (#1888).
+          // BOM is stripped inside readFileStrictUtf8 (#1842).
+          const content = await readFileStrictUtf8(filePath);
           results.push({
             type: "standalone",
             path: filePath,
@@ -410,19 +480,28 @@ function registerFileHandlers() {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
+    // Declared outside try so the finally block can always destroy it,
+    // preventing hidden BrowserWindow accumulation on print failures (#1919).
+    let printWin = null;
     try {
       const { BrowserWindow } = require("electron");
       const { mdiToHtml } = require("../../lib/export/mdi-to-html");
-      const {
-        calculateTypesetting,
-        PAGE_DIMENSIONS,
-      } = require("../../lib/export/pdf-export-settings");
+      const { calculateTypesetting } = require("../../lib/export/pdf-export-settings");
+      const { fullwidthIndentCount } = require("../../lib/export/fullwidth-indent");
 
       const opts = options || {};
       const pageSize = opts.pageSize ?? "A5";
       const margins = opts.margins ?? { top: 20, bottom: 20, left: 15, right: 15 };
       const verticalWriting = opts.verticalWriting ?? false;
       const landscape = opts.landscape ?? false;
+
+      // Full-width-space 字下げ: literal U+3000 characters replace CSS text-indent.
+      // When the toggle is on, suppress textIndentEm to avoid double indentation
+      // (same logic as pdf-exporter.ts).
+      const fullwidthSpaceCount = opts.fullwidthSpaceIndent
+        ? fullwidthIndentCount(opts.textIndent ?? 0)
+        : 0;
+      const effectiveTextIndentEm = opts.fullwidthSpaceIndent ? 0 : opts.textIndent;
 
       // Build typesetting when chars/lines specified
       let typesetting;
@@ -439,7 +518,7 @@ function registerFileHandlers() {
           fontFamily: opts.fontFamily,
           fontSizeMm,
           lineHeightRatio,
-          textIndentEm: opts.textIndent,
+          textIndentEm: effectiveTextIndentEm,
           margins,
           pageSize,
           landscape,
@@ -454,10 +533,21 @@ function registerFileHandlers() {
         typesetting,
         googleFontFamily: opts.googleFontFamily,
         fileType: opts.fileType,
+        fullwidthSpaceIndentCount: fullwidthSpaceCount,
+        // Embed page numbers via CSS @page margin boxes so they appear in the
+        // actual print output (webContents.print does not support
+        // headerTemplate/footerTemplate unlike printToPDF).
+        pageNumbers: opts.showPageNumbers
+          ? {
+              show: true,
+              format: opts.pageNumberFormat,
+              position: opts.pageNumberPosition,
+            }
+          : undefined,
       });
 
       const partition = `print-${Date.now()}`;
-      const printWin = new BrowserWindow({
+      printWin = new BrowserWindow({
         show: false,
         width: 800,
         height: 600,
@@ -514,11 +604,16 @@ function registerFileHandlers() {
         });
       });
 
-      printWin.destroy();
       return { success: true };
     } catch (error) {
       log.error("Print failed:", error);
       return { success: false, error: error.message || "Print failed" };
+    } finally {
+      // Always destroy the hidden print window to prevent resource leaks,
+      // regardless of whether the print succeeded, was cancelled, or failed.
+      if (printWin && !printWin.isDestroyed()) {
+        printWin.destroy();
+      }
     }
   });
 

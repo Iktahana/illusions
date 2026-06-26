@@ -11,7 +11,12 @@ import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
 import WebSunsetNotice from "@/components/WebSunsetNotice";
 import { useRubyTcy } from "@/lib/editor-page/use-ruby-tcy";
+import {
+  subscribeWindowActivity,
+  getWindowActivitySnapshot,
+} from "@/lib/editor-page/window-activity";
 import { useLintHandlers } from "@/lib/editor-page/use-lint-handlers";
+import { useUserDictionaryActions } from "@/lib/editor-page/use-user-dictionary-actions";
 import { useTabManager } from "@/lib/tab-manager";
 import { useUnsavedWarning } from "@/lib/hooks/use-unsaved-warning";
 import { useDockviewAdapter } from "@/lib/dockview/use-dockview-adapter";
@@ -20,15 +25,19 @@ import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { openWebPrintPreview } from "@/lib/export/web-print-preview";
+import TxtExportDialog from "@/components/TxtExportDialog";
+import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import { notificationManager } from "@/lib/services/notification-manager";
+import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
@@ -40,11 +49,14 @@ import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
-import { CORRECTION_MODES, MODE_TO_PRESET } from "@/lib/linting/correction-modes";
-import { LINT_PRESETS } from "@/lib/linting/lint-presets";
+import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
+import { buildModeRuleConfigsFromRules } from "@/lib/linting/mode-rule-configs";
+import { useInstalledRuleMetas } from "@/lib/editor-page/use-installed-rule-metas";
+import { useModeConfigMigration } from "@/lib/editor-page/use-mode-config-migration";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
+import { useKnownTerms } from "@/lib/editor-page/use-known-terms";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
 import { findSearchMatches, type SearchRange } from "@/lib/editor-page/find-search-matches";
@@ -115,6 +127,20 @@ export default function EditorPage() {
     setEditorKey((prev) => prev + 1);
   }, []);
 
+  // #1840 / #1885: holds the active editor's on-demand live-content flush.
+  // Declared early so incrementEditorKeyWithFlush (used by useEditorSettings)
+  // can close over it. MilkdownEditor registers itself via registerFlush below.
+  const flushActiveEditorRef = useRef<(() => string | null) | null>(null);
+
+  // #1885: display-setting changes that trigger incrementEditorKey() remount the
+  // editor, cancelling the Milkdown listener's 200ms debounce and losing the last
+  // typed characters. Flush live content into React state first so the new editor
+  // instance initialises with currentContentRef containing the latest keystrokes.
+  const incrementEditorKeyWithFlush = useCallback(() => {
+    flushActiveEditorRef.current?.();
+    incrementEditorKey();
+  }, [incrementEditorKey]);
+
   // Ref for dockview layout flush — populated after useDockviewPersistence,
   // consumed by useTabManager's close handler via stable callback.
   const flushLayoutStateRef = useRef<(() => Promise<void>) | undefined>(undefined);
@@ -136,7 +162,8 @@ export default function EditorPage() {
     settings,
     handlers: settingsHandlers,
     setters: settingsSetters,
-  } = useEditorSettings(incrementEditorKey);
+    settingsHydrated,
+  } = useEditorSettings(incrementEditorKeyWithFlush);
   const {
     fontScale,
     lineHeight,
@@ -153,6 +180,7 @@ export default function EditorPage() {
     showSettingsModal,
     lintingEnabled,
     lintingRuleConfigs,
+    lintingModeConfigVersion,
     powerSaveMode,
     autoPowerSaveOnBattery,
     correctionConfig,
@@ -174,12 +202,41 @@ export default function EditorPage() {
     handleLintingEnabledChange,
     handleLintingRuleConfigChange,
     handleLintingRuleConfigsBatchChange,
+    handleLintingModeConfigVersionChange,
     handlePowerSaveModeChange,
     handleAutoPowerSaveOnBatteryChange,
     handleCorrectionConfigChange,
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
+
+  // Rule metas of every installed external ruleset (all lint rules now live in
+  // external rulesets). The inspector's correction-mode dropdown derives its
+  // per-rule config map from these, mirroring the settings ModeSelector (#1817).
+  const loadedRules = useInstalledRuleMetas();
+
+  // Rules whose detections can be resolved by adding the flagged word to the
+  // user dictionary (manifest `suggestsDictionaryEntry`). Drives the "辞書に追加"
+  // action on correction cards and the squiggle context menu.
+  const dictEntryRuleIds = useMemo(
+    () => new Set(loadedRules.filter((r) => r.suggestsDictionaryEntry).map((r) => r.ruleId)),
+    [loadedRules],
+  );
+
+  // One-time recovery: re-derive the rule-config map from the current mode for
+  // installs whose persisted config predates mode-aware derivation (fresh
+  // installs with an empty map, AND existing users left with a COMPLETE
+  // all-enabled map by the #1809/#1810 regression + "すべて有効"). Gated by a
+  // persisted version so it runs exactly once and never clobbers later manual
+  // edits. See use-mode-config-migration.ts.
+  useModeConfigMigration({
+    hydrated: settingsHydrated,
+    loadedRules,
+    currentMode: correctionConfig.mode,
+    configVersion: lintingModeConfigVersion,
+    applyConfigs: handleLintingRuleConfigsBatchChange,
+    setConfigVersion: handleLintingModeConfigVersionChange,
+  });
 
   // Derive a stable per-window key from the project root path (Electron project mode).
   // This key scopes tabs and dockview layout so multiple windows with different projects
@@ -259,6 +316,32 @@ export default function EditorPage() {
     triggerSwitchToCorrections,
   } = panelHandlers;
 
+  // #1840: save flows call flushActiveEditorRef right before persisting so they
+  // never write debounce-lagged content. The mounted MilkdownEditor registers
+  // itself here; unmount clears it. (Ref declared early above for #1885.)
+  const registerFlush = useCallback((flush: (() => string | null) | null) => {
+    flushActiveEditorRef.current = flush;
+  }, []);
+
+  // #1840 (Codex F-02 mitigation): the dirty/clean decision on close/quit reads
+  // `tab.isDirty`, which lags the live editor by the 200ms listener debounce.
+  // Flush the live content whenever the window loses focus or becomes hidden
+  // (e.g. the user clicks away, or the in-app update dialog steals focus before
+  // "今すぐ再起動"), so `tab.content`/`isDirty` are current before any close
+  // decision. This only syncs state (never loses data). The full fix — a main →
+  // renderer close-preflight that flushes before deciding — is tracked separately.
+  useEffect(() => {
+    let prev = getWindowActivitySnapshot();
+    return subscribeWindowActivity((next) => {
+      const lostFocus = prev.isWindowFocused && !next.isWindowFocused;
+      const becameHidden = prev.isDocumentVisible && !next.isDocumentVisible;
+      prev = next;
+      if (lostFocus || becameHidden) {
+        flushActiveEditorRef.current?.();
+      }
+    });
+  }, []);
+
   const tabManager = useTabManager({
     skipAutoRestore,
     autoSave,
@@ -267,6 +350,7 @@ export default function EditorPage() {
     flushLayoutState: stableFlushLayoutState,
     windowKey,
     onEditorRemountNeeded: incrementEditorKey,
+    flushActiveEditorRef,
   });
   const {
     content,
@@ -278,10 +362,13 @@ export default function EditorPage() {
     lastSaveWasAuto,
     openFile: tabOpenFile,
     saveFile,
+    saveAllDirtyTabs,
     saveAsFile,
     newFile: tabNewFile,
     updateFileName,
     wasAutoRecovered,
+    recoveredBuffer,
+    clearRecoveredBuffer,
     onSystemFileOpen,
     _loadSystemFile: tabLoadSystemFile,
     tabs,
@@ -306,6 +393,9 @@ export default function EditorPage() {
     handleCloseTabCancel,
     flushTabState,
     restoreProjectTabs,
+    notifyFileRenamed,
+    findTabsAffectedByDelete,
+    notifyFileDeleted,
   } = tabManager;
 
   // Keep a live tabs ref for dockview panel renderers captured by stale closures.
@@ -435,6 +525,14 @@ export default function EditorPage() {
   const [dismissedRecovery, setDismissedRecovery] = useState(false);
   const [recoveryExiting, setRecoveryExiting] = useState(false);
   const [newFileTrigger, setNewFileTrigger] = useState(0);
+  // Incremented to ask the files panel to reload the tree after an external
+  // mutation (e.g. inspector rename, #1870).
+  const [fileTreeRefreshTrigger, setFileTreeRefreshTrigger] = useState(0);
+  // Pending file-name collision confirmation raised by the inspector rename.
+  const [renameCollision, setRenameCollision] = useState<{
+    name: string;
+    execute: () => Promise<void>;
+  } | null>(null);
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const [selectedManuscriptCells, setSelectedManuscriptCells] = useState(0);
   const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
@@ -484,12 +582,28 @@ export default function EditorPage() {
     content,
   ]);
 
+  // #1857: 明示的ナビゲーション（次へ/前へ/結果クリック）のたびに増加するカウンター。
+  // コンテンツ編集で matches が再計算されても nonce は変わらないため、
+  // useSearchHighlight 内でカーソル誤移動が起きない。
+  const [searchNavigationNonce, setSearchNavigationNonce] = useState(0);
+
+  // 明示的ナビゲーション専用ハンドラー。setCurrentMatchIndex と同時に nonce を増やす。
+  // setSearchTerm（検索語変更時リセット）は直接 setCurrentMatchIndex を呼ぶためナビゲーションとして扱わない。
+  const handleNavigateToMatch = useCallback(
+    (index: number | ((prev: number) => number)) => {
+      setCurrentMatchIndex(index);
+      setSearchNavigationNonce((n) => n + 1);
+    },
+    [setCurrentMatchIndex],
+  );
+
   useSearchHighlight({
     editorView: editorViewInstance,
     matches: searchMatches,
     currentMatchIndex,
     searchTerm,
     isSearchVisible,
+    navigationNonce: searchNavigationNonce,
   });
 
   // フローティング検索窓は <main> のトップレベル（dockview パネル外）でレンダリングし、
@@ -558,8 +672,11 @@ export default function EditorPage() {
   } = projectLifecycle;
 
   // Unsaved warning hook (project mode transitions only; tabs handle per-tab dirty checks)
+  // #1859: save ALL dirty tabs (not just the active one) and block the pending
+  // action when any save is cancelled/failed, so background dirty tabs and
+  // cancelled saves no longer lose unsaved content.
   const anyDirty = tabs.some((t) => isEditorTab(t) && t.isDirty);
-  const unsavedWarning = useUnsavedWarning(anyDirty, saveFile, currentFile?.name || null);
+  const unsavedWarning = useUnsavedWarning(anyDirty, saveAllDirtyTabs, currentFile?.name || null);
 
   // Auto-recovered editor remount
   useEffect(() => {
@@ -568,6 +685,21 @@ export default function EditorPage() {
       incrementEditorKey();
     }
   }, [wasAutoRecovered, incrementEditorKey]);
+
+  // #1966 H-5: 復元バッファをエディタへ適用する。setContent が active タブ内容を
+  // 差し替え dirty を自動判定し、incrementEditorKey で Milkdown を再マウントして
+  // 反映する（自動復元と同じ remount 機構）。適用後は永続バッファを破棄する。
+  const applyRecoveredBuffer = useCallback(async () => {
+    if (!recoveredBuffer) return;
+    setContent(recoveredBuffer.content);
+    incrementEditorKey();
+    await clearRecoveredBuffer?.();
+  }, [recoveredBuffer, setContent, incrementEditorKey, clearRecoveredBuffer]);
+
+  // #1966 H-6: ディスク内容を維持し、復元バッファを破棄する（既定で読込済み）。
+  const discardRecoveredBuffer = useCallback(async () => {
+    await clearRecoveredBuffer?.();
+  }, [clearRecoveredBuffer]);
 
   // With tabs, open/new don't need unsaved warnings (they create new tabs)
   const openFile = useCallback(async () => {
@@ -626,8 +758,13 @@ export default function EditorPage() {
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
 
-  // Export hook: handles PDF/EPUB/DOCX export with notifications
-  const getExportContent = useCallback(() => content, [content]);
+  // Export hook: handles PDF/EPUB/DOCX export with notifications.
+  // #1840: flush the live editor doc first so export/print never use
+  // debounce-lagged content (falls back to React state when no editor).
+  const getExportContent = useCallback(() => {
+    const live = flushActiveEditorRef.current?.();
+    return live ?? content;
+  }, [content]);
   const getExportTitle = useCallback(() => {
     const tab = tabs.find((t) => t.id === activeTabId);
     const name = (tab && isEditorTab(tab) ? tab.file?.name : undefined) ?? "untitled";
@@ -656,11 +793,36 @@ export default function EditorPage() {
   interface PrintDialogState {
     content: string;
     metadata: ExportMetadata;
+    fileType: SupportedFileExtension;
   }
   const [printDialogState, setPrintDialogState] = useState<PrintDialogState | null>(null);
 
   const handlePrintDialogRequest = useCallback((content: string, metadata: ExportMetadata) => {
-    setPrintDialogState({ content, metadata });
+    setPrintDialogState({ content, metadata, fileType: activeFileTypeRef.current });
+  }, []);
+
+  // TXT export 字下げ dialog. The export hook awaits the user's choice via a
+  // promise resolved when the dialog is confirmed (options) or cancelled (null).
+  const [txtDialogFormat, setTxtDialogFormat] = useState<"txt" | "txt-ruby" | null>(null);
+  const txtOptionsResolverRef = useRef<((options: TxtIndentOptions | null) => void) | null>(null);
+
+  const handleRequestTxtExportOptions = useCallback(
+    (format: "txt" | "txt-ruby"): Promise<TxtIndentOptions | null> =>
+      new Promise<TxtIndentOptions | null>((resolve) => {
+        // If a previous request is still pending (e.g. the dialog was re-opened
+        // before being answered), cancel it so its awaiting export does not hang.
+        txtOptionsResolverRef.current?.(null);
+        txtOptionsResolverRef.current = resolve;
+        setTxtDialogFormat(format);
+      }),
+    [],
+  );
+
+  const resolveTxtExportOptions = useCallback((options: TxtIndentOptions | null) => {
+    setTxtDialogFormat(null);
+    const resolve = txtOptionsResolverRef.current;
+    txtOptionsResolverRef.current = null;
+    resolve?.(options);
   }, []);
 
   const handleExportDialogRequest = useCallback(
@@ -703,6 +865,7 @@ export default function EditorPage() {
           pageNumberFormat: settings.pageNumberFormat,
           pageNumberPosition: settings.pageNumberPosition,
           textIndent: settings.textIndent,
+          fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
           googleFontFamily: settings.googleFontFamily,
           // Thread the active tab's snapshotted file type so the HTML pipeline
           // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
@@ -758,9 +921,8 @@ export default function EditorPage() {
 
       // Electron path: use IPC
       if (window.electronAPI?.printDocument) {
-        setPrintDialogState(null);
         try {
-          await window.electronAPI.printDocument(printDialogState.content, {
+          const result = await window.electronAPI.printDocument(printDialogState.content, {
             metadata: printDialogState.metadata,
             verticalWriting: settings.verticalWriting,
             pageSize: settings.pageSize,
@@ -773,8 +935,23 @@ export default function EditorPage() {
             pageNumberFormat: settings.pageNumberFormat,
             pageNumberPosition: settings.pageNumberPosition,
             textIndent: settings.textIndent,
+            fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
             googleFontFamily: settings.googleFontFamily,
+            // Pass the snapshotted file type so the HTML pipeline correctly
+            // handles .md/.txt literals vs .mdi MDI macros (#1882).
+            fileType: printDialogState.fileType,
           });
+          if (
+            result !== null &&
+            result !== undefined &&
+            typeof result === "object" &&
+            "success" in result &&
+            !result.success
+          ) {
+            notificationManager.error(`印刷に失敗しました: ${(result as { error: string }).error}`);
+            return;
+          }
+          setPrintDialogState(null);
         } catch (error) {
           const message = error instanceof Error ? error.message : "不明なエラー";
           notificationManager.error(`印刷に失敗しました: ${message}`);
@@ -955,6 +1132,7 @@ export default function EditorPage() {
     getIsEditorTabActive: useCallback(() => isEditorTabActiveRef.current, []),
     onExportDialogRequest: handleExportDialogRequest,
     onPrintDialogRequest: handlePrintDialogRequest,
+    onRequestTxtExportOptions: handleRequestTxtExportOptions,
   });
 
   // System file open: tab manager handles loading; we just update editor key
@@ -1007,6 +1185,8 @@ export default function EditorPage() {
     recoveryExiting,
     setDismissedRecovery,
     setRecoveryExiting,
+    // #1966 H-5/H-6: バッファ選択待ちの間はバナーを自動フェードアウトさせない。
+    recoveryActionPending: recoveredBuffer != null,
     editorViewInstance,
     contentRef,
     setContent,
@@ -1052,13 +1232,16 @@ export default function EditorPage() {
     charTypeAnalysis,
     charUsageRates,
     readabilityAnalysis,
-  } = useTextStatistics(content);
+  } = useTextStatistics(content, activeFileType);
 
   // charCount は旧インターフェース互換用エイリアス（可視本文文字数）
   const charCount = visibleTextCharCount;
 
   // --- Previous day comparison ---
-  const previousDayStats = usePreviousDayStats(currentFile?.name, isProjectMode(editorMode));
+  const previousDayStats = usePreviousDayStats(
+    currentFile?.path ?? undefined,
+    isProjectMode(editorMode),
+  );
 
   // --- Linting hook ---
   const {
@@ -1078,7 +1261,24 @@ export default function EditorPage() {
   );
 
   // --- Ignored corrections hook ---
-  const { ignoredCorrections, ignoreCorrection } = useIgnoredCorrections(editorMode);
+  const { ignoredCorrections, ignoreCorrection, unignoreCorrection, clearIgnoredCorrections } =
+    useIgnoredCorrections(editorMode);
+
+  // Known terms (user dictionary + dictionary-ruleset sources) that
+  // dictionary-matching lint rules must not flag as 辞書外語.
+  const knownTerms = useKnownTerms(editorMode);
+
+  // Quick "add to user dictionary" action for 辞書外語 detections.
+  const { addWordToUserDictionary } = useUserDictionaryActions(editorMode);
+
+  const ignoredCorrectionsContextValue = useMemo(
+    () => ({
+      items: ignoredCorrections,
+      clear: clearIgnoredCorrections,
+      unignore: unignoreCorrection,
+    }),
+    [ignoredCorrections, clearIgnoredCorrections, unignoreCorrection],
+  );
 
   // Sync ignoredCorrections to ProseMirror plugin
   useEffect(() => {
@@ -1093,6 +1293,19 @@ export default function EditorPage() {
       });
   }, [editorViewInstance, ignoredCorrections]);
 
+  // Sync known terms to ProseMirror plugin
+  useEffect(() => {
+    if (!editorViewInstance) return;
+
+    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+      .then(({ updateLintingSettings }) => {
+        updateLintingSettings(editorViewInstance, { knownTerms }, "known-terms-change");
+      })
+      .catch((err) => {
+        console.error("[page] Failed to sync known terms:", err);
+      });
+  }, [editorViewInstance, knownTerms]);
+
   // --- Lint handlers hook ---
   const {
     enrichedLintIssues,
@@ -1100,11 +1313,13 @@ export default function EditorPage() {
     handleNavigateToIssue,
     handleShowLintHint,
     handleIgnoreCorrection,
+    handleAddToUserDictionary,
     handleApplyFix,
   } = useLintHandlers({
     editorViewInstance,
     lintIssues,
     ignoreCorrection,
+    addWordToUserDictionary,
     triggerSwitchToCorrections,
   });
 
@@ -1160,6 +1375,66 @@ export default function EditorPage() {
   useEffect(() => {
     setFeatures(getAvailableFeatures());
   }, []);
+
+  // Inspector file-name rename (#1870). For an open *project* file the rename
+  // must hit disk via the same VFS the explorer uses, then sync the open tab's
+  // path/name so subsequent saves write to the new path. Standalone / untitled
+  // tabs have no known VFS file, so we keep the display-only descriptor update.
+  // NOTE: must stay ABOVE the `editorMode === null` early return below — hooks
+  // cannot be declared after a conditional return (#1960 follow-up crash fix).
+  const handleInspectorRename = useCallback(
+    async (newName: string) => {
+      const tab = tabsRef.current.find((t) => t.id === activeTabId);
+      const editorTab = tab && isEditorTab(tab) ? tab : null;
+      const vfsPath = editorTab?.file?.path ?? null;
+
+      // Standalone / untitled: no real file to rename — display-only.
+      if (!isProjectMode(editorMode) || !editorTab || !vfsPath) {
+        updateFileName(newName);
+        return;
+      }
+
+      // Apply a successful rename result to the open tab descriptor + tree.
+      // Reuse #1868's tab-path-sync (notifyFileRenamed → applyTabRename), which
+      // rewrites path/name/fileType (incl. extension change) for the renamed tab
+      // and any tab nested under it, instead of a bespoke single-tab update.
+      const applyRename = (outcome: Extract<RenameOutcome, { kind: "renamed" }>): void => {
+        notifyFileRenamed(outcome.oldPath, outcome.newPath);
+        setFileTreeRefreshTrigger((v) => v + 1);
+      };
+
+      const { getProjectFileService } = await import("@/lib/services/project-file-service");
+      const vfs = getProjectFileService();
+      const outcome = await renameProjectFile(vfs, { currentPath: vfsPath, newName });
+
+      switch (outcome.kind) {
+        case "noop":
+          return;
+        case "renamed":
+          applyRename(outcome);
+          return;
+        case "collision":
+          // Defer to the user via the safe overwrite dialog (#1869 parity).
+          setRenameCollision({
+            name: outcome.name,
+            execute: async () => {
+              const forced = await renameProjectFile(vfs, { currentPath: vfsPath, newName }, true);
+              if (forced.kind === "renamed") {
+                applyRename(forced);
+              } else if (forced.kind === "error") {
+                notificationManager.error("ファイル名の変更に失敗しました");
+              }
+            },
+          });
+          return;
+        case "error":
+          // Leave the displayed name unchanged so the inspector reverts.
+          notificationManager.error("ファイル名の変更に失敗しました");
+          return;
+      }
+    },
+    [activeTabId, editorMode, updateFileName, notifyFileRenamed],
+  );
 
   // --- Routing: WelcomeScreen vs Editor ---
   if (editorMode === null) {
@@ -1247,7 +1522,7 @@ export default function EditorPage() {
     onExcludeCommentsChange: setExcludeComments,
     onSearchTargetChange: setSearchTarget,
     onSelectionOnlyChange: setSelectionOnly,
-    onCurrentMatchIndexChange: setCurrentMatchIndex,
+    onCurrentMatchIndexChange: handleNavigateToMatch,
     onCloseSearchResults: handleCloseSearchResults,
     editorViewInstance,
     dictionarySearchTrigger,
@@ -1255,7 +1530,11 @@ export default function EditorPage() {
     projectSearchBuffers,
     onProjectBufferChange: handleProjectSearchBufferChange,
     newFileTrigger,
+    fileTreeRefreshTrigger,
     openProjectFile,
+    onFileRenamed: notifyFileRenamed,
+    onFileDeleted: notifyFileDeleted,
+    findTabsAffectedByDelete,
     incrementEditorKey,
     onWordSearch: (word: string) => {
       // 共有検索語へ反映し、フローティング検索窓を開く。
@@ -1278,7 +1557,7 @@ export default function EditorPage() {
     isSaving,
     lastSavedTime,
     onSaveFile: saveFile,
-    onFileNameChange: updateFileName,
+    onFileNameChange: handleInspectorRename,
     sentenceCount,
     charTypeAnalysis,
     charUsageRates,
@@ -1303,6 +1582,12 @@ export default function EditorPage() {
           sanitizeMdiContent(lastSaved, fileTypeOpts);
         updateTab(activeTabId, {
           fileSyncStatus: isClean ? "clean" : "dirty",
+          // #1845: keep isDirty consistent with fileSyncStatus so the tab ●
+          // shows, close-confirm fires, and auto-save picks up the restore.
+          // Editor remount (incrementEditorKey) sets the value via
+          // defaultValueCtx and never fires markdownUpdated, so isDirty would
+          // otherwise stay false after a restore.
+          isDirty: !isClean,
           conflictDiskContent: null,
         });
       }
@@ -1313,6 +1598,8 @@ export default function EditorPage() {
     onNavigateToIssue: handleNavigateToIssue,
     onApplyFix: handleApplyFix,
     onIgnoreCorrection: handleIgnoreCorrection,
+    onAddToUserDictionary: handleAddToUserDictionary,
+    dictEntryRuleIds,
     onRefreshLinting: refreshLinting,
     isLinting,
     activeLintIssueIndex,
@@ -1321,8 +1608,7 @@ export default function EditorPage() {
     onCorrectionModeChange: (modeId: CorrectionModeId) => {
       const mode = CORRECTION_MODES[modeId];
       handleCorrectionConfigChange({ mode: modeId, guidelines: [...mode.defaultGuidelines] });
-      const preset = LINT_PRESETS[MODE_TO_PRESET[modeId]];
-      if (preset) handleLintingRuleConfigsBatchChange({ ...preset.configs });
+      handleLintingRuleConfigsBatchChange(buildModeRuleConfigsFromRules(modeId, loadedRules));
     },
     switchToCorrectionsTrigger,
     previousDayStats,
@@ -1339,6 +1625,7 @@ export default function EditorPage() {
           terminalTabContextValue,
           settings,
           settingsHandlers,
+          ignoredCorrectionsContextValue,
         }}
         chrome={{
           currentFile,
@@ -1384,6 +1671,7 @@ export default function EditorPage() {
             onPrint: handlePrintConfirm,
             content: printDialogState?.content ?? "",
             metadata: printDialogState?.metadata ?? { title: "" },
+            fileType: printDialogState?.fileType,
           },
         }}
         recovery={{
@@ -1392,6 +1680,9 @@ export default function EditorPage() {
           recoveryExiting,
           setRecoveryExiting,
           currentFileName: currentFile?.name,
+          recoveredBuffer,
+          applyRecoveredBuffer,
+          discardRecoveredBuffer,
         }}
         upgrade={{
           showUpgradeBanner,
@@ -1458,7 +1749,7 @@ export default function EditorPage() {
           isSearchDialogOpen,
           onSearchTermChange: setSearchTerm,
           onCaseSensitiveChange: setCaseSensitive,
-          onCurrentMatchIndexChange: setCurrentMatchIndex,
+          onCurrentMatchIndexChange: handleNavigateToMatch,
           onOpenSearchDialog: openSearchDialog,
           onCloseSearchDialog: closeSearchDialog,
           onToggleSearchDialog: toggleSearchDialog,
@@ -1472,8 +1763,11 @@ export default function EditorPage() {
           handleOpenDictionary,
           handleShowLintHint,
           handleIgnoreCorrection,
+          handleAddToUserDictionary,
+          dictEntryRuleIds,
           switchTab,
           updateTab,
+          registerFlush,
         }}
         inspector={{
           isRightPanelCollapsed,
@@ -1483,6 +1777,25 @@ export default function EditorPage() {
           showSaveToast,
           saveToastExiting,
         }}
+      />
+      <TxtExportDialog
+        isOpen={txtDialogFormat != null}
+        format={txtDialogFormat ?? "txt"}
+        onConfirm={(options) => resolveTxtExportOptions(options)}
+        onCancel={() => resolveTxtExportOptions(null)}
+      />
+      <ConfirmDialog
+        isOpen={renameCollision !== null}
+        title="上書きの確認"
+        message={`「${renameCollision?.name ?? ""}」はすでに存在します。上書きしますか？\nこの操作は元に戻せません。`}
+        confirmLabel="上書きする"
+        cancelLabel="キャンセル"
+        onConfirm={() => {
+          const pending = renameCollision;
+          setRenameCollision(null);
+          void pending?.execute();
+        }}
+        onCancel={() => setRenameCollision(null)}
       />
     </>
   );

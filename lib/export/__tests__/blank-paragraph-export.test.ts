@@ -4,6 +4,7 @@ import { mdiToHtml } from "@/lib/export/mdi-to-html";
 import { mdiToPlainText } from "@/lib/export/txt-exporter";
 import { generateDocxBlob } from "@/lib/export/docx-exporter";
 import { buildEpubFiles } from "@/lib/export/epub-shared";
+import { promoteBlankRunsToMarkers } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 
 describe("html exporter — [[blank]] paragraph handling", () => {
   it("[[blank]] → <p></p>", () => {
@@ -336,5 +337,101 @@ describe("export — non-.mdi preserves literal editor HTML (Codex P3)", () => {
       expect(documentXml).not.toContain("&lt;p&gt;");
       expect(documentXml).toContain("本文");
     });
+  });
+});
+
+// Regression for #1826: author-intentional blank lines (Enter-key empty
+// paragraphs, NO [[blank]] macro) were preserved in TXT but collapsed in
+// HTML/PDF/print/DOCX/EPUB. The fix promotes the 2nd+ blank line in a run to a
+// [[blank]] marker for ".mdi" exports, matching TXT's collapseBlankLines rule
+// (1st blank = structural separator, rest = preserved). All paths must reach
+// TXT parity. Synthetic fixtures only — no manuscript content.
+describe("export — plain blank lines (no [[blank]] macro) preserved at TXT parity (#1826)", () => {
+  // 第一場 then 3 blank lines then 第二場 → TXT keeps 2 (1st is the structural
+  // paragraph separator). HTML/DOCX/EPUB must keep the same 2 blank paragraphs.
+  const SRC = "第一場\n\n\n\n第二場";
+
+  it("txt (reference): keeps exactly 2 intentional blank lines", () => {
+    const lines = mdiToPlainText(SRC, ".mdi").split("\n");
+    const aIdx = lines.findIndex((l) => l.includes("第一場"));
+    const bIdx = lines.findIndex((l) => l.includes("第二場"));
+    const blanks = lines.slice(aIdx + 1, bIdx).filter((l) => l.trim() === "").length;
+    expect(blanks).toBe(2);
+  });
+
+  it("html (.mdi): 2 empty <p></p> between the two scenes — TXT parity", () => {
+    const html = mdiToHtml(SRC, { bodyOnly: true, fileType: ".mdi" });
+    const count = (html.match(/<p><\/p>/g) ?? []).length;
+    expect(count).toBe(2);
+    // The U+E000 sentinel must not leak
+    expect(html).not.toContain(String.fromCharCode(0xe000));
+    expect(html).not.toContain("[[blank]]");
+  });
+
+  it("docx (.mdi): 4 total <w:p> (第一場 + 2 blanks + 第二場) — TXT parity", async () => {
+    const blob = await generateDocxBlob(SRC, {
+      metadata: { title: "novel.mdi", language: "ja" },
+      fileType: ".mdi",
+    });
+    const unzipped = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    const documentXml = strFromU8(unzipped["word/document.xml"]!);
+    const pCount = (documentXml.match(/<w:p[\s>]/g) ?? []).length;
+    expect(pCount).toBe(4);
+    expect(documentXml).not.toContain("[[blank]]");
+  });
+
+  it("epub (.mdi): 2 empty <p></p> in chapter xhtml — TXT parity", () => {
+    const files = buildEpubFiles(`# 第一章\n\n${SRC}`, {
+      metadata: { title: "novel.mdi", language: "ja" },
+      fileType: ".mdi",
+    });
+    const chapter = files.get("OEBPS/chapter-1.xhtml") as string;
+    const count = (chapter.match(/<p><\/p>/g) ?? []).length;
+    expect(count).toBe(2);
+    expect(chapter).not.toContain("[[blank]]");
+  });
+
+  it("html (.mdi): a SINGLE blank line is a structural separator — no spurious <p></p>", () => {
+    const html = mdiToHtml("第一場\n\n第二場", { bodyOnly: true, fileType: ".mdi" });
+    expect(html).not.toContain("<p></p>");
+  });
+
+  it("docx (.mdi): a SINGLE blank line → 2 <w:p> only (no extra blank paragraph)", async () => {
+    const blob = await generateDocxBlob("第一場\n\n第二場", {
+      metadata: { title: "novel.mdi", language: "ja" },
+      fileType: ".mdi",
+    });
+    const unzipped = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    const documentXml = strFromU8(unzipped["word/document.xml"]!);
+    const pCount = (documentXml.match(/<w:p[\s>]/g) ?? []).length;
+    expect(pCount).toBe(2);
+  });
+
+  it(".md scope guard: plain blank lines stay collapsed (CommonMark / DATA-LOSS)", () => {
+    // For .md the standard Markdown semantics apply — extra blank lines collapse.
+    const html = mdiToHtml(SRC, { bodyOnly: true, fileType: ".md" });
+    expect(html).not.toContain("<p></p>");
+  });
+});
+
+describe("promoteBlankRunsToMarkers (#1826 helper)", () => {
+  it("promotes the 2nd+ blank line in a run to [[blank]] markers", () => {
+    expect(promoteBlankRunsToMarkers("A\n\n\n\nB")).toBe("A\n\n[[blank]]\n\n[[blank]]\n\nB");
+  });
+
+  it("a single blank line stays a structural separator (no marker)", () => {
+    expect(promoteBlankRunsToMarkers("A\n\nB")).toBe("A\n\nB");
+  });
+
+  it("trims leading/trailing blank runs (matches collapseBlankLines)", () => {
+    expect(promoteBlankRunsToMarkers("\n\n\nA\n\nB\n\n\n")).toBe("A\n\nB");
+  });
+
+  it("leaves an existing [[blank]] marker untouched (no double promotion)", () => {
+    expect(promoteBlankRunsToMarkers("A\n\n[[blank]]\n\nB")).toBe("A\n\n[[blank]]\n\nB");
+  });
+
+  it("handles content with no blank runs", () => {
+    expect(promoteBlankRunsToMarkers("A\nB\nC")).toBe("A\nB\nC");
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import GlassDialog from "@/components/GlassDialog";
+import GlassDialog from "@/shared/ui/GlassDialog";
 
 interface UnsavedWarningDialogProps {
   isOpen: boolean;

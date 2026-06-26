@@ -141,7 +141,7 @@ export default function BubbleMenu({
       className={clsx(
         "fixed z-50 bg-background-elevated rounded-lg shadow-lg border border-border flex gap-1 p-1 transition-opacity duration-100",
         isVertical ? "flex-col items-center" : "items-center",
-        selectionState.hasSelection ? "opacity-100" : "opacity-0 pointer-events-none",
+        "opacity-100",
       )}
       style={{
         top: `${position.top}px`,
@@ -209,7 +209,9 @@ export default function BubbleMenu({
     </div>
   );
 
-  // Render via portal to document.body to escape dockview's transform context
-  if (!mounted) return null;
+  // Render via portal to document.body to escape dockview's transform context.
+  // Do not render when there is no selection — keeps hidden buttons out of the
+  // accessibility tree and Tab order (#1855).
+  if (!mounted || !selectionState.hasSelection) return null;
   return createPortal(menu, document.body);
 }

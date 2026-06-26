@@ -104,7 +104,7 @@
 **DO NOT implement custom storage logic. ALWAYS use StorageService.**
 
 ```typescript
-import { getStorageService } from "@/lib/storage-service";
+import { getStorageService } from "@/lib/storage/storage-service";
 
 const storage = getStorageService();
 
@@ -215,7 +215,7 @@ illusions/
 │   ├── Inspector.tsx     # Right sidebar (stats, AI)
 │   └── ...
 ├── lib/                   # Business logic
-│   ├── storage-service.ts        # Storage abstraction (ALWAYS USE THIS)
+│   ├── storage/                  # Unified storage service and platform adapters
 │   ├── nlp-backend/              # Japanese text processing
 │   └── nlp-client/               # Client-side NLP interface
 ├── packages/
@@ -246,7 +246,7 @@ illusions/
 
 - Custom format: `.mdi` (Markdown with ruby syntax)
 - Ruby notation: `{漢字|かんじ}` → `<ruby><rb>漢字</rb><rt>かんじ</rt></ruby>`
-- Syntax spec: See `MDI.md` in repo root
+- Syntax spec: See `docs/MDI/spec.md`
 
 ### Part-of-Speech Highlighting
 
@@ -254,12 +254,6 @@ illusions/
 - 12 POS categories with color coding
 - Viewport-based rendering for performance
 - Cache tokenization results
-
-### Browser Native AI
-
-- Feature detection: `window.ai?.canCreateTextSession()`
-- Status indicator: `AiStatusIndicator.tsx`
-- Future: Real-time proofreading via Prompt API
 
 ## Testing Philosophy
 
@@ -269,10 +263,9 @@ illusions/
 
 ## Documentation References
 
-- Quick nav: `docs/STORAGE_INDEX.md`
-- Storage API: `docs/STORAGE_QUICK_REFERENCE.md`
-- Architecture: `docs/STORAGE_ARCHITECTURE.md`
-- Code examples: `lib/storage-service-examples.ts`
+- Documentation index: `docs/README.md`
+- Storage architecture and API: `docs/architecture/storage-system.md`
+- VFS architecture: `docs/architecture/vfs.md`
 
 ## Custom Agents Available
 

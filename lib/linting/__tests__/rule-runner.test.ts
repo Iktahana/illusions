@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import { RuleRunner } from "../rule-runner";
 import type { LintIssue, LintRuleConfig } from "../types";
 import { AbstractLintRule } from "../base-rule";
-import { createJtfL1Rules } from "../rules/json-l1/jtf-l1-rules";
 
 /** A minimal test rule for unit testing the runner */
 class TestRule extends AbstractLintRule {
@@ -29,6 +28,37 @@ class TestRule extends AbstractLintRule {
           messageJa: "テスト問題発見",
           from: text.indexOf("ERROR"),
           to: text.indexOf("ERROR") + 5,
+        },
+      ];
+    }
+    return [];
+  }
+}
+
+/** A second stub rule that fires on a different trigger, for multi-rule tests */
+class AnotherRule extends AbstractLintRule {
+  readonly id = "another-rule";
+  readonly name = "Another Rule";
+  readonly nameJa = "別のルール";
+  readonly description = "Another rule for testing";
+  readonly descriptionJa = "テスト用の別ルール";
+  readonly level = "L1" as const;
+  readonly defaultConfig: LintRuleConfig = {
+    enabled: true,
+    severity: "info",
+  };
+
+  lint(text: string, config: LintRuleConfig): LintIssue[] {
+    if (!text) return [];
+    if (text.includes("WARN")) {
+      return [
+        {
+          ruleId: this.id,
+          severity: config.severity,
+          message: "Another issue found",
+          messageJa: "別の問題発見",
+          from: text.indexOf("WARN"),
+          to: text.indexOf("WARN") + 4,
         },
       ];
     }
@@ -79,6 +109,41 @@ describe("RuleRunner", () => {
       const runner = new RuleRunner();
       expect(runner.getConfig("nonexistent")).toBeUndefined();
     });
+
+    it("preserves manifest rule options when a later setConfig omits them (#1962)", () => {
+      // A rule registered with options (e.g. genji-out-of-dict noun-only scope).
+      class OptionRule extends AbstractLintRule {
+        readonly id = "opt-rule";
+        readonly name = "Opt";
+        readonly nameJa = "Opt";
+        readonly description = "";
+        readonly descriptionJa = "";
+        readonly level = "L2" as const;
+        readonly defaultConfig: LintRuleConfig = {
+          enabled: true,
+          severity: "info",
+          options: { includeVerbsAdjectives: false },
+        };
+        lint(): LintIssue[] {
+          return [];
+        }
+      }
+      const runner = new RuleRunner();
+      runner.registerRule(new OptionRule());
+
+      // The renderer pushes a mode config carrying only enabled/severity.
+      runner.setConfig("opt-rule", { enabled: true, severity: "info" });
+
+      // Options must survive — otherwise the rule reverts to its internal default.
+      expect(runner.getConfig("opt-rule")?.options).toEqual({ includeVerbsAdjectives: false });
+    });
+
+    it("lets an explicit options object override the preserved one (#1962)", () => {
+      const runner = new RuleRunner();
+      runner.setConfig("r", { enabled: true, severity: "info", options: { a: 1 } });
+      runner.setConfig("r", { enabled: true, severity: "info", options: { b: 2 } });
+      expect(runner.getConfig("r")?.options).toEqual({ b: 2 });
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -105,14 +170,13 @@ describe("RuleRunner", () => {
 
     it("should sort issues by position", () => {
       const runner = new RuleRunner();
-      // Register a real JTF rule for testing sort behavior
-      const jtfRules = createJtfL1Rules();
-      if (jtfRules.length > 0) {
-        runner.registerRule(jtfRules[0]);
-      }
+      // AnotherRule fires on "WARN" (position 0), TestRule fires on "ERROR" (position 5)
+      runner.registerRule(new AnotherRule());
       runner.registerRule(new TestRule());
 
-      const issues = runner.runAll("ERROR ﾒｰﾙ text");
+      // "WARN ERROR" — WARN at 0, ERROR at 5
+      const issues = runner.runAll("WARN ERROR text");
+      expect(issues.length).toBeGreaterThanOrEqual(2);
       for (let i = 1; i < issues.length; i++) {
         expect(issues[i].from).toBeGreaterThanOrEqual(issues[i - 1].from);
       }
@@ -192,15 +256,12 @@ describe("RuleRunner", () => {
     it("should return only enabled rules", () => {
       const runner = new RuleRunner();
       runner.registerRule(new TestRule());
-      const jtfRules = createJtfL1Rules();
-      if (jtfRules.length > 0) {
-        runner.registerRule(jtfRules[0]);
-      }
+      runner.registerRule(new AnotherRule());
       runner.setConfig("test-rule", { enabled: false, severity: "warning" });
 
       const enabled = runner.getEnabledRules();
       expect(enabled.length).toBe(1);
-      expect(enabled[0].id).toBe(jtfRules[0].id);
+      expect(enabled[0].id).toBe("another-rule");
     });
   });
 

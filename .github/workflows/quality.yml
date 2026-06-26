@@ -2,30 +2,34 @@ name: Code Quality
 
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [dev, beta, alpha, main]
   push:
-    branches: [dev, main]
+    branches: [dev, beta, alpha, main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
       - run: npm ci
       - run: npm run lint
+      - run: npm run check:boundaries
       - run: npm run type-check
 
   test:
     name: Test & Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
@@ -44,7 +48,7 @@ jobs:
     name: Format Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "22"

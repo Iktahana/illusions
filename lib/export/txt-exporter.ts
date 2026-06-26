@@ -11,6 +11,29 @@
  */
 
 import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import { fullwidthIndentPrefix } from "./fullwidth-indent";
+
+/** Options controlling literal full-width-space (U+3000) 字下げ for TXT export. */
+export interface TxtIndentOptions {
+  /** When true, prepend full-width spaces to each non-empty line. */
+  fullwidthSpaceIndent: boolean;
+  /** Number of full-width spaces to prepend (>= 1 when enabled). */
+  indentCount: number;
+}
+
+/**
+ * Prepend `count` full-width spaces (U+3000) to each non-empty line.
+ * Blank lines are preserved as-is so paragraph spacing is not disturbed.
+ */
+function applyFullwidthIndent(text: string, options?: TxtIndentOptions): string {
+  if (!options?.fullwidthSpaceIndent) return text;
+  const prefix = fullwidthIndentPrefix(options.indentCount);
+  if (!prefix) return text;
+  return text
+    .split("\n")
+    .map((line) => (line.length > 0 ? prefix + line : line))
+    .join("\n");
+}
 
 /**
  * Build the source MDI document for an export, branching on file type.
@@ -41,8 +64,12 @@ function buildExportDocument(content: string, fileType: string): MdiDocument {
  * @param fileType - Active document file extension (".mdi" | ".md" | ".txt").
  *   Defaults to ".mdi". See {@link buildExportDocument} for the branch rationale.
  */
-export function mdiToPlainText(content: string, fileType: string = ".mdi"): string {
-  return buildExportDocument(content, fileType).toExportText("txt");
+export function mdiToPlainText(
+  content: string,
+  fileType: string = ".mdi",
+  indent?: TxtIndentOptions,
+): string {
+  return applyFullwidthIndent(buildExportDocument(content, fileType).toExportText("txt"), indent);
 }
 
 /**
@@ -53,6 +80,13 @@ export function mdiToPlainText(content: string, fileType: string = ".mdi"): stri
  *   authored text (non-`.mdi`)
  * @param fileType - Active document file extension. See {@link mdiToPlainText}.
  */
-export function mdiToRubyText(content: string, fileType: string = ".mdi"): string {
-  return buildExportDocument(content, fileType).toExportText("txt-ruby");
+export function mdiToRubyText(
+  content: string,
+  fileType: string = ".mdi",
+  indent?: TxtIndentOptions,
+): string {
+  return applyFullwidthIndent(
+    buildExportDocument(content, fileType).toExportText("txt-ruby"),
+    indent,
+  );
 }

@@ -48,6 +48,16 @@ export interface UnifiedExportSettings {
   pageNumberFormat: PageNumberFormat;
   pageNumberPosition: PageNumberPosition;
   textIndent: number;
+  /**
+   * When true, PDF/DOCX 字下げ is rendered as literal full-width spaces (U+3000)
+   * prepended to each paragraph instead of a layout indent. The number of spaces
+   * is derived from `textIndent` (rounded). Default false. EPUB is unaffected.
+   */
+  fullwidthSpaceIndent: boolean;
+  /** TXT export: prepend literal full-width spaces (U+3000) as 字下げ. Default false. */
+  txtFullwidthSpaceIndent: boolean;
+  /** TXT export: number of full-width spaces to prepend when enabled (1–4). */
+  txtIndentCount: number;
   // EPUB-specific
   epubPublisher: string;
   epubIdentifier: string;
@@ -66,6 +76,9 @@ export const DEFAULT_EXPORT_SETTINGS: UnifiedExportSettings = {
   pageNumberFormat: "simple",
   pageNumberPosition: "bottom-center",
   textIndent: 1,
+  fullwidthSpaceIndent: false,
+  txtFullwidthSpaceIndent: false,
+  txtIndentCount: 1,
   epubPublisher: "",
   epubIdentifier: "",
   epubChapterSplitLevel: "h1",
@@ -180,6 +193,7 @@ export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings
     pageNumberFormat: s.pageNumberFormat,
     pageNumberPosition: s.pageNumberPosition,
     textIndent: s.textIndent,
+    fullwidthSpaceIndent: s.fullwidthSpaceIndent,
     googleFontFamily: isGoogleFont ? s.fontFamily : undefined,
   };
 }
@@ -204,6 +218,7 @@ export function toDocxExportSettings(s: UnifiedExportSettings): DocxExportSettin
     lineSpacing: Math.round(lineHeightRatio * 10) / 10,
     margins: { ...s.margins },
     textIndent: s.textIndent,
+    fullwidthSpaceIndent: s.fullwidthSpaceIndent,
     showPageNumbers: s.showPageNumbers,
     pageNumberFormat: s.pageNumberFormat,
     pageNumberPosition: s.pageNumberPosition,
@@ -307,6 +322,18 @@ function sanitize(raw: Partial<UnifiedExportSettings>): UnifiedExportSettings {
       ? (raw.pageNumberPosition as PageNumberPosition)
       : d.pageNumberPosition,
     textIndent: typeof raw.textIndent === "number" ? clamp(raw.textIndent, 0, 4) : d.textIndent,
+    fullwidthSpaceIndent:
+      typeof raw.fullwidthSpaceIndent === "boolean"
+        ? raw.fullwidthSpaceIndent
+        : d.fullwidthSpaceIndent,
+    txtFullwidthSpaceIndent:
+      typeof raw.txtFullwidthSpaceIndent === "boolean"
+        ? raw.txtFullwidthSpaceIndent
+        : d.txtFullwidthSpaceIndent,
+    txtIndentCount:
+      typeof raw.txtIndentCount === "number"
+        ? clamp(Math.round(raw.txtIndentCount), 1, 4)
+        : d.txtIndentCount,
     epubPublisher: typeof raw.epubPublisher === "string" ? raw.epubPublisher : d.epubPublisher,
     epubIdentifier: typeof raw.epubIdentifier === "string" ? raw.epubIdentifier : d.epubIdentifier,
     epubChapterSplitLevel: VALID_CHAPTER_SPLIT_LEVELS.includes(

@@ -44,6 +44,7 @@ const STORAGE_CHANNELS = Object.freeze({
     setItem: "storage:set-item",
     getItem: "storage:get-item",
     removeItem: "storage:remove-item",
+    getKeysByPrefix: "storage:get-keys-by-prefix",
   }),
   event: Object.freeze({}),
 });
@@ -70,6 +71,7 @@ const FILE_CHANNELS = Object.freeze({
     openFile: "open-file",
     saveFile: "save-file",
     getPendingFile: "get-pending-file",
+    readStandaloneFile: "read-standalone-file",
   }),
   event: Object.freeze({
     openFileFromSystem: "open-file-from-system",
@@ -110,6 +112,12 @@ const SYSTEM_CHANNELS = Object.freeze({
     setDirty: "set-dirty",
     saveBeforeCloseDone: "save-before-close-done",
     newWindow: "new-window",
+  }),
+  send: Object.freeze({
+    // #1839: renderer → main one-way signal that a requested close was aborted
+    // (save failed / conflict). Lets the quit-and-install flow stop waiting for
+    // a window that will not close, instead of hanging.
+    closeAborted: "close-aborted",
   }),
   event: Object.freeze({
     requestSaveBeforeClose: "electron-request-save-before-close",
@@ -192,6 +200,14 @@ const SAFE_STORAGE_CHANNELS = Object.freeze({
   event: Object.freeze({}),
 });
 
+// Usage analytics / Aptabase (electron/ipc/analytics-ipc.js)
+const ANALYTICS_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    trackEvent: "analytics:track-event",
+  }),
+  event: Object.freeze({}),
+});
+
 // Power monitoring (invoke in electron/ipc/system-ipc.js; event pushed from
 // electron/window-manager.js)
 const POWER_CHANNELS = Object.freeze({
@@ -200,6 +216,12 @@ const POWER_CHANNELS = Object.freeze({
   }),
   event: Object.freeze({
     stateChanged: "power:state-changed",
+    /** Fired when the system resumes from sleep/suspend. */
+    resumed: "power:resumed",
+    /** Fired when the system is about to suspend (sleep). */
+    suspended: "power:suspended",
+    /** Fired when the screen is locked. */
+    lockScreen: "power:lock-screen",
   }),
 });
 
@@ -239,6 +261,21 @@ const UPDATE_CHANNELS = Object.freeze({
   event: Object.freeze({}),
 });
 
+// Official校正ルールセットの自動DL/更新 (electron/ipc/rulesets-ipc.js)
+const RULESETS_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    listInstalled: "rulesets:list-installed",
+    sync: "rulesets:sync",
+    checkUpdate: "rulesets:check-update",
+    readModule: "rulesets:read-module",
+    uninstall: "rulesets:uninstall",
+  }),
+  event: Object.freeze({
+    syncProgress: "rulesets:sync-progress",
+    changed: "rulesets:changed",
+  }),
+});
+
 // Integrated terminal PTY sessions (electron/ipc/pty-ipc.js)
 const PTY_CHANNELS = Object.freeze({
   invoke: Object.freeze({
@@ -266,9 +303,11 @@ module.exports = {
   VFS_CHANNELS,
   AUTH_CHANNELS,
   SAFE_STORAGE_CHANNELS,
+  ANALYTICS_CHANNELS,
   POWER_CHANNELS,
   EDITOR_CHANNELS,
   NLP_CHANNELS,
   PTY_CHANNELS,
   UPDATE_CHANNELS,
+  RULESETS_CHANNELS,
 };

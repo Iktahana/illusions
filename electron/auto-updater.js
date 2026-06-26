@@ -1,10 +1,15 @@
-/* eslint-disable no-console */
 // Auto-updater setup and manual/automatic update checks
 
 const { app, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const { isDev, isMicrosoftStoreApp } = require("./app-constants");
+const { resolveUpdaterFlags, isUnpublishedChannelVersion } = require("./lib/update-policy");
+
+// dev/alpha ブランチのビルドは GitHub Release を持たない CI 専用成果物のため、
+// auto-updater を走らせると安定版/beta への誤ダウングレードを招く。バージョン文字列で
+// 検出して更新を無効化する（isDev は環境変数依存で packaged dev 版を検出できない）。
+const isUnpublishedChannelBuild = isUnpublishedChannelVersion(app.getVersion());
 
 // auto-updater のログ設定
 autoUpdater.logger = log;
@@ -32,10 +37,12 @@ async function applyBetaOptIn() {
   try {
     const { getStorageManager } = require("./ipc/storage-ipc");
     const appState = await getStorageManager().loadAppState();
-    const allowBeta = appState?.allowBetaUpdates === true;
-    autoUpdater.allowPrerelease = allowBeta;
-    autoUpdater.allowDowngrade = !allowBeta;
-    log.info(`アップデート設定: allowPrerelease=${allowBeta}, allowDowngrade=${!allowBeta}`);
+    const { allowPrerelease, allowDowngrade } = resolveUpdaterFlags(appState?.allowBetaUpdates);
+    autoUpdater.allowPrerelease = allowPrerelease;
+    autoUpdater.allowDowngrade = allowDowngrade;
+    log.info(
+      `アップデート設定: allowPrerelease=${allowPrerelease}, allowDowngrade=${allowDowngrade}`,
+    );
   } catch (e) {
     log.error("beta opt-in 設定の読み込みに失敗しました:", e);
   }
@@ -48,6 +55,12 @@ function setupAutoUpdater() {
   // 開発モードではアップデート確認をしない
   if (isDev) {
     log.info("開発モードのため auto-updater は無効です");
+    return;
+  }
+
+  // dev/alpha チャンネルのビルドは公開 Release が無く、更新先が存在しない
+  if (isUnpublishedChannelBuild) {
+    log.info(`dev/alpha チャンネルビルド (${app.getVersion()}) のため auto-updater は無効です`);
     return;
   }
 
@@ -98,10 +111,17 @@ function setupAutoUpdater() {
           defaultId: 0,
           cancelId: 1,
         })
-        .then((result) => {
+        .then(async (result) => {
           if (result.response === 0) {
             // 「今すぐ再起動」
-            autoUpdater.quitAndInstall();
+            // before-quit-for-update は BrowserWindow の close イベントをスキップするため
+            // dirty ウィンドウがあっても保存ダイアログが表示されない (#1839)。
+            // quitAndInstall の前に全ウィンドウの未保存変更を自前で処理する。
+            const { saveAllBeforeQuitAndInstall } = require("./window-manager");
+            const shouldQuit = await saveAllBeforeQuitAndInstall();
+            if (shouldQuit) {
+              autoUpdater.quitAndInstall();
+            }
           }
         });
     }
@@ -172,6 +192,24 @@ async function checkForUpdates(manual = false) {
     return;
   }
 
+  if (isUnpublishedChannelBuild) {
+    if (manual) {
+      const { getMainWindow } = require("./window-manager");
+      const mainWindow = getMainWindow();
+      if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: "info",
+          title: "アップデート",
+          message: "開発版",
+          detail:
+            "この開発版 (dev/alpha) はアップデート機能の対象外です。安定版または beta 版をご利用ください。",
+          buttons: ["OK"],
+        });
+      }
+    }
+    return;
+  }
+
   if (isMicrosoftStoreApp) {
     if (manual) {
       const { getMainWindow } = require("./window-manager");
@@ -202,7 +240,7 @@ async function checkForUpdates(manual = false) {
  * ダイアログ表示のみ。OFF にした場合も latest へ戻す）。
  */
 async function reevaluateUpdateChannel() {
-  if (isDev || isMicrosoftStoreApp) return;
+  if (isDev || isUnpublishedChannelBuild || isMicrosoftStoreApp) return;
   await checkForUpdates(false);
 }
 

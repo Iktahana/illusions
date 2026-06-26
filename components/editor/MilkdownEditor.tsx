@@ -1,7 +1,14 @@
 "use client";
 
 import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
+import {
+  commandsCtx,
+  Editor,
+  rootCtx,
+  defaultValueCtx,
+  editorViewCtx,
+  serializerCtx,
+} from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
   commonmark,
@@ -34,6 +41,7 @@ import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin
 import type { EditorSelectionState } from "@/lib/editor-page/use-selection-tracking";
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { commitPendingComposition } from "@/lib/editor-page/commit-pending-composition";
 import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
 import {
   getScrollProgress,
@@ -66,6 +74,9 @@ interface MilkdownEditorProps {
   onOpenDictionary?: (searchTerm?: string) => void;
   onShowLintHint?: (issue: LintIssue) => void;
   onIgnoreCorrection?: (issue: LintIssue, ignoreAll: boolean) => void;
+  onAddToUserDictionary?: (issue: LintIssue) => void;
+  /** Rule ids whose detections support adding the flagged word to the user dictionary. */
+  dictEntryRuleIds?: ReadonlySet<string>;
   mdiExtensionsEnabled?: boolean;
   gfmEnabled?: boolean;
   onStartSpeech?: () => void;
@@ -79,6 +90,15 @@ interface MilkdownEditorProps {
   onExternalContentApplied?: () => void;
   /** Called after layout reflow completes (style application + browser paint). */
   onLayoutReady?: () => void;
+  /**
+   * Register an on-demand flush that synchronously serializes the *live*
+   * editor doc and returns it (#1840). The content update path
+   * (`markdownUpdated`) is debounced 200ms with no maxWait, so during
+   * continuous typing the parent's `tab.content` lags arbitrarily. Save flows
+   * call this right before persisting so they never write stale content.
+   * Called with the flush fn on mount and `null` on unmount.
+   */
+  registerFlush?: (flush: (() => string | null) | null) => void;
 }
 
 export default function MilkdownEditor({
@@ -97,6 +117,8 @@ export default function MilkdownEditor({
   onOpenDictionary,
   onShowLintHint,
   onIgnoreCorrection,
+  onAddToUserDictionary,
+  dictEntryRuleIds,
   mdiExtensionsEnabled = true,
   gfmEnabled = true,
   onStartSpeech,
@@ -105,6 +127,7 @@ export default function MilkdownEditor({
   externalContent,
   onExternalContentApplied,
   onLayoutReady,
+  registerFlush,
 }: MilkdownEditorProps) {
   const {
     fontScale,
@@ -134,6 +157,9 @@ export default function MilkdownEditor({
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
   // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
   const initialContentRef = useRef<string>(initialContent);
+  // 最新コンテンツを追跡する。isVertical 切替でエディタが再構築されたとき、
+  // 未保存の変更を保持するために initialContentRef の代わりに使う（#426）。
+  const currentContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
   const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
@@ -191,7 +217,7 @@ export default function MilkdownEditor({
 
   const { get } = useEditor(
     (root) => {
-      const value = initialContentRef.current;
+      const value = currentContentRef.current;
       let editor = Editor.make()
         .config(nord)
         .config((ctx) => {
@@ -210,10 +236,13 @@ export default function MilkdownEditor({
               doc.forEach((node) => {
                 lines.push(node.textContent);
               });
-              onChangeRef.current?.(lines.join("\n"));
+              const content = lines.join("\n");
+              currentContentRef.current = content;
+              onChangeRef.current?.(content);
             });
           } else {
             ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
+              currentContentRef.current = markdown;
               onChangeRef.current?.(markdown);
             });
           }
@@ -232,17 +261,18 @@ export default function MilkdownEditor({
       }
 
       // MDI extensions: conditionally loaded
-      // NOTE: enableNoBreak / enableKern are not explicitly passed here, so
-      //   they default to `true` (always enabled, even in .md files).
-      //   enableMdiBreak is explicitly gated on mdiExtensionsEnabled so that
-      //   `[[br]]` is only active in .mdi files. Aligning nobreak/kern with
-      //   the same gating is tracked separately.
+      // All MDI macro families are gated on mdiExtensionsEnabled (true only
+      // for .mdi files) so that .txt/.md content containing [[blank]],
+      // [[no-break:...]], [[kern:...:...]] etc. is preserved byte-for-byte
+      // and not stripped/altered by the serializer (#1886).
       editor = editor.use(
         japaneseNovel({
           isVertical,
           showManuscriptLine: false,
           enableRuby: mdiExtensionsEnabled,
           enableTcy: mdiExtensionsEnabled,
+          enableNoBreak: mdiExtensionsEnabled,
+          enableKern: mdiExtensionsEnabled,
           enableMdiBreak: mdiExtensionsEnabled,
           // .txt: characters like *, #, ** are literal — copy must bypass
           // markdown stripping / MDI conversion (P2-A).
@@ -350,6 +380,70 @@ export default function MilkdownEditor({
       console.warn("外部コンテンツの適用に失敗しました:", error);
     }
   }, [externalContent, get, isVertical, scrollContainerRef]);
+
+  // 保存直前にライブ doc を即時シリアライズして返す（#1840）。
+  // markdownUpdated は debounce(200ms, maxWait なし) のため、連続入力中は
+  // currentContentRef / 親の tab.content が古いままになる。保存経路はこの関数を
+  // 呼び、エディタの現在状態から content を再生成してから永続化する。
+  // per-keystroke ではなく保存時のみ呼ばれるので perf 影響はない。
+  const flushContent = useCallback((): string | null => {
+    const editor = get();
+    if (!editor) return null;
+    try {
+      let result: string | null = null;
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        // IME 変換中なら未確定文字を取りこぼさないよう、シリアライズ前に
+        // composition を best-effort でコミットする（#1971）。通常経路は no-op。
+        commitPendingComposition(view);
+        const doc = view.state.doc;
+        if (isPlainText) {
+          // listener の plain-text 経路（行 = node.textContent）と同一ロジック。
+          const lines: string[] = [];
+          doc.forEach((node) => {
+            lines.push(node.textContent);
+          });
+          result = lines.join("\n");
+        } else {
+          result = ctx.get(serializerCtx)(doc);
+        }
+      });
+      // 注（#1840 / Codex F-01）: ここに来た時点で editor.action は editorViewCtx を
+      // 解決できている＝EditorView は ready。ready な view の doc は内容の単一の
+      // 真実なので、result === "" は「本当に空」を意味する（ユーザーの全削除など）。
+      // よって "" を異常値として弾かない。未 ready 時は上の ctx.get が throw して
+      // catch 節で null を返し、呼び出し側が既存 tab.content にフォールバックする。
+      // 再マウント過渡は registerFlush(null)（登録が一旦 null）でも保護される。
+      if (result != null && result !== currentContentRef.current) {
+        // ライブ値を ref と親 state に反映し、後続の isDirty 再計算も正しくする。
+        currentContentRef.current = result;
+        onChangeRef.current?.(result);
+      }
+      return result;
+    } catch (error) {
+      console.warn("コンテンツのフラッシュに失敗しました:", error);
+      return null;
+    }
+  }, [get, isPlainText]);
+
+  // flush を親へ登録/解除する（onEditorViewReady と同じ readiness パターン）。
+  // dockview はタブ切替や分割表示でも非アクティブな pane を portal でマウントし続ける
+  // ため、エディタはタブ切替で再マウントされない（#1878）。代わりに親
+  // (EditorLayout) は active pane にだけ実体の registrar を渡し、inactive pane には
+  // undefined を渡す。よって登録/解除は registerFlush の変化（= アクティブ状態の
+  // 反転）に追従させる必要がある。registerFlush を ref 越しに読んで [flushContent]
+  // だけに依存すると effect が再実行されず、flushActiveEditorRef がマウント時に
+  // アクティブだった pane を指したまま固まり、保存時に別 pane の内容を直列化して
+  // しまう（#1878 の退行）。registerFlush を依存に含め、アクティブな pane の flush
+  // だけが常に登録されている状態を保証する。inactive 化時は registerFlush が
+  // undefined になるので cleanup は no-op となり、新たに active 化した pane の登録を
+  // 上書きしない。
+  useEffect(() => {
+    registerFlush?.(flushContent);
+    return () => {
+      registerFlush?.(null);
+    };
+  }, [registerFlush, flushContent]);
 
   // posHighlight 設定を動的に更新（Editor を再作成せずに）。
   // enabled は power policy 由来の実効値（バックグラウンド中は停止、
@@ -744,6 +838,11 @@ export default function MilkdownEditor({
             onIgnoreCorrection?.(lintIssueAtCursor, true);
           }
           break;
+        case "add-to-user-dict":
+          if (lintIssueAtCursor) {
+            onAddToUserDictionary?.(lintIssueAtCursor);
+          }
+          break;
         case "start-speech":
           onStartSpeech?.();
           break;
@@ -759,6 +858,7 @@ export default function MilkdownEditor({
       lintIssueAtCursor,
       onShowLintHint,
       onIgnoreCorrection,
+      onAddToUserDictionary,
       onStartSpeech,
       onFind,
     ],
@@ -776,6 +876,9 @@ export default function MilkdownEditor({
               { label: "校正提示を表示", action: "show-lint-hint" },
               { label: "この指摘を無視", action: "ignore-correction" },
               { label: "同じ指摘をすべて無視", action: "ignore-correction-all" },
+              ...(dictEntryRuleIds?.has(issue.ruleId)
+                ? [{ label: "この語をユーザー辞書に追加", action: "add-to-user-dict" }]
+                : []),
               { label: "-", action: "_separator" },
             ]
           : []),
@@ -819,6 +922,7 @@ export default function MilkdownEditor({
       handleContextMenuAction,
       mdiExtensionsEnabled,
       selectionState.hasSelection,
+      dictEntryRuleIds,
     ],
   );
 
@@ -1019,6 +1123,9 @@ export default function MilkdownEditor({
           onAction={handleContextMenuAction}
           hasSelection={selectionState.hasSelection}
           lintIssueAtCursor={lintIssueAtCursor}
+          canAddLintIssueToDict={
+            !!(lintIssueAtCursor && dictEntryRuleIds?.has(lintIssueAtCursor.ruleId))
+          }
           onContextMenuOpen={(e) =>
             setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))
           }

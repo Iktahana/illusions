@@ -8,6 +8,7 @@ import KeymapSettingsTab from "./KeymapSettingsTab";
 import LintingSettingsTab from "./LintingSettingsTab";
 import PosHighlightSettingsTab from "./PosHighlightSettingsTab";
 import PowerSettingsTab from "./PowerSettingsTab";
+import PrivacySettingsTab from "./PrivacySettingsTab";
 import SpeechSettingsTab from "./SpeechSettingsTab";
 import TerminalSettingsTab from "./TerminalSettingsTab";
 import TypographySettingsTab from "./TypographySettingsTab";
@@ -26,8 +27,8 @@ export interface TabRegistryEntry {
 
 /**
  * Registry of settings tabs. `Partial<Record<...>>` because Electron-only
- * tabs (`terminal`, `power`) may be absent in the Web build; callers must
- * normalize unavailable categories via `resolveLegacyCategory`.
+ * tabs (`terminal`, `power`, `privacy`) may be absent in the Web build; callers
+ * must normalize unavailable categories via `resolveLegacyCategory`.
  */
 export type SettingsTabRegistry = Partial<Record<SettingsCategory, TabRegistryEntry>>;
 
@@ -47,6 +48,7 @@ export function buildSettingsTabRegistry(options: { isElectron: boolean }): Sett
   if (options.isElectron) {
     base.terminal = { component: TerminalSettingsTab };
     base.power = { component: PowerSettingsTab };
+    base.privacy = { component: PrivacySettingsTab };
   }
   return base;
 }

@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * VFS IPC handlers for Electron
  * Provides file system operations for the renderer process
@@ -7,16 +6,16 @@
 const { ipcMain, dialog, app, BrowserWindow, webContents } = require("electron");
 const fs = require("fs/promises");
 const path = require("path");
-const { createApprovedPathRegistry } = require("../lib/approved-paths");
+const { createApprovedPathRegistry, isWithinApprovedTree } = require("../lib/approved-paths");
 const {
   toForwardSlash,
   assertPathInsideRoot,
-  normalizeSeparators,
-  trimTrailingSlashes,
+  normalizeForCompare,
   resolveRealPath,
 } = require("../lib/path-utils");
 const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
 const { VFS_CHANNELS } = require("../lib/ipc-channels");
+const { readFileStrictUtf8 } = require("../lib/text-decode");
 // #1476: rehydration — begin
 const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
 const { createIndexLockManager } = require("../lib/index-lock");
@@ -100,14 +99,18 @@ function registerVFSHandlers() {
   }
 
   /**
-   * Normalize path separators to forward slashes for cross-platform compatibility.
-   * Intentional difference vs file-ipc.js: trailing slashes are trimmed here
-   * because VFS roots are prefix-matched (`${root}/`) by assertPathInsideRoot.
+   * Normalize a path to the canonical comparison form (forward slashes, no
+   * trailing slash, NFC). Delegates to the shared path-utils primitive so the
+   * NFC-immunity contract documented in approved-paths.js actually holds: macOS
+   * dialogs return the on-disk NFD form for Japanese names while the renderer /
+   * recent-projects list supplies NFC, and set-root must treat them as equal
+   * (#1955 follow-up). Trailing slashes are trimmed because VFS roots are
+   * prefix-matched (`${root}/`) by assertPathInsideRoot.
    * @param {string} p
    * @returns {string}
    */
   function normalizePath(p) {
-    return trimTrailingSlashes(normalizeSeparators(p));
+    return normalizeForCompare(p);
   }
 
   /**
@@ -180,7 +183,15 @@ function registerVFSHandlers() {
       if (stats.size > MAX_READ_BYTES) {
         throw new Error("ファイルサイズが上限を超えています");
       }
-      return await fs.readFile(resolved, "utf-8");
+      // Read as strict UTF-8 and BOM-strip. Non-UTF-8 byte sequences throw
+      // (code "NON_UTF8") instead of being silently replaced with U+FFFD, which
+      // previously let a non-UTF-8 manuscript open lossy and be saved back over
+      // the original (#1888). App-written metadata/JSON (project.json,
+      // workspace.json, etc.) is always valid UTF-8 and decodes unchanged;
+      // genuinely non-UTF-8 files are refused. Callers that read arbitrary
+      // project files (e.g. search indexing) already handle read errors
+      // per-file and simply skip the offending file.
+      return await readFileStrictUtf8(resolved);
     } catch (error) {
       // ENOENT is expected for optional config files — skip noisy logging
       if (error.code !== "ENOENT") {
@@ -367,7 +378,11 @@ function registerVFSHandlers() {
       }
     } catch (error) {
       if (error.code === "ENOENT") {
-        throw new Error("指定されたディレクトリが見つかりません");
+        // Prefix with the ENOENT marker so the renderer can classify this as a
+        // "folder not found" failure across the IPC boundary — ipcMain.handle
+        // serialization strips custom error properties like `.code`, but the
+        // message survives, so callers can offer recovery (remove from recent).
+        throw new Error("ENOENT: 指定されたディレクトリが見つかりません");
       }
       throw error;
     }
@@ -381,11 +396,35 @@ function registerVFSHandlers() {
 
     // 4. Check approval: in-session dialog approval OR persisted project approval
     // #1476: rehydration — load persisted approvals so re-prompting is skipped on restart
-    const alreadyApprovedInSession = dialogApprovedPaths.has(event.sender.id, resolved);
+    let alreadyApprovedInSession = dialogApprovedPaths.has(event.sender.id, resolved);
+
+    // A path inside an already-approved tree is itself approved. The new-project
+    // flow approves the *parent* via openDirectory(), then creates a child folder
+    // and promotes it to root — that child is legitimately accessible (the VFS
+    // already grants read/write to the whole approved tree), so re-prompting is
+    // both unnecessary and broken: on macOS the second dialog returns the NFD
+    // on-disk name while the requested path is NFC, so the exact-match check at
+    // step 5 would reject it ("選択されたディレクトリが要求されたパスと一致しません").
+    if (!alreadyApprovedInSession) {
+      const approvedTrees = dialogApprovedPaths
+        .listWindowPaths(event.sender.id)
+        .map((approved) => normalizePath(approved));
+      if (isWithinApprovedTree(approvedTrees, normalizedResolved)) {
+        approveDialogPath(event.sender.id, resolved);
+        alreadyApprovedInSession = true;
+      }
+    }
+
     let alreadyApprovedFromDisk = false;
     if (!alreadyApprovedInSession && effectiveProjectId) {
       const persistedSet = await loadApprovals(APPROVED_PATHS_FILE, effectiveProjectId);
-      alreadyApprovedFromDisk = persistedSet.has(resolvedReal) || persistedSet.has(resolved);
+      // Persisted entries were written from earlier dialog confirmations, so on
+      // macOS they may carry the on-disk NFD form while the requested path is
+      // NFC (or vice versa). Fold both sides to NFC so a Japanese-named project
+      // matches its stored approval regardless of Unicode encoding (#1955).
+      const persistedNFC = new Set([...persistedSet].map((p) => normalizePath(p)));
+      alreadyApprovedFromDisk =
+        persistedNFC.has(resolvedReal) || persistedNFC.has(normalizedResolved);
       if (alreadyApprovedFromDisk) {
         // Restore in-session approval so subsequent calls are fast
         approveDialogPath(event.sender.id, resolved);

@@ -13,9 +13,17 @@ import type { LintIssue, Severity } from "@/lib/linting";
 import type { INlpClient } from "@/lib/nlp-client/types";
 import type { Token } from "@/lib/nlp-client/types";
 import type { IgnoredCorrection } from "@/lib/project/project-types";
-import { LRUCache } from "@/lib/utils/lru-cache";
-import { hashString } from "@/lib/utils/hash-string";
+import { LRUCache } from "@/shared/lib/lru-cache";
+import { hashString } from "@/shared/lib/hash-string";
 import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
+import { getDictAccess } from "@/lib/dict/dict-access";
+import type { GenjiHealth } from "@/lib/dict/dict-access";
+import { collectDictCandidateTerms } from "@/lib/linting/dict-candidate-terms";
+
+// Derived from the already-allowed getDictAccess import so this package does not
+// reach into @/lib/dict/dict-types directly (import-boundary rule). Equals
+// Map<string, DictLookup>, the resolved value of DictAccess.lookupBatch().
+type DictLookupMap = Awaited<ReturnType<ReturnType<typeof getDictAccess>["lookupBatch"]>>;
 import type {
   LintingPluginState,
   LintingPluginOptions,
@@ -23,8 +31,61 @@ import type {
   RuleRunnerLike,
 } from "./types";
 import { isSilentCancelError } from "./worker/protocol";
+import type { DictSnapshotPayload } from "./worker/protocol";
 
 export const lintingKey = new PluginKey<LintingPluginState>("linting");
+
+/**
+ * Time budget for the pre-`runBatch` IPC steps (NLP tokenization and dictionary
+ * prewarm). These steps depend on Electron IPC (`window.electronAPI.nlp.*` /
+ * dict-access), which can stall indefinitely in the packaged `file://` renderer
+ * — the exact environment where the lint worker already fails to start and the
+ * pass falls back to the main thread (#1964). A stalled pre-step would block the
+ * subsequent `runBatch`, so even regex (L1) rules — which need neither tokens nor
+ * the dictionary — never run, and the panel reports "0 件" despite enabled rules.
+ *
+ * Time-boxing each await guarantees we always reach `runBatch`: on timeout we
+ * degrade gracefully (skip L2 tokens / treat dict as not-ready) while L1 keeps
+ * detecting. The budget is generous so it never fires in normal operation
+ * (IPC resolves in milliseconds; even a first-time kuromoji dictionary load
+ * completes well within it) and only trips on a genuine hang.
+ */
+const PRESTEP_TIMEOUT_MS = 5000;
+
+/**
+ * Race a promise against a timeout. Resolves to `fallback` if `promise` does not
+ * settle within `ms`, or if it rejects. The underlying promise is left pending
+ * (it cannot be cancelled) but its eventual result is ignored. Used to keep a
+ * stalled IPC pre-step from blocking the synchronous lint batch (#1964).
+ */
+export function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  if (ms <= 0) return Promise.resolve(fallback);
+  return new Promise<T>((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve(fallback);
+      }
+    }, ms);
+    promise.then(
+      (value) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        }
+      },
+      () => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(fallback);
+        }
+      },
+    );
+  });
+}
 
 /**
  * Map severity to CSS class name for decoration styling.
@@ -73,6 +134,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
 
   // Ignored corrections list (updated dynamically via setMeta)
   let currentIgnoredCorrections: IgnoredCorrection[] = options.ignoredCorrections ?? [];
+
+  // Known terms — words dictionary-matching rules must not flag as 辞書外語
+  // (user dictionary + registered dictionary-ruleset sources). Updated via setMeta.
+  let currentKnownTerms: ReadonlySet<string> = options.knownTerms ?? new Set();
 
   // NLP error state: tracks whether tokenization has failed.
   // When true, L2 (morphological) rules are explicitly disabled
@@ -158,7 +223,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 break;
               case "rule-config-change":
               case "guideline-change":
-                // Clear issue cache and force re-run (keep token cache)
+              case "known-terms-change":
+                // Known terms feed the prewarm snapshot, which the rule consumes
+                // at run time — so a re-run is required (not just a re-filter).
+                // Clear issue cache and force re-run (keep token cache).
                 issueCache.clear();
                 documentIssueCache = null;
                 pendingFullScan = true;
@@ -180,6 +248,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           // Update ignoredCorrections list if provided
           if ("ignoredCorrections" in meta) {
             currentIgnoredCorrections = meta.ignoredCorrections ?? [];
+          }
+          // Update known terms if provided
+          if ("knownTerms" in meta) {
+            currentKnownTerms = meta.knownTerms ?? new Set();
           }
           // enabled/disabled change
           if (meta.enabled !== undefined) {
@@ -263,15 +335,37 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           const useTokens = hasMorphRules && nlp && !nlpErrorFired;
           const tokensByText = new Map<string, ReadonlyArray<Token>>();
 
+          // Per-batch flag: set when a tokenization IPC call exceeds the budget.
+          // Unlike `nlpErrorFired` (a hard, session-sticky failure on throw), a
+          // timeout is treated as transient — we skip L2 for the rest of this
+          // pass so a hung NLP backend can't block L1, but the next pass retries
+          // (#1964). A unique sentinel distinguishes "timed out" from a real
+          // (always non-undefined) token array result.
+          let nlpTimedOut = false;
+          const TOKENIZE_TIMED_OUT = Symbol("tokenize-timeout");
+
           async function tokenizeIfNeeded(text: string): Promise<ReadonlyArray<Token> | undefined> {
-            // Re-check `nlpErrorFired` on every call so the first failure
-            // in a batch short-circuits the rest — otherwise a long doc
-            // with a broken NLP backend incurs one failed IPC per paragraph.
-            if (!useTokens || nlpErrorFired) return undefined;
+            // Re-check `nlpErrorFired`/`nlpTimedOut` on every call so the first
+            // failure or stall in a batch short-circuits the rest — otherwise a
+            // long doc with a broken/hung NLP backend incurs one failed or
+            // budget-length IPC per paragraph.
+            if (!useTokens || nlpErrorFired || nlpTimedOut) return undefined;
             const cached = tokenCache.get(text);
             if (cached) return cached;
             try {
-              const fresh = await nlp!.tokenizeParagraph(text);
+              const fresh = await withTimeout<Token[] | typeof TOKENIZE_TIMED_OUT>(
+                nlp!.tokenizeParagraph(text),
+                PRESTEP_TIMEOUT_MS,
+                TOKENIZE_TIMED_OUT,
+              );
+              if (fresh === TOKENIZE_TIMED_OUT) {
+                // Stall (not a throw): degrade L2 for this pass but let L1 run.
+                nlpTimedOut = true;
+                console.warn(
+                  "[Linting] NLP tokenization timed out — L2 rules skipped this pass (#1964)",
+                );
+                return undefined;
+              }
               tokenCache.set(text, fresh);
               return fresh;
             } catch (err) {
@@ -306,6 +400,67 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
 
           if (version !== processingVersion) return;
 
+          // Prewarm dictionary membership for dict:genji rules. The lint pass is
+          // synchronous but dictionary I/O is async, so we look up every
+          // candidate headword here (the renderer, where getDictAccess() is
+          // reachable) and ship the result with the batch. Most-inclusive
+          // options are used so the snapshot is a superset of whatever the rule
+          // queries regardless of its config (undeclared terms simply skip).
+          let dictPayload: DictSnapshotPayload | undefined;
+          if (currentRuleRunner.hasDictRules()) {
+            const terms = new Set<string>();
+            for (const tokens of tokensByText.values()) {
+              for (const term of collectDictCandidateTerms(tokens)) terms.add(term);
+            }
+            try {
+              const access = getDictAccess();
+              // Time-box dict IPC so a stalled getHealth/lookupBatch cannot block
+              // `runBatch` and zero out L1 detection (#1964). On timeout we degrade
+              // to "dict not ready", which is the fail-safe state for out-of-dict
+              // rules (they skip rather than flag every term as unknown).
+              const health = await withTimeout<GenjiHealth | null>(
+                access.getHealth(),
+                PRESTEP_TIMEOUT_MS,
+                null,
+              );
+              if (version !== processingVersion) return;
+              const ready = health?.state === "ready";
+              if (ready && terms.size > 0) {
+                const map = await withTimeout<DictLookupMap | null>(
+                  access.lookupBatch([...terms]),
+                  PRESTEP_TIMEOUT_MS,
+                  null,
+                );
+                if (version !== processingVersion) return;
+                if (!map) {
+                  // lookup stalled: ship dict as not-ready so out-of-dict rules
+                  // stay fail-safe (an empty entries list with ready=true would
+                  // make every term look unknown → false positives).
+                  console.warn(
+                    "[Linting] dictionary lookup timed out — dict treated as not ready (#1964)",
+                  );
+                  dictPayload = { ready: false, entries: [] };
+                } else {
+                  // Treat known terms (user dictionary + other dictionary rulesets)
+                  // as dictionary hits so out-of-dict rules never flag them. Mirrors
+                  // applyKnownTermsToSnapshot in @/lib/linting/known-terms, inlined
+                  // here to keep this package free of application-root imports.
+                  if (currentKnownTerms.size > 0) {
+                    for (const term of terms) {
+                      if (currentKnownTerms.has(term)) map.set(term, { found: true });
+                    }
+                  }
+                  dictPayload = { ready, entries: [...map.entries()] };
+                }
+              } else {
+                dictPayload = { ready, entries: [] };
+              }
+            } catch (err) {
+              console.error("[Linting] dictionary prewarm failed:", err);
+              dictPayload = { ready: false, entries: [] };
+            }
+          }
+
           // Build the per-paragraph batch (uncached only). The runner
           // will route through the worker for L1 + main thread for L2
           // morph; results merge transparently.
@@ -325,6 +480,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 paragraphs: perParaInputs,
                 mode: "per-paragraph",
                 version,
+                dict: dictPayload,
               });
               if (version !== processingVersion) return;
               for (const p of uncachedParagraphs) {
@@ -353,6 +509,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
                 paragraphs: docInputs,
                 mode: "document",
                 version,
+                dict: dictPayload,
               });
               if (version !== processingVersion) return;
               documentIssueCache = resp.document;
@@ -397,7 +554,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
               }
 
               const extraFrom = getAtomOffset(paragraph.atomAdjustments, issue.from);
-              const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to);
+              const extraTo = getAtomOffset(paragraph.atomAdjustments, issue.to, true);
               const from = paragraph.pos + 1 + issue.from + extraFrom;
               const to = paragraph.pos + 1 + issue.to + extraTo;
 
@@ -429,6 +586,19 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
               : DecorationSet.empty;
           const tr = view.state.tr.setMeta(lintingKey, { decorations });
           view.dispatch(tr);
+
+          // Diagnostics for #1964: a packaged lint pass that re-lints paragraphs
+          // yet yields nothing is the exact symptom. Logging only this case keeps
+          // the console quiet on normal (clean) passes while capturing the flags
+          // needed to pinpoint where the zero comes from.
+          if (allIssues.length === 0 && uncachedParagraphs.length > 0) {
+            console.info(
+              `[lint] 0 issues for ${uncachedParagraphs.length} relinted paragraph(s) (#1964 diag): ` +
+                `dict=${currentRuleRunner.hasDictRules()}, ` +
+                `morph=${currentRuleRunner.hasMorphologicalRules()}, ` +
+                `dictReady=${dictPayload?.ready ?? "n/a"}`,
+            );
+          }
 
           // Notify parent of all issues
           onIssuesUpdated?.(allIssues);

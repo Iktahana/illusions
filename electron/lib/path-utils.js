@@ -30,6 +30,24 @@ function trimTrailingSlashes(p) {
 }
 
 /**
+ * Canonical comparison form for VFS root-path matching: forward slashes,
+ * trailing slashes trimmed, and Unicode folded to NFC.
+ *
+ * NFC folding is the critical part. `path.resolve` and plain separator
+ * normalization do NOT fold Unicode, so on macOS the native dialog returns the
+ * on-disk (NFD) form of a Japanese name while the renderer / recent-projects
+ * list supplies the NFC form. Without this fold, the same directory compares
+ * unequal and set-root rejects it ("選択されたディレクトリが要求されたパスと
+ * 一致しません", #1955 follow-up). Use this for every path equality/containment
+ * comparison in the set-root approval flow.
+ * @param {string} p
+ * @returns {string}
+ */
+function normalizeForCompare(p) {
+  return trimTrailingSlashes(normalizeSeparators(p)).normalize("NFC");
+}
+
+/**
  * Resolves a path and normalizes all separators to forward slashes.
  * Also strips Windows extended-path prefix (\\?\, //./), and UNC paths become //server/share/...
  * @param {string} p
@@ -133,6 +151,7 @@ async function resolveRealPath(p) {
 module.exports = {
   normalizeSeparators,
   trimTrailingSlashes,
+  normalizeForCompare,
   toForwardSlash,
   assertPathInsideRoot,
   getWindowsDenyPrefixes,

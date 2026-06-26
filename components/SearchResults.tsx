@@ -123,6 +123,8 @@ export default function SearchResults({
     [],
   );
   const searchInputRef = useRef<HTMLInputElement>(null);
+  /** Monotonically increasing counter used to ignore stale open-file resolutions. */
+  const navRequestIdRef = useRef(0);
 
   useEffect(() => setHistory(loadSearchHistory()), []);
 
@@ -371,8 +373,11 @@ export default function SearchResults({
         projectMatchLocations.length;
       const location = projectMatchLocations[nextIndex];
       setProjectNavigationIndex(nextIndex);
+      const reqId = ++navRequestIdRef.current;
       void onOpenProjectFile(location.file.path).then(() => {
-        onCurrentMatchIndexChange(location.matchIndex);
+        if (navRequestIdRef.current === reqId) {
+          onCurrentMatchIndexChange(location.matchIndex);
+        }
       });
     },
     [
@@ -425,7 +430,7 @@ export default function SearchResults({
   };
 
   return (
-    <div className="h-full bg-background-secondary border-r border-border flex flex-col">
+    <div className="h-full bg-background-secondary flex flex-col">
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Search className="w-5 h-5 text-foreground-secondary" />
@@ -575,8 +580,11 @@ export default function SearchResults({
             <OptionCheckbox
               label="選択範囲のみ"
               checked={selectionOnly}
-              onChange={onSelectionOnlyChange}
-              disabled={!hasSelection || scope !== "current"}
+              onChange={(checked) => {
+                if (checked && scope !== "current") setScope("current");
+                onSelectionOnlyChange(checked);
+              }}
+              disabled={!hasSelection}
             />
             {projectSearchEnabled && (
               <label className="flex items-center justify-between gap-2">
@@ -752,8 +760,11 @@ export default function SearchResults({
                             onClick={() => {
                               if (!onOpenProjectFile) return;
                               setProjectNavigationIndex(navigationIndex);
+                              const reqId = ++navRequestIdRef.current;
                               void onOpenProjectFile(file.path).then(() => {
-                                onCurrentMatchIndexChange(index);
+                                if (navRequestIdRef.current === reqId) {
+                                  onCurrentMatchIndexChange(index);
+                                }
                               });
                             }}
                             className="w-full text-left"

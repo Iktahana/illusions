@@ -58,7 +58,12 @@ class NlpProcessor {
    * Clears cache since tokenization results may change.
    */
   setUserDictionary(entries: UserDictionaryEntry[]): void {
-    this.userDictionary = [...entries].sort((a, b) => b.word.length - a.word.length);
+    // Drop entries with an empty/whitespace-only headword: a zero-length word
+    // matches the empty combined string immediately, which would read
+    // `tokens[-1]` and fail to advance the merge cursor (crash / infinite loop).
+    this.userDictionary = entries
+      .filter((e) => e.word.trim().length > 0)
+      .sort((a, b) => b.word.length - a.word.length);
     this.cache.clear();
   }
 
@@ -78,6 +83,7 @@ class NlpProcessor {
 
       for (const dictEntry of this.userDictionary) {
         const word = dictEntry.word;
+        if (!word) continue; // defensive: never match a zero-length word
         // Try to match starting from token i
         let combined = "";
         let j = i;
@@ -200,11 +206,24 @@ class NlpProcessor {
     // Step 2: Tokenize cleaned text
     const rawTokens = this.tokenizer.tokenize(cleanedText);
 
-    // Step 3: Build tokens with correct character positions
-    let charPosition = 0;
+    // Step 3: Build tokens with correct character positions.
+    //
+    // Re-anchor each token by locating its surface form in the cleaned text from
+    // a running cursor, rather than blindly accumulating `surface_form.length`.
+    // Kuromoji occasionally fails to cover certain code-point sequences (e.g.
+    // regional-indicator flag emoji like 🇯🇵, which it drops surrounding tokens
+    // for), leaving its internal positions inconsistent. Blind accumulation lets
+    // that single mismatch drift EVERY subsequent token's highlight; anchoring on
+    // the surface form self-heals — the un-analyzed gap is simply left uncolored.
+    let cursor = 0;
     const tokens: Token[] = rawTokens.map((t) => {
+      const surface = t.surface_form;
+      const found = cleanedText.indexOf(surface, cursor);
+      const start = found >= 0 ? found : cursor;
+      const end = start + surface.length;
+      cursor = end;
       const token: Token = {
-        surface: t.surface_form,
+        surface,
         pos: t.pos,
         pos_detail_1: t.pos_detail_1,
         pos_detail_2: t.pos_detail_2,
@@ -215,18 +234,26 @@ class NlpProcessor {
         reading: t.reading,
         pronunciation: t.pronunciation,
         // Character positions in cleaned text
-        start: charPosition,
-        end: charPosition + t.surface_form.length,
+        start,
+        end,
       };
-      charPosition += t.surface_form.length;
       return token;
     });
 
-    // Step 4: Remap positions back to original text coordinates
+    // Step 4: Remap positions back to original text coordinates.
+    //
+    // `start` is inclusive: map the first character directly.
+    //
+    // `end` is exclusive. Mapping it as `positionMap[end]` (the next character's
+    // origin) would swallow any noise characters that were stripped between this
+    // token and the next one — e.g. "改行\n" would extend the "改行" token's
+    // range over the newline. Instead, anchor on the token's LAST character and
+    // add one: `positionMap[end - 1] + 1`.
     const remappedTokens = tokens.map((t) => ({
       ...t,
       start: positionMap[t.start] ?? t.start,
-      end: positionMap[t.end] ?? t.end,
+      end:
+        t.end > t.start ? (positionMap[t.end - 1] ?? t.end - 1) + 1 : (positionMap[t.end] ?? t.end),
     }));
 
     // Step 5: Apply user dictionary (merge matching token sequences)

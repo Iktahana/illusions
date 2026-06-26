@@ -10,6 +10,25 @@
 
 import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";
 import type { Token } from "@/lib/nlp-client/types";
+import type { DictLookup } from "@/lib/dict/dict-types";
+
+/**
+ * Prewarmed dictionary membership for one batch.
+ *
+ * The lint pass is synchronous but dictionary I/O is async, so the renderer
+ * looks up every candidate headword in the batch (where `getDictAccess()` is
+ * reachable) and ships the result here. `dict:genji` rules read it synchronously
+ * via `ctx.toolkit.dict.hasCached/lookupCached`.
+ *
+ * `entries` includes misses (`{ found: false }`) so the rule can distinguish
+ * "looked up, absent → flag" from "not looked up → skip". `ready` is false when
+ * the dictionary is not usable (not installed / web fallback / corrupt), in
+ * which case the rule no-ops.
+ */
+export interface DictSnapshotPayload {
+  ready: boolean;
+  entries: Array<[string, DictLookup]>;
+}
 
 // -------------------------------------------------------------------------
 // Plugin-facing surface
@@ -32,6 +51,12 @@ export interface RuleRunnerLike {
    * paragraphs in addition to the uncached set.
    */
   hasMorphologicalDocumentRules(): boolean;
+  /**
+   * True iff at least one loaded ruleset requires the Genji dictionary. The
+   * decoration plugin uses this to decide whether to prewarm dictionary
+   * membership and attach a {@link DictSnapshotPayload} to each batch.
+   */
+  hasDictRules(): boolean;
   /** Execute one batched lint pass. */
   runBatch(req: RunBatchRequest): Promise<RunBatchResponse>;
   /**
@@ -83,6 +108,12 @@ export interface RunBatchRequest {
    * Defaults to `true`.
    */
   runWorker?: boolean;
+  /**
+   * Prewarmed dictionary membership for this batch. Present only when a loaded
+   * ruleset requires the dictionary (`hasDictRules()`); the rule reads it via
+   * `ctx.toolkit.dict.hasCached/lookupCached`.
+   */
+  dict?: DictSnapshotPayload;
 }
 
 export interface RunBatchResponse {
@@ -102,6 +133,13 @@ export interface RunBatchResponse {
  */
 export type SerializedIssueMap = Array<[number, LintIssue[]]>;
 
+/** A single warning emitted by the ruleset loader or registry. */
+export interface RulesetLoadWarning {
+  code: string;
+  messageJa: string;
+  detail?: string;
+}
+
 /** Worker → main events. */
 export type WorkerEvent =
   | { type: "READY" }
@@ -116,6 +154,30 @@ export type WorkerEvent =
       type: "ERROR";
       correlationId?: number;
       error: { name: string; message: string };
+    }
+  | {
+      type: "RULESET_LOADED";
+      correlationId: number;
+      id: string;
+      ok: boolean;
+      ruleIds: string[];
+      warnings: RulesetLoadWarning[];
+      /**
+       * Whether the worker's rebuilt runner now hosts at least one
+       * registered morphological (L2) rule. The proxy uses this to decide
+       * whether to (a) report `hasMorphologicalRules()` as true so the
+       * decoration plugin tokenizes paragraphs, and (b) forward those
+       * tokens to the worker in subsequent RUN_BATCH messages.
+       * Computed from registered rules regardless of enabled state, so
+       * tokens start flowing before the main thread sends SET_CONFIG.
+       */
+      hasMorphologicalRules: boolean;
+      /**
+       * Whether any currently-loaded ruleset requires the Genji dictionary.
+       * Drives the proxy's `hasDictRules()` so the decoration plugin prewarms
+       * membership and ships a {@link DictSnapshotPayload} per batch.
+       */
+      hasDictRules: boolean;
     };
 
 /** Main → worker requests. */
@@ -140,8 +202,29 @@ export type WorkerRequest =
       type: "RUN_BATCH";
       correlationId: number;
       version: number;
-      paragraphs: ReadonlyArray<{ text: string; index: number }>;
+      /**
+       * `tokens` are present only when the worker hosts morphological (L2)
+       * rules (external rulesets). The proxy omits them otherwise to keep
+       * the structured-clone payload small for the common L1-only case.
+       */
+      paragraphs: ReadonlyArray<{ text: string; index: number; tokens?: ReadonlyArray<Token> }>;
       mode: BatchMode;
+      /** Prewarmed dictionary membership; present only when `hasDictRules()`. */
+      dict?: DictSnapshotPayload;
+    }
+  | {
+      /** Load (or reload) an external ruleset by injecting its ESM source. */
+      type: "LOAD_RULESET";
+      correlationId: number;
+      id: string;
+      /** Full ESM module source string (already sha256-verified by the main process). */
+      code: string;
+    }
+  | {
+      /** Unload a previously-loaded external ruleset and rebuild the runner. */
+      type: "UNLOAD_RULESET";
+      correlationId: number;
+      id: string;
     };
 
 // -------------------------------------------------------------------------

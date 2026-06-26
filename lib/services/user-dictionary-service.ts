@@ -23,6 +23,35 @@ const USER_DICTIONARY_FILENAME = "user-dictionary.json";
 const STANDALONE_STORAGE_PREFIX = "illusions-user-dictionary:";
 
 // -----------------------------------------------------------------------
+// Change notification
+// -----------------------------------------------------------------------
+
+/**
+ * Listeners notified after any successful write to the user dictionary. Lets the
+ * lint pipeline (see use-known-terms) re-read the dictionary and refresh
+ * 辞書外語 marks the instant the user adds/removes a word — no reload needed.
+ */
+const changeListeners = new Set<() => void>();
+
+/** Subscribe to user-dictionary writes. Returns an unsubscribe function. */
+export function subscribeUserDictionaryChange(listener: () => void): () => void {
+  changeListeners.add(listener);
+  return () => {
+    changeListeners.delete(listener);
+  };
+}
+
+function notifyUserDictionaryChange(): void {
+  for (const listener of changeListeners) {
+    try {
+      listener();
+    } catch (err) {
+      console.warn("[user-dictionary] change listener failed:", err);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------
 // Domain mutations (identity / dedupe policy)
 // -----------------------------------------------------------------------
 
@@ -91,7 +120,8 @@ class UserDictionaryService {
    * Creates .illusions directory if it does not exist.
    */
   async saveEntries(entries: UserDictionaryEntry[]): Promise<void> {
-    return this.store.saveProject(entries);
+    await this.store.saveProject(entries);
+    notifyUserDictionaryChange();
   }
 
   /**
@@ -99,7 +129,9 @@ class UserDictionaryService {
    * Guarded by the store mutex to prevent concurrent read-modify-write races.
    */
   async addEntry(entry: UserDictionaryEntry): Promise<UserDictionaryEntry[]> {
-    return this.store.mutateProject((entries) => insertEntry(entries, entry));
+    const result = await this.store.mutateProject((entries) => insertEntry(entries, entry));
+    notifyUserDictionaryChange();
+    return result;
   }
 
   /**
@@ -110,7 +142,9 @@ class UserDictionaryService {
     id: string,
     updates: Partial<UserDictionaryEntry>,
   ): Promise<UserDictionaryEntry[]> {
-    return this.store.mutateProject((entries) => applyUpdate(entries, id, updates));
+    const result = await this.store.mutateProject((entries) => applyUpdate(entries, id, updates));
+    notifyUserDictionaryChange();
+    return result;
   }
 
   /**
@@ -118,7 +152,9 @@ class UserDictionaryService {
    * Guarded by the store mutex to prevent concurrent read-modify-write races.
    */
   async removeEntry(id: string): Promise<UserDictionaryEntry[]> {
-    return this.store.mutateProject((entries) => removeById(entries, id));
+    const result = await this.store.mutateProject((entries) => removeById(entries, id));
+    notifyUserDictionaryChange();
+    return result;
   }
 
   // -------------------------------------------------------------------
@@ -139,7 +175,8 @@ class UserDictionaryService {
    * @param filePath - Full path to the file (used as storage key to avoid basename collisions).
    */
   async saveEntriesStandalone(filePath: string, entries: UserDictionaryEntry[]): Promise<void> {
-    return this.store.saveStandalone(filePath, entries);
+    await this.store.saveStandalone(filePath, entries);
+    notifyUserDictionaryChange();
   }
 
   /**
@@ -150,7 +187,11 @@ class UserDictionaryService {
     fileName: string,
     entry: UserDictionaryEntry,
   ): Promise<UserDictionaryEntry[]> {
-    return this.store.mutateStandalone(fileName, (entries) => insertEntry(entries, entry));
+    const result = await this.store.mutateStandalone(fileName, (entries) =>
+      insertEntry(entries, entry),
+    );
+    notifyUserDictionaryChange();
+    return result;
   }
 
   /**
@@ -162,7 +203,11 @@ class UserDictionaryService {
     id: string,
     updates: Partial<UserDictionaryEntry>,
   ): Promise<UserDictionaryEntry[]> {
-    return this.store.mutateStandalone(fileName, (entries) => applyUpdate(entries, id, updates));
+    const result = await this.store.mutateStandalone(fileName, (entries) =>
+      applyUpdate(entries, id, updates),
+    );
+    notifyUserDictionaryChange();
+    return result;
   }
 
   /**
@@ -170,7 +215,11 @@ class UserDictionaryService {
    * Guarded by the store mutex to prevent concurrent read-modify-write races.
    */
   async removeEntryStandalone(fileName: string, id: string): Promise<UserDictionaryEntry[]> {
-    return this.store.mutateStandalone(fileName, (entries) => removeById(entries, id));
+    const result = await this.store.mutateStandalone(fileName, (entries) =>
+      removeById(entries, id),
+    );
+    notifyUserDictionaryChange();
+    return result;
   }
 }
 

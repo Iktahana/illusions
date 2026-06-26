@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // Electron のメインプロセス入口
 
 const { app, BrowserWindow, powerMonitor } = require("electron");
@@ -28,7 +27,7 @@ const { registerNlpHandlers } = require("./ipc/nlp-ipc");
 const { registerStorageHandlers, getStorageManager } = require("./ipc/storage-ipc");
 const { registerVFSHandlers } = require("./ipc/vfs-ipc");
 const { setupAutoUpdater, checkForUpdates } = require("./auto-updater");
-const { createMainWindow, broadcastPowerState } = require("./window-manager");
+const { createMainWindow, broadcastPowerState, broadcastPowerEvent } = require("./window-manager");
 const {
   handleMdiFileOpen,
   getPendingFilePath,
@@ -43,7 +42,20 @@ const { registerAuthHandlers, handleAuthCallback } = require("./ipc/auth-ipc");
 const { registerEditorHandlers } = require("./ipc/editor-ipc");
 const { registerDictHandlers } = require("./ipc/dict-ipc");
 const { getDictManager } = require("./dict-manager");
-const { DICT_CHANNELS } = require("./lib/ipc-channels");
+const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
+const { getRulesetsManager } = require("./rulesets-manager");
+const { registerAnalyticsHandlers } = require("./ipc/analytics-ipc");
+const { DICT_CHANNELS, POWER_CHANNELS, RULESETS_CHANNELS } = require("./lib/ipc-channels");
+
+// --- Aptabase（匿名使用統計）初期化 ---
+// initialize() は app.whenReady() より前に呼ぶ必要がある（内部でカスタムプロトコルを
+// privileged scheme として登録するため）。App Key はビルド時に esbuild の define で
+// 埋め込まれる（scripts/bundle-electron.mjs）。未設定（OSSビルド等）の場合は計測を無効化する。
+const APTABASE_APP_KEY = process.env.APTABASE_APP_KEY || "";
+if (APTABASE_APP_KEY) {
+  const { initialize: initializeAnalytics } = require("@aptabase/electron/main");
+  initializeAnalytics(APTABASE_APP_KEY);
+}
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -165,7 +177,11 @@ app.whenReady().then(async () => {
         "Content-Security-Policy": [
           [
             "default-src 'self'",
-            `script-src 'self' 'unsafe-inline'${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
+            // blob: は外部ルールセットを lint worker 内で ESM `import(blobURL)` する
+            // ために必要（dynamic import は worker-src ではなく script-src で評価される）。
+            // blob は同一オリジンのスクリプトからしか生成できず、ルールセットは
+            // sha256 検証済みコードのみを Blob 化するため XSS 面は限定的。
+            `script-src 'self' 'unsafe-inline' blob:${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
@@ -202,10 +218,37 @@ app.whenReady().then(async () => {
   registerAuthHandlers();
   registerEditorHandlers();
   registerDictHandlers();
+  registerRulesetsHandlers();
+  registerAnalyticsHandlers({ hasAppKey: () => Boolean(APTABASE_APP_KEY) });
+
+  // 匿名使用統計：起動イベント（同意フラグ未設定時はデフォルト ON）
+  if (APTABASE_APP_KEY) {
+    try {
+      const appState = await getStorageManager().loadAppState();
+      if (appState?.usageAnalyticsConsent !== false) {
+        const { trackEvent } = require("@aptabase/electron/main");
+        void trackEvent("app_launched", { platform: process.platform }).catch((trackError) => {
+          console.warn("[Analytics] Failed to send app_launched event:", trackError);
+        });
+      }
+    } catch (err) {
+      console.warn("[Analytics] Failed to send app_launched event:", err);
+    }
+  }
 
   // Power state monitoring
   powerMonitor.on("on-ac", () => broadcastPowerState("ac"));
   powerMonitor.on("on-battery", () => broadcastPowerState("battery"));
+
+  // System lifecycle events (M-1/M-2 resume, M-5 lock-screen)
+  // "resume" fires after the system wakes from sleep; the renderer must
+  // re-arm its auto-save timer and flush dirty tabs immediately.
+  powerMonitor.on("resume", () => broadcastPowerEvent(POWER_CHANNELS.event.resumed));
+  // "suspend" fires just before sleep; renderer gets an early-warning signal.
+  powerMonitor.on("suspend", () => broadcastPowerEvent(POWER_CHANNELS.event.suspended));
+  // "lock-screen" fires when the user locks the screen (macOS/Windows only);
+  // the renderer must flush dirty tabs immediately.
+  powerMonitor.on("lock-screen", () => broadcastPowerEvent(POWER_CHANNELS.event.lockScreen));
 
   // ウィンドウ作成後に auto-updater を初期化
   setupAutoUpdater();
@@ -240,6 +283,38 @@ app.whenReady().then(async () => {
       console.error("[Dict] Auto update check failed:", err);
     }
   }, 5000);
+
+  // 公式校正ルールセットの自動ダウンロード/更新（同意不要・サイレント・best-effort）。
+  // 起動を妨げないよう遅延実行し、失敗は握りつぶす（オフライン等でも問題なし）。
+  // AppState の rulesetsAutoSync が明示的に false のときのみ無効化。
+  setTimeout(async () => {
+    try {
+      const appState = await getStorageManager().loadAppState();
+      if (appState?.rulesetsAutoSync === false) return;
+      const summary = await getRulesetsManager().syncAllOfficial();
+      const installed = summary.filter((s) => s.status === "installed");
+      if (installed.length > 0) {
+        const ids = installed.map((s) => s.id);
+        console.log("[Rulesets] auto-sync installed:", ids.join(", "));
+        // Notify every open renderer so its lint worker (re)loads the freshly
+        // installed rulesets WITHOUT an app restart. The interactive sync IPC
+        // handler emits the same event; this closes the gap on first launch
+        // where a newly-added ruleset would otherwise stay inactive until the
+        // next start (the mount-time syncLoadedRulesets had already run before
+        // this delayed download finished, and nothing re-signaled the renderer).
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (!win.isDestroyed()) {
+            win.webContents.send(RULESETS_CHANNELS.event.changed, {
+              reason: "installed",
+              ids,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[Rulesets] auto-sync failed:", err);
+    }
+  }, 6000);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) void createMainWindow();

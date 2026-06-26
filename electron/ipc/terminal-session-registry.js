@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 // PTY session registry — owns all terminal session lifecycle in the main process.
 // Sessions survive React component mount/unmount and are identified by a
 // main-process-generated sessionId.

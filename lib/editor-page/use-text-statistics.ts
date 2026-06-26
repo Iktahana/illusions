@@ -21,6 +21,7 @@ import { getDictAccess } from "@/lib/dict/dict-access";
 import type { Token } from "@/lib/nlp-client/types";
 import { computeTextStatistics } from "./text-statistics";
 import type { TextStatistics } from "./text-statistics";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 
 export type { TextStatistics };
 
@@ -46,9 +47,18 @@ export interface TextStatisticsResult extends TextStatistics {
  *                    using kuromoji through INlpClient
  *   Phase 3 (async): dictionary enrichment via enrichReadabilityWithDict()
  *                    using Genji freq_rank via DictAccess — only when state === "ready"
+ *
+ * @param content  - エディタの生コンテンツ
+ * @param fileType - ファイル種別（".txt" は記法除去なし、デフォルト ".mdi"）
  */
-export function useTextStatistics(content: string): TextStatisticsResult {
-  const manuscriptStats = useMemo(() => computeTextStatistics(content), [content]);
+export function useTextStatistics(
+  content: string,
+  fileType: SupportedFileExtension = ".mdi",
+): TextStatisticsResult {
+  const manuscriptStats = useMemo(
+    () => computeTextStatistics(content, fileType),
+    [content, fileType],
+  );
 
   const cleanedContent = useMemo(() => cleanMarkdown(content), [content]);
 

@@ -61,7 +61,9 @@ function findPreviousDaySnapshot(snapshots: SnapshotEntry[]): SnapshotEntry | nu
  * 昨日の文字数を取得するフック。
  * 履歴サービスから昨日の最後のスナップショットを取得する。
  *
- * @param sourceFile - Source file name to filter snapshots (e.g. "main.mdi")
+ * @param sourceFile - Full source path to filter snapshots (e.g. "chapters/main.mdi").
+ *   Must be the full path, not just the basename, to correctly match snapshots for
+ *   files in sub-directories (#1891).
  * @param enabled - Whether the hook should fetch data (requires project mode)
  */
 export function usePreviousDayStats(
