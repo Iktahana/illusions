@@ -262,7 +262,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -293,7 +293,7 @@ jobs:
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .next/cache
           key: next-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
@@ -355,7 +355,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -386,7 +386,7 @@ jobs:
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .next/cache
           key: next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
@@ -452,7 +452,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -577,7 +577,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -693,7 +693,7 @@ jobs:
 
       - name: Restore Electron caches
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.ELECTRON_CACHE }}
@@ -728,7 +728,7 @@ jobs:
 
       - name: Restore Next.js cache
         if: github.event_name != 'pull_request'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .next/cache
           key: next-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
