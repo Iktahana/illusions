@@ -177,7 +177,9 @@ export function useAnalyticsSettings() {
   return useMemo(
     () => ({
       usageAnalyticsConsent: settings.usageAnalyticsConsent,
+      errorReportingConsent: settings.errorReportingConsent,
       onUsageAnalyticsConsentChange: handlers.handleUsageAnalyticsConsentChange,
+      onErrorReportingConsentChange: handlers.handleErrorReportingConsentChange,
     }),
     [settings, handlers],
   );

@@ -37,6 +37,13 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
       error,
       errorInfo,
     );
+    void window.electronAPI?.errorReporting?.captureRendererError({
+      source: "error-boundary",
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      sectionName: this.props.sectionName,
+    });
     this.props.onError?.(error, errorInfo);
   }
 
