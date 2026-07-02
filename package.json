@@ -134,7 +134,7 @@
     ]
   },
   "build": {
-    "appId": "com.iktahana.illusions",
+    "appId": "app.illusions.editor",
     "productName": "illusions",
     "directories": {
       "app": ".",
@@ -176,7 +176,7 @@
       "extendInfo": {
         "UTExportedTypeDeclarations": [
           {
-            "UTTypeIdentifier": "com.iktahana.illusions.mdi",
+            "UTTypeIdentifier": "app.illusions.mdi",
             "UTTypeDescription": "illusions MDI Document",
             "UTTypeConformsTo": [
               "public.plain-text"
