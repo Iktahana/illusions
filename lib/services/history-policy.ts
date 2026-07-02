@@ -23,12 +23,7 @@
  * "restore-point"        — taken before restoring a previous snapshot (Wave 2)
  */
 export type SnapshotType =
-  | "auto"
-  | "manual"
-  | "milestone"
-  | "pre-close"
-  | "pre-external-reload"
-  | "restore-point";
+  "auto" | "manual" | "milestone" | "pre-close" | "pre-external-reload" | "restore-point";
 
 /**
  * A single entry in the history index.

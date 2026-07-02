@@ -182,12 +182,7 @@ export interface MdiStylesheetOptions {
    * Maps to the CSS @page named margin box (e.g. @bottom-center).
    */
   pageNumberPosition?:
-    | "bottom-left"
-    | "bottom-center"
-    | "bottom-right"
-    | "top-left"
-    | "top-center"
-    | "top-right";
+    "bottom-left" | "bottom-center" | "bottom-right" | "top-left" | "top-center" | "top-right";
 }
 
 /**
@@ -333,12 +328,7 @@ export function mdiToHtml(
       show: boolean;
       format?: "simple" | "dash" | "fraction";
       position?:
-        | "bottom-left"
-        | "bottom-center"
-        | "bottom-right"
-        | "top-left"
-        | "top-center"
-        | "top-right";
+        "bottom-left" | "bottom-center" | "bottom-right" | "top-left" | "top-center" | "top-right";
     };
   },
 ): string {

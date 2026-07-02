@@ -28,12 +28,7 @@ export interface DocxExportSettings {
   showPageNumbers: boolean;
   pageNumberFormat: "simple" | "dash" | "fraction";
   pageNumberPosition:
-    | "bottom-left"
-    | "bottom-center"
-    | "bottom-right"
-    | "top-left"
-    | "top-center"
-    | "top-right";
+    "bottom-left" | "bottom-center" | "bottom-right" | "top-left" | "top-center" | "top-right";
 }
 
 export const DEFAULT_DOCX_SETTINGS: DocxExportSettings = {
