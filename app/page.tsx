@@ -66,6 +66,7 @@ import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
+import { useErrorReportingConsentToast } from "@/lib/error-reporting/use-error-reporting-consent-toast";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -315,6 +316,13 @@ export default function EditorPage() {
     handleOpenPowerSettings,
     triggerSwitchToCorrections,
   } = panelHandlers;
+
+  useErrorReportingConsentToast({
+    openPrivacySettings: () => {
+      setSettingsInitialCategory("privacy");
+      setShowSettingsModal(true);
+    },
+  });
 
   // #1840: save flows call flushActiveEditorRef right before persisting so they
   // never write debounce-lagged content. The mounted MilkdownEditor registers

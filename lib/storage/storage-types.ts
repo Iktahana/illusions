@@ -202,6 +202,13 @@ export interface AppState {
    * 本文・ファイル名・パス・検索語など内容に関わる情報は送信対象に含まれない。
    */
   usageAnalyticsConsent?: boolean;
+  /**
+   * エラーレポートの送信に同意する（デフォルト: true）。
+   * 本文・ファイル名・パス・検索語など内容に関わる情報は送信対象に含まれない。
+   */
+  errorReportingConsent?: boolean;
+  /** 初回のエラーレポート同意案内を表示した時刻。未設定なら未案内。 */
+  errorReportingConsentPromptedAt?: string;
 }
 
 /**

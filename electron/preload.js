@@ -21,6 +21,7 @@ const {
   AUTH_CHANNELS,
   SAFE_STORAGE_CHANNELS,
   ANALYTICS_CHANNELS,
+  ERROR_REPORTING_CHANNELS,
   POWER_CHANNELS,
   EDITOR_CHANNELS,
   NLP_CHANNELS,
@@ -170,6 +171,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     // イベント名 + ホワイトリスト化した引数のみを渡す。同意フラグの判定と実送信は
     // main process（electron/ipc/analytics-ipc.js）で行う。
     trackEvent: invokeChannel(ANALYTICS_CHANNELS.invoke.trackEvent, { arity: 2 }),
+  },
+  errorReporting: {
+    captureRendererError: invokeChannel(ERROR_REPORTING_CHANNELS.invoke.captureRendererError, {
+      arity: 1,
+    }),
   },
   power: {
     // Returns an unsubscribe function that removes ONLY this wrapper.

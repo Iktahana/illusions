@@ -275,6 +275,15 @@ declare global {
        */
       trackEvent: (eventName: string, props?: Record<string, string | number>) => Promise<void>;
     };
+    errorReporting?: {
+      captureRendererError: (payload: {
+        source: "error-boundary" | "window-error" | "unhandledrejection";
+        name?: string;
+        message?: string;
+        stack?: string;
+        sectionName?: string;
+      }) => Promise<void>;
+    };
     power?: {
       /**
        * Listen for debounced power state changes from main process.

@@ -208,6 +208,13 @@ const ANALYTICS_CHANNELS = Object.freeze({
   event: Object.freeze({}),
 });
 
+const ERROR_REPORTING_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    captureRendererError: "error-reporting:capture-renderer-error",
+  }),
+  event: Object.freeze({}),
+});
+
 // Power monitoring (invoke in electron/ipc/system-ipc.js; event pushed from
 // electron/window-manager.js)
 const POWER_CHANNELS = Object.freeze({
@@ -304,6 +311,7 @@ module.exports = {
   AUTH_CHANNELS,
   SAFE_STORAGE_CHANNELS,
   ANALYTICS_CHANNELS,
+  ERROR_REPORTING_CHANNELS,
   POWER_CHANNELS,
   EDITOR_CHANNELS,
   NLP_CHANNELS,
