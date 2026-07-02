@@ -148,8 +148,8 @@ Japanese typography often requires preventing awkward line breaks inside proper 
 ### 5.2 Examples
 
 ```markdown
-[[no-break:東京都新宿区]]
-[[no-break:被愛妄想罪]]
+[[no-break]]
+[[no-break]]
 ```
 
 ### 5.3 HTML Conversion (Recommended)
@@ -157,7 +157,7 @@ Japanese typography often requires preventing awkward line breaks inside proper 
 Input:
 
 ```markdown
-[[no-break:ここは改行させない]]
+[[no-break]]
 ```
 
 Output (example):
@@ -332,8 +332,8 @@ br.mdi-break {
 ### 7.2 Examples
 
 ```markdown
-彼は[[kern:-0.1em:確実]]にそう言った。
-[[kern:+0.3em:沈黙]]が落ちた。
+彼は[[kern]]にそう言った。
+[[kern]]が落ちた。
 ```
 
 ### 7.3 HTML Conversion (Recommended)
@@ -343,7 +343,7 @@ To reduce CSS/HTML injection risk, using a CSS custom property is recommended.
 Input:
 
 ```markdown
-[[kern:-0.1em:言葉]]
+[[kern]]
 ```
 
 Output (example):

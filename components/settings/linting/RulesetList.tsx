@@ -117,13 +117,11 @@ export default function RulesetList({
     rules: cat.rules
       .map((ruleId) => ruleMetaMap.get(ruleId))
       .filter((meta): meta is (typeof LINT_RULES_META)[number] => meta != null)
-      .map(
-        (meta): RulesetCardRule => ({
-          ruleId: meta.id,
-          nameJa: meta.nameJa,
-          supportsSkipDialogue: meta.supportsSkipDialogue,
-        }),
-      ),
+      .map((meta): RulesetCardRule => ({
+        ruleId: meta.id,
+        nameJa: meta.nameJa,
+        supportsSkipDialogue: meta.supportsSkipDialogue,
+      })),
   }));
 
   return (

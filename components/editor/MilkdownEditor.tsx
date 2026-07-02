@@ -1010,8 +1010,9 @@ export default function MilkdownEditor({
           width: ${textIndent}em;
         }
         div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p:not(.mdi-blank)::before) {
-          ${showParagraphNumbers
-            ? `
+          ${
+            showParagraphNumbers
+              ? `
               content: counter(paragraph);
               position: absolute;
               /* Anchor the number's edge nearest the text at a fixed distance
@@ -1030,11 +1031,13 @@ export default function MilkdownEditor({
               user-select: none;
               font-family: 'Fira Code', monospace;
             `
-            : "content: none;"}
+              : "content: none;"
+          }
         }
         div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p:not(.mdi-blank)::before) {
-          ${showParagraphNumbers
-            ? `
+          ${
+            showParagraphNumbers
+              ? `
               content: counter(paragraph);
               position: absolute;
               /* In vertical-rl the inline axis is vertical, so the paragraph's
@@ -1051,7 +1054,8 @@ export default function MilkdownEditor({
               font-family: 'Fira Code', monospace;
               writing-mode: horizontal-tb;
             `
-            : "content: none;"}
+              : "content: none;"
+          }
         }
         /* 見出し・リスト・引用などには字下げを適用しない */
         div :global(.milkdown .ProseMirror h1),

@@ -177,8 +177,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
       apply(tr, pluginState): LintingPluginState {
         // Update settings via meta
         const meta = tr.getMeta(lintingKey) as
-          | (LintingSettingsUpdate & Partial<LintingPluginState>)
-          | undefined;
+          (LintingSettingsUpdate & Partial<LintingPluginState>) | undefined;
         if (meta) {
           // If decorations are included, apply directly
           if (meta.decorations !== undefined) {
