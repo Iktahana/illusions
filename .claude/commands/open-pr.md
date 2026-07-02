@@ -24,14 +24,14 @@ git branch --show-current
 Then detect the **base branch**:
 
 ```bash
-# Check project convention file first
-grep -i "base.*branch\|target.*branch\|PR.*target\|→.*main\|→.*dev" CLAUDE.md 2>/dev/null | head -3
+# Check canonical release policy first
+grep -i "base.*branch\|target.*branch\|PR.*target\|beta\|dev\|main" .github/ai/release-policy.md 2>/dev/null | head -5
 # Then verify the candidate branch actually exists on the remote
 git ls-remote --heads origin dev main master 2>/dev/null
 ```
 
-Use `dev` if it exists remotely. Otherwise use `main`, then `master`. If the
-project's CLAUDE.md clearly names a different base, use that instead.
+Use `dev` if it exists remotely. Otherwise use `main`, then `master`. If
+`.github/ai/release-policy.md` clearly names a different base, use that instead.
 
 Check commits that will be in this PR:
 
