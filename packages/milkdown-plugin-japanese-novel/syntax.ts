@@ -301,6 +301,15 @@ function paragraphNodeFromText(value: string): Paragraph {
   };
 }
 
+type MdastListItem = { type: "listItem"; spread: boolean; children: unknown[] };
+type MdastList = {
+  type: "list";
+  ordered: boolean;
+  start?: number;
+  spread: boolean;
+  children: MdastListItem[];
+};
+
 export interface RemarkFullWidthMarkdownOptions {
   enable?: boolean;
 }
@@ -341,35 +350,33 @@ export const remarkFullWidthMarkdownPlugin: Plugin<
         return;
       }
 
-      if (marker.kind === "bulletList") {
-        containerChildren.splice(index, 1, {
-          type: "list",
-          ordered: false,
-          spread: false,
-          children: [
-            {
-              type: "listItem",
-              spread: false,
-              children: [paragraph],
-            },
-          ],
-        });
-        return;
+      // 箇条書き / 番号付きリストは、直前の兄弟が同種のリストなら項目を追記して
+      // 1 つのリストにまとめる（標準 Markdown のリストグルーピングに合わせる）。
+      const ordered = marker.kind === "orderedList";
+      const listItem: MdastListItem = {
+        type: "listItem",
+        spread: false,
+        children: [paragraph],
+      };
+
+      const prev = containerChildren[index - 1] as MdastList | undefined;
+      if (prev && prev.type === "list" && prev.ordered === ordered) {
+        prev.children.push(listItem);
+        containerChildren.splice(index, 1);
+        // ノードを 1 つ削除したので、同じ index に繰り上がった次ノードから継続する
+        return index;
       }
 
-      containerChildren.splice(index, 1, {
+      const list: MdastList = {
         type: "list",
-        ordered: true,
-        start: marker.start,
+        ordered,
         spread: false,
-        children: [
-          {
-            type: "listItem",
-            spread: false,
-            children: [paragraph],
-          },
-        ],
-      });
+        children: [listItem],
+      };
+      if (marker.kind === "orderedList") {
+        list.start = marker.start;
+      }
+      containerChildren.splice(index, 1, list);
     });
   };
 };

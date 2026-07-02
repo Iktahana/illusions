@@ -5,9 +5,9 @@ Status: Active canonical policy
 
 ## 1. Language
 
-- Code and docs: English preferred, Japanese allowed.
+- Code and docs: English or Japanese only.
 - UI text shown to end users: Japanese required.
-- Forbidden in code/docs: Chinese, Korean.
+- Forbidden in code/docs: Chinese, Korean, and any language other than English or Japanese.
 
 ## 2. Branch and PR
 

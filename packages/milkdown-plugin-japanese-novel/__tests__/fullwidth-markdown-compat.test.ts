@@ -100,6 +100,32 @@ describe("full-width markdown compatibility", () => {
     await editor.destroy();
   });
 
+  it("merges consecutive full-width bullet markers into a single list", async () => {
+    const { editor, view } = await makeView("＊ 一\n\n＊ 二\n\n＊ 三");
+    const doc = view.state.doc;
+    expect(doc.childCount).toBe(1);
+    expect(doc.firstChild?.type.name).toBe("bullet_list");
+    expect(doc.firstChild?.childCount).toBe(3);
+    await editor.destroy();
+  });
+
+  it("merges consecutive full-width ordered markers into a single list", async () => {
+    const { editor, view } = await makeView("１． 一\n\n２． 二");
+    const doc = view.state.doc;
+    expect(doc.childCount).toBe(1);
+    expect(doc.firstChild?.type.name).toBe("ordered_list");
+    expect(doc.firstChild?.childCount).toBe(2);
+    await editor.destroy();
+  });
+
+  it("does not merge full-width bullets separated by a paragraph", async () => {
+    const { editor, view } = await makeView("＊ 一\n\n本文\n\n＊ 二");
+    const types: string[] = [];
+    view.state.doc.forEach((n) => types.push(n.type.name));
+    expect(types).toEqual(["bullet_list", "paragraph", "bullet_list"]);
+    await editor.destroy();
+  });
+
   it("keeps full-width markers literal in plain-text mode", async () => {
     const { editor, view } = await makePlainTextView("＃ 見出し\n＊ 箇条書き");
     expect(firstBlockType(view)).toBe("paragraph");
