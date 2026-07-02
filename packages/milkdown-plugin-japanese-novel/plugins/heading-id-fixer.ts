@@ -1,6 +1,9 @@
 import { Plugin, PluginKey } from "@milkdown/prose/state";
 import type { Node } from "@milkdown/prose/model";
 
+const HEADING_ID_FIXER_META_COMPOSING = "headingIdFixerComposing";
+const HEADING_ID_FIXER_META_FORCE_RECONCILE = "headingIdFixerForceReconcile";
+
 /**
  * 見出しの内容からアンカーIDを生成する（URLエンコード）
  */
@@ -30,12 +33,48 @@ function generateHeadingIdFromContent(node: Node): string {
  * それ以外の経路でも常に妥当な ID が付くようにする。
  */
 export function createHeadingIdFixerPlugin() {
+  let composing = false;
+
   return new Plugin({
     key: new PluginKey("headingIdFixer"),
+    view(editorView) {
+      const handleCompositionStart = () => {
+        composing = true;
+      };
+
+      const handleCompositionEnd = () => {
+        composing = false;
+        editorView.dispatch(
+          editorView.state.tr.setMeta(HEADING_ID_FIXER_META_FORCE_RECONCILE, true),
+        );
+      };
+
+      editorView.dom.addEventListener("compositionstart", handleCompositionStart);
+      editorView.dom.addEventListener("compositionend", handleCompositionEnd);
+
+      return {
+        destroy() {
+          editorView.dom.removeEventListener("compositionstart", handleCompositionStart);
+          editorView.dom.removeEventListener("compositionend", handleCompositionEnd);
+        },
+      };
+    },
     appendTransaction(transactions, _oldState, newState) {
       // 文書が変更されたときだけ処理する
       const docChanged = transactions.some((transaction) => transaction.docChanged);
-      if (!docChanged) return null;
+      const forceReconcile = transactions.some(
+        (transaction) => transaction.getMeta(HEADING_ID_FIXER_META_FORCE_RECONCILE) === true,
+      );
+      const metaComposing = transactions.some(
+        (transaction) => transaction.getMeta(HEADING_ID_FIXER_META_COMPOSING) === true,
+      );
+
+      if (metaComposing) {
+        composing = true;
+      }
+
+      if (composing) return null;
+      if (!docChanged && !forceReconcile) return null;
 
       // ID がない/内容変更で不一致になった見出しを探す
       const headingsToFix: Array<{ pos: number; node: Node; attrs: Record<string, unknown> }> = [];

@@ -12,6 +12,12 @@ metadata:
 
 # CI エラー解析エージェント (CI Debugger Agent)
 
+Canonical policy reference:
+
+- `.github/ai/base-policy.md`
+- `.github/ai/release-policy.md`
+- `.github/ai/overlays/copilot.md`
+
 あなたは **「Illusions」** プロジェクトの品質管理担当エージェントです。GitHub Actions で CI が失敗した際、ログを解析して根本原因の特定と解決策の提案を行うのが任務です。
 
 ## 🛠 任務 (Mission)
