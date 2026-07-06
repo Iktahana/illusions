@@ -4,6 +4,8 @@ import contract from "./usage-event-contract.json";
 
 export type UsageEventName =
   | "app_launched"
+  | "app_heartbeat"
+  | "app_closed"
   | "auth_login_started"
   | "auth_login_completed"
   | "auth_login_failed"
@@ -53,6 +55,7 @@ export type TelemetryReason =
   | "unknown";
 
 export type TelemetryCountBucket = "0" | "1" | "2_5" | "6_10" | "11_plus";
+export type SessionDurationBucket = "lt_1m" | "1_5m" | "5_15m" | "15_60m" | "gte_60m";
 export type TelemetryTargetKind = "file" | "untitled" | "handle" | "unknown";
 
 export type UsageEventProps = Record<string, string | number | undefined>;
@@ -90,6 +93,15 @@ export function bucketTelemetryCount(count: number): TelemetryCountBucket {
   if (count <= 5) return "2_5";
   if (count <= 10) return "6_10";
   return "11_plus";
+}
+
+export function bucketSessionDuration(ms: number): SessionDurationBucket {
+  const minutes = ms / 60_000;
+  if (minutes < 1) return "lt_1m";
+  if (minutes < 5) return "1_5m";
+  if (minutes < 15) return "5_15m";
+  if (minutes < 60) return "15_60m";
+  return "gte_60m";
 }
 
 export function normalizeTelemetryFileType(
