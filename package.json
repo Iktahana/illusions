@@ -138,7 +138,7 @@
     ]
   },
   "build": {
-    "appId": "app.illusions.editor",
+    "appId": "com.iktahana.illusions",
     "productName": "illusions",
     "directories": {
       "app": ".",
