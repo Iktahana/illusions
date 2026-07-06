@@ -38,7 +38,7 @@ export default function PrivacySettingsTab(): React.ReactElement {
 
       <SettingsSection
         title="エラーレポート"
-        description="今後の品質向上のため、エラー情報の自動送信にご協力ください。プライバシーに関わる情報や原稿データは絶対に収集されませんので、ご安心ください。"
+        description="今後の品質向上のため、エラー情報の自動送信にご協力ください。原稿に関わる情報は絶対に収集されません。送信されるのはエラーの種類・発生箇所・アプリバージョン・OS 情報など、必要最低限の技術情報のみです。"
       >
         <SettingsField label="エラーレポートを送信する" htmlFor="error-reporting-consent" inline>
           <SettingsToggle
