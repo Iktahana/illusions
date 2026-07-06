@@ -145,6 +145,11 @@ describe("startCountdownDownload duplicate guard", () => {
     expect(notificationManager.showMessage).toHaveBeenCalledTimes(1);
 
     resolveDownload({ success: true });
+    // The internal chain is `downloadPromise.then(A).catch(B).finally(C)` — each
+    // link adds one more microtask hop before `finally` (which releases the key)
+    // actually runs, so flush a few ticks rather than just one or two.
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
 
