@@ -20,7 +20,7 @@ export default function PrivacySettingsTab(): React.ReactElement {
     <div className="space-y-6">
       <SettingsSection
         title="使用統計"
-        description="どの機能がよく使われているかを把握し、今後の改善に活かすため、匿名の使用統計を送信します。本文・ファイル名・ファイルパス・検索文字列など、内容に関わる情報は一切含まれません。"
+        description="どの機能がよく使われているかを把握し、今後の改善に活かすため、匿名の使用統計を送信します。本文・ファイル名・ファイルパス・検索文字列など、原稿に関わる情報は一切含まれません。"
       >
         <SettingsField label="匿名の使用統計を送信する" htmlFor="usage-analytics-consent" inline>
           <SettingsToggle
@@ -38,7 +38,7 @@ export default function PrivacySettingsTab(): React.ReactElement {
 
       <SettingsSection
         title="エラーレポート"
-        description="品質向上のため、クラッシュ情報やエラー情報を送信します。送信されるのはエラーの種類・発生箇所・アプリバージョン・OS 情報のみです。原稿本文・ファイル名・ファイルパス・検索文字列は送信されません。"
+        description="今後の品質向上のため、エラー情報の自動送信にご協力ください。原稿に関わる情報は絶対に収集されません。送信されるのはエラーの種類・発生箇所・アプリバージョン・OS 情報など、必要最低限の技術情報のみです。"
       >
         <SettingsField label="エラーレポートを送信する" htmlFor="error-reporting-consent" inline>
           <SettingsToggle
