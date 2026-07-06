@@ -69,14 +69,17 @@ describe("dictUpdateCheck", () => {
     expect(startCountdownDownload).not.toHaveBeenCalled();
   });
 
-  it("starts a 10s countdown (no notice) when not installed and auto-download is allowed", async () => {
+  it("starts a 3s countdown (no notice) when not installed and auto-download is allowed", async () => {
     setElectronDict(true);
     getDownloadState.mockResolvedValue({ providerId: "genji", status: "not-installed" });
     isAutoDownloadAllowed.mockResolvedValue(true);
     const notice = await dictUpdateCheck.evaluate();
     expect(notice).toBeNull();
     expect(startCountdownDownload).toHaveBeenCalledTimes(1);
-    expect(startCountdownDownload.mock.calls[0][0]).toMatchObject({ seconds: 10 });
+    expect(startCountdownDownload.mock.calls[0][0]).toMatchObject({
+      key: "dict-not-installed",
+      seconds: 3,
+    });
   });
 
   it("informs when an update is available (auto-download not allowed)", async () => {
@@ -107,7 +110,10 @@ describe("dictUpdateCheck", () => {
     const notice = await dictUpdateCheck.evaluate();
     expect(notice).toBeNull();
     expect(startCountdownDownload).toHaveBeenCalledTimes(1);
-    expect(startCountdownDownload.mock.calls[0][0]).toMatchObject({ seconds: 30 });
+    expect(startCountdownDownload.mock.calls[0][0]).toMatchObject({
+      key: "dict-update",
+      seconds: 30,
+    });
   });
 
   it("returns null when installed and up to date", async () => {
