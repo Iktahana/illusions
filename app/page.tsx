@@ -26,6 +26,8 @@ import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import TxtExportDialog from "@/components/TxtExportDialog";
+import BugReportDialog from "@/components/BugReportDialog";
+import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
 import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
@@ -797,6 +799,9 @@ export default function EditorPage() {
   const [exportDialogState, setExportDialogState] = useState<ExportDialogState | null>(null);
   const exportDialogStateRef = useRef<ExportDialogState | null>(null);
 
+  // Bug/feedback report dialog state (null = closed; category = open with preset)
+  const [bugReportCategory, setBugReportCategory] = useState<BugReportCategory | null>(null);
+
   // Print dialog state
   interface PrintDialogState {
     content: string;
@@ -1172,6 +1177,7 @@ export default function EditorPage() {
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
     isEditorTabActive: !!activeEditorTab,
+    onReportBug: (category) => setBugReportCategory(category),
   });
 
   // Global shortcuts for Web (only when not in Electron)
@@ -1221,6 +1227,7 @@ export default function EditorPage() {
     handleOpenRecentProject,
     handleOpenAsProject,
     confirmBeforeAction: unsavedWarning.confirmBeforeAction,
+    onReportBug: (category) => setBugReportCategory(category),
   });
 
   contentRef.current = content;
@@ -1804,6 +1811,11 @@ export default function EditorPage() {
           void pending?.execute();
         }}
         onCancel={() => setRenameCollision(null)}
+      />
+      <BugReportDialog
+        isOpen={bugReportCategory != null}
+        initialCategory={bugReportCategory ?? "bug"}
+        onClose={() => setBugReportCategory(null)}
       />
     </>
   );

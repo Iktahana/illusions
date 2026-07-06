@@ -3,6 +3,7 @@ import { useEffect } from "react";
 
 import { persistAppState } from "@/lib/storage/app-state-manager";
 import { getProjectFileService } from "@/lib/services/project-file-service";
+import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
 
 interface UseElectronEventsParams {
   isElectron: boolean;
@@ -40,6 +41,9 @@ interface UseElectronEventsParams {
   // Open as project (double-clicked .mdi in project dir)
   handleOpenAsProject: (projectPath: string, initialFile: string) => Promise<void>;
   confirmBeforeAction: (action: () => void | Promise<void>) => void;
+
+  // Open the bug/feedback report dialog with a preset category
+  onReportBug: (category: BugReportCategory) => void;
 }
 
 /**
@@ -67,6 +71,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     handleOpenRecentProject,
     handleOpenAsProject,
     confirmBeforeAction,
+    onReportBug,
   } = params;
 
   // Paste as plaintext IPC listener
@@ -212,6 +217,28 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
       cleanup?.();
     };
   }, [isElectron]);
+
+  // Bug/feedback report from menu IPC listener
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuReportBug?.(() => {
+      onReportBug("bug");
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, onReportBug]);
+
+  // AI-inappropriate report from menu IPC listener (opens the same dialog)
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuReportAiInappropriate?.(() => {
+      onReportBug("ai-inappropriate");
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, onReportBug]);
 
   // Open project from menu IPC listener
   useEffect(() => {
