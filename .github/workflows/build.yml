@@ -811,7 +811,7 @@ jobs:
       # release is published, so assets must be attached while the release is
       # still a draft. Publish only after every asset above has landed.
       - name: Publish GitHub Release
-        run: gh release edit "v${{ needs.compute-version.outputs.full }}" --draft=false
+        run: gh release edit "v${{ needs.compute-version.outputs.full }}" --draft=false --repo "${{ github.repository }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
