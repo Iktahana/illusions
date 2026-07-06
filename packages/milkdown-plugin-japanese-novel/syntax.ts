@@ -232,7 +232,7 @@ export const remarkMdiBreakPlugin: Plugin<[RemarkMdiBreakOptions | undefined], R
 };
 
 export const remarkHeadingAnchorPlugin: Plugin<[], Root> = () => {
-  return (tree) => {
+  return (_tree) => {
     // 見出しアンカーはここでは処理しない
     // ID は見出しの内容から直接生成される
   };
@@ -241,6 +241,145 @@ export const remarkHeadingAnchorPlugin: Plugin<[], Root> = () => {
 export interface RemarkMdiBlankOptions {
   enable?: boolean;
 }
+
+type FullWidthMarkdownMarker =
+  | { kind: "heading"; depth: number; text: string }
+  | { kind: "blockquote"; text: string }
+  | { kind: "bulletList"; text: string }
+  | { kind: "orderedList"; text: string; start: number };
+
+function parseFullWidthMarkdownMarker(value: string): FullWidthMarkdownMarker | null {
+  const headingMatch = value.match(/^(＃{1,6})[ \t\u3000]+(.+)$/);
+  if (headingMatch) {
+    return {
+      kind: "heading",
+      depth: headingMatch[1]!.length,
+      text: headingMatch[2]!,
+    };
+  }
+
+  const blockquoteMatch = value.match(/^＞[ \t\u3000]+(.+)$/);
+  if (blockquoteMatch) {
+    return {
+      kind: "blockquote",
+      text: blockquoteMatch[1]!,
+    };
+  }
+
+  const bulletMatch = value.match(/^[＊＋－][ \t\u3000]+(.+)$/);
+  if (bulletMatch) {
+    return {
+      kind: "bulletList",
+      text: bulletMatch[1]!,
+    };
+  }
+
+  const orderedMatch = value.match(/^([０-９]+)．[ \t\u3000]+(.+)$/);
+  if (orderedMatch) {
+    const start = Number(
+      orderedMatch[1]!
+        .split("")
+        .map((ch) => String(ch.charCodeAt(0) - "０".charCodeAt(0)))
+        .join(""),
+    );
+
+    if (Number.isNaN(start)) return null;
+    return {
+      kind: "orderedList",
+      text: orderedMatch[2]!,
+      start,
+    };
+  }
+
+  return null;
+}
+
+function paragraphNodeFromText(value: string): Paragraph {
+  return {
+    type: "paragraph",
+    children: [{ type: "text", value }],
+  };
+}
+
+type MdastListItem = { type: "listItem"; spread: boolean; children: unknown[] };
+type MdastList = {
+  type: "list";
+  ordered: boolean;
+  start?: number;
+  spread: boolean;
+  children: MdastListItem[];
+};
+
+export interface RemarkFullWidthMarkdownOptions {
+  enable?: boolean;
+}
+
+export const remarkFullWidthMarkdownPlugin: Plugin<
+  [RemarkFullWidthMarkdownOptions | undefined],
+  Root
+> = (opts) => {
+  const enable = opts?.enable !== false;
+
+  return (tree) => {
+    if (!enable) return;
+
+    visit(tree, "paragraph", (node, index, parent) => {
+      if (!parent || typeof index !== "number") return;
+      if (node.children.length !== 1 || node.children[0]?.type !== "text") return;
+
+      const value = (node.children[0] as Text).value;
+      const marker = parseFullWidthMarkdownMarker(value);
+      if (!marker) return;
+
+      if (marker.kind === "heading") {
+        const heading = node as unknown as HeadingNode;
+        heading.type = "heading";
+        heading.depth = marker.depth;
+        heading.children = [{ type: "text", value: marker.text }];
+        return;
+      }
+
+      const paragraph = paragraphNodeFromText(marker.text);
+      const containerChildren = (parent as { children: unknown[] }).children;
+
+      if (marker.kind === "blockquote") {
+        containerChildren.splice(index, 1, {
+          type: "blockquote",
+          children: [paragraph],
+        });
+        return;
+      }
+
+      // 箇条書き / 番号付きリストは、直前の兄弟が同種のリストなら項目を追記して
+      // 1 つのリストにまとめる（標準 Markdown のリストグルーピングに合わせる）。
+      const ordered = marker.kind === "orderedList";
+      const listItem: MdastListItem = {
+        type: "listItem",
+        spread: false,
+        children: [paragraph],
+      };
+
+      const prev = containerChildren[index - 1] as MdastList | undefined;
+      if (prev && prev.type === "list" && prev.ordered === ordered) {
+        prev.children.push(listItem);
+        containerChildren.splice(index, 1);
+        // ノードを 1 つ削除したので、同じ index に繰り上がった次ノードから継続する
+        return index;
+      }
+
+      const list: MdastList = {
+        type: "list",
+        ordered,
+        spread: false,
+        children: [listItem],
+      };
+      if (marker.kind === "orderedList") {
+        list.start = marker.start;
+      }
+      containerChildren.splice(index, 1, list);
+    });
+  };
+};
 
 export const remarkMdiBlankPlugin: Plugin<[RemarkMdiBlankOptions | undefined], Root> = (opts) => {
   const enable = opts?.enable !== false;

@@ -147,6 +147,7 @@ Japanese typography often requires preventing awkward line breaks inside proper 
 
 ### 5.2 Examples
 
+<!-- prettier-ignore -->
 ```markdown
 [[no-break:東京都新宿区]]
 [[no-break:被愛妄想罪]]
@@ -156,6 +157,7 @@ Japanese typography often requires preventing awkward line breaks inside proper 
 
 Input:
 
+<!-- prettier-ignore -->
 ```markdown
 [[no-break:ここは改行させない]]
 ```
@@ -331,6 +333,7 @@ br.mdi-break {
 
 ### 7.2 Examples
 
+<!-- prettier-ignore -->
 ```markdown
 彼は[[kern:-0.1em:確実]]にそう言った。
 [[kern:+0.3em:沈黙]]が落ちた。
@@ -342,6 +345,7 @@ To reduce CSS/HTML injection risk, using a CSS custom property is recommended.
 
 Input:
 
+<!-- prettier-ignore -->
 ```markdown
 [[kern:-0.1em:言葉]]
 ```

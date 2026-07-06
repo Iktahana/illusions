@@ -21,12 +21,12 @@ principal class を持つ Quick Look Preview Extension を `<App>.app/Contents/P
    - `Source/MarkdownRenderer.swift` — Markdown → HTML（macOS 12+ は `AttributedString`、
      以前は escaped plain text）
    - `Info.plist` — `NSExtension`（`com.apple.quicklook.preview`）+
-     `QLSupportedContentTypes = com.iktahana.illusions.mdi`
+     `QLSupportedContentTypes = app.illusions.mdi`
    - エントリポイントは Foundation の `NSExtensionMain`（`scripts/build-quicklook.sh` が
      `-e _NSExtensionMain` でリンク、universal binary を `lipo` で生成）
 
 2. **UTI の export**（`package.json` の `mac.extendInfo.UTExportedTypeDeclarations`）
-   - ホストアプリが `com.iktahana.illusions.mdi`（`public.plain-text` 準拠、拡張子 `mdi`）を
+   - ホストアプリが `app.illusions.mdi`（`public.plain-text` 準拠、拡張子 `mdi`）を
      export しないと、`.mdi` は動的 UTI (`dyn... = public.data`) に解決され、
      拡張の `QLSupportedContentTypes` に**永遠にマッチしません**。これが旧構成で
      プレビューが出なかったもう一つの根本原因です。

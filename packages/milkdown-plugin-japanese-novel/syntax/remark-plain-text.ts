@@ -23,11 +23,9 @@ export function remarkPlainTextPlugin() {
     // Replace the entire parsed mdast with one paragraph per line.
     // An empty line produces an empty paragraph (no children), which
     // ProseMirror renders as a blank line and textContent returns "".
-    tree.children = lines.map(
-      (line): Paragraph => ({
-        type: "paragraph",
-        children: line.length > 0 ? [{ type: "text", value: line } as Text] : [],
-      }),
-    );
+    tree.children = lines.map((line): Paragraph => ({
+      type: "paragraph",
+      children: line.length > 0 ? [{ type: "text", value: line } as Text] : [],
+    }));
   };
 }

@@ -45,6 +45,12 @@ const { getDictManager } = require("./dict-manager");
 const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
 const { getRulesetsManager } = require("./rulesets-manager");
 const { registerAnalyticsHandlers } = require("./ipc/analytics-ipc");
+const { registerErrorReportingHandlers } = require("./ipc/error-reporting-ipc");
+const {
+  initializeErrorReporting,
+  captureMainError,
+  captureRendererError,
+} = require("./error-reporting");
 const { DICT_CHANNELS, POWER_CHANNELS, RULESETS_CHANNELS } = require("./lib/ipc-channels");
 
 // --- Aptabase（匿名使用統計）初期化 ---
@@ -57,11 +63,20 @@ if (APTABASE_APP_KEY) {
   initializeAnalytics(APTABASE_APP_KEY);
 }
 
+initializeErrorReporting({
+  dsn: process.env.ERROR_REPORT_DSN || "",
+  getStorageManager,
+  getRelease: () => app.getVersion(),
+  environment: app.isPackaged ? "production" : "development",
+});
+
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
+  void captureMainError(err, { source: "uncaughtException" });
 });
 process.on("unhandledRejection", (reason) => {
   console.error("[FATAL] Unhandled rejection:", reason);
+  void captureMainError(reason, { source: "unhandledRejection" });
 });
 
 // --- Single-instance lock ---
@@ -220,6 +235,7 @@ app.whenReady().then(async () => {
   registerDictHandlers();
   registerRulesetsHandlers();
   registerAnalyticsHandlers({ hasAppKey: () => Boolean(APTABASE_APP_KEY) });
+  registerErrorReportingHandlers({ captureRendererError });
 
   // 匿名使用統計：起動イベント（同意フラグ未設定時はデフォルト ON）
   if (APTABASE_APP_KEY) {

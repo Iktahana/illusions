@@ -29,12 +29,7 @@ export type ExportPageSize = string;
 
 export type PageNumberFormat = "simple" | "dash" | "fraction";
 export type PageNumberPosition =
-  | "bottom-left"
-  | "bottom-center"
-  | "bottom-right"
-  | "top-left"
-  | "top-center"
-  | "top-right";
+  "bottom-left" | "bottom-center" | "bottom-right" | "top-left" | "top-center" | "top-right";
 
 export interface UnifiedExportSettings {
   pageSize: ExportPageSize;

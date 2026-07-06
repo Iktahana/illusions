@@ -28,12 +28,7 @@ export interface PdfGenerationOptions {
   showPageNumbers?: boolean;
   pageNumberFormat?: "simple" | "dash" | "fraction";
   pageNumberPosition?:
-    | "bottom-left"
-    | "bottom-center"
-    | "bottom-right"
-    | "top-left"
-    | "top-center"
-    | "top-right";
+    "bottom-left" | "bottom-center" | "bottom-right" | "top-left" | "top-center" | "top-right";
   textIndent?: number;
   /** Render 字下げ as literal full-width spaces (U+3000) instead of CSS text-indent. */
   fullwidthSpaceIndent?: boolean;

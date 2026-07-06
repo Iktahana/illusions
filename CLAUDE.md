@@ -1,120 +1,21 @@
-# illusions Project - AI Agent Rules
+# Illusions Project - Claude Entry
 
-> Code and documentation: **English or Japanese only**. All UI text: **Japanese**.
-> Chinese, Korean, and other languages are forbidden in code/docs. Agent conversations may use any language.
+This file is a transition wrapper.
+Canonical AI policy moved to `.github/ai/`.
 
----
+## Read Order
 
-## 1. Language
+1. `.github/ai/base-policy.md`
+2. `.github/ai/release-policy.md`
+3. `.github/ai/overlays/claude.md`
+4. `.github/ai/domain/component-map.md`
 
-- **Code** (variables, functions, types, comments, JSDoc, configs): English preferred, Japanese allowed
-- **UI strings** (menus, dialogs, buttons, labels, tooltips, errors, notifications): Japanese required
+## Claude Notes
 
-## 2. Branch Strategy
+- Keep review feedback focused on correctness, security, and behavioral regressions.
+- Do not block merges for cosmetic-only edits.
+- For architecture-sensitive changes, state trade-offs explicitly.
 
-```
-feature/<name>  →  dev  →  beta  →  (weekly Friday promotion)  →  main
-hotfix/<name>   →  main  (emergency, then cherry-pick to dev)
-```
+## Deprecated Content
 
-- `main`: production — merges only via weekly beta-promotion PR
-- `dev`: integration — all feature/fix PRs target `dev`; pushes build `-dev` prereleases
-- `beta`: preview channel — `dev` is merged in via the `release-beta` skill, producing
-  `vX.Y.Z-beta.YYYYMMDD.HHMMSS` prereleases that in-app beta opt-in users receive
-- Weekly promotion: Friday 09:00 JST, GH Actions auto-creates `beta → main` PR (latest beta only)
-- Hotfix: branch from `main`, merge to `main`, cherry-pick to `dev`
-
-## 3. Git Worktree Isolation
-
-Every task uses a dedicated worktree. One per task, clean up after merge.
-
-- Naming: `../illusions-work-<short-name>` with branch `feature/<name>`
-- Before removing: check `git log main..<branch>` and `git status` for unmerged/uncommitted work
-- After merge: `git worktree remove` + `git branch -d` + verify with `git worktree list`
-
-## 4. TypeScript & Code Style
-
-- Strict mode, no `any` (use `unknown`), `import type` for type-only, explicit return types on public functions
-
-| Target                   | Convention       | Example                           |
-| ------------------------ | ---------------- | --------------------------------- |
-| Components/Classes/Types | PascalCase       | `EditorComponent`, `FileMetadata` |
-| Functions/Variables      | camelCase        | `handleClick`, `isLoading`        |
-| Constants                | UPPER_SNAKE_CASE | `MAX_FILE_SIZE`                   |
-| Utility files            | kebab-case       | `use-mdi-file.ts`                 |
-| Component files          | PascalCase       | `Editor.tsx`                      |
-
-- Import order: external → `@/` → relative → types
-
-## 5. Security
-
-- Never hardcode secrets (API keys, passwords, tokens)
-- Electron IPC: `contextIsolation: true`, `nodeIntegration: false`, validate all inputs
-- No `eval()`, `Function()`, unsafe DOM manipulation, or unescaped user input
-
-## 6. Storage Service (CRITICAL)
-
-**Always use the unified StorageService. Never implement custom storage.**
-
-```typescript
-import { getStorageService } from "@/lib/storage/storage-service";
-const storage = getStorageService();
-```
-
-12 methods: `saveSession`, `loadSession`, `saveAppState`, `loadAppState`, `addToRecent`, `getRecentFiles`, `removeFromRecent`, `clearRecent`, `saveEditorBuffer`, `loadEditorBuffer`, `clearEditorBuffer`, `clearAll`
-
-- Electron: SQLite at `~/Library/Application Support/illusions/illusions-storage.db`
-- Web: IndexedDB via Dexie
-- Auto-save editor buffer every 5 seconds (foreground) / 20 seconds (background, when power-aware throttling is enabled). See `AUTO_SAVE_INTERVAL` in `lib/tab-manager/types.ts`
-
-## 7. Framework Rules
-
-- **Electron**: Typed IPC channels from `types/electron.d.ts`, validate IPC input, use `electron-storage.ts`
-- **Next.js**: `"use client"` for browser APIs/hooks, default to server components, dynamic imports for splitting
-- **Milkdown**: Follow patterns in `packages/milkdown-plugin-japanese-novel/`, type ProseMirror schemas, use kuromoji for tokenization, follow `MDI.md` for `.mdi` syntax
-
-## 8. Code Review
-
-- When Codex (or other agents) provide code reviews, you have the right to disagree with their suggestions. Evaluate each item independently — accept what makes sense, skip what doesn't, and briefly explain your reasoning for items you reject.
-
-## 9. Commits
-
-```
-<type>(<scope>): <subject>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-```
-
-Types: `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`
-
-## 10. Pull Request Hygiene
-
-- PR を開く前に `gh issue list --state open` で関連 issue を必ず確認し、close 可能な issue があれば PR body に `Closes #<番号>` を全件記載する
-- キーワード grep を併用 (例: `gh issue list --state open --search "ルビ"`) して close 漏れを防ぐ
-- 親 issue (epic / umbrella / verify) も対象。本 PR が parent の条件を満たす場合は parent も `Closes #N` で含める
-- 該当 issue が無い場合のみ body に「関連 issue なし」と明記
-- merge 後、自動 close されなかった関連 issue (verify / 親 epic 等) があれば手動で `gh issue close` し、PR リンクをコメント追記
-
-## Component Map
-
-| Component / Hook                                                                     | Responsible For                                                                                                    |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `app/page.tsx`                                                                       | Top-level coordinator                                                                                              |
-| `components/EditorLayout.tsx`                                                        | Layout structure only                                                                                              |
-| `components/Editor.tsx`                                                              | Milkdown + ProseMirror bridge                                                                                      |
-| `lib/editor-page/use-linting.ts`                                                     | RuleRunner lifecycle and lint state                                                                                |
-| `lib/editor-page/use-file-opening.ts`                                                | Open/save dialogs and IPC                                                                                          |
-| `lib/editor-page/window-activity.ts`                                                 | Framework-free focus/visibility signal source (#1448)                                                              |
-| `lib/editor-page/power-policy.ts`                                                    | Pure power decisions: watcher pause / auto-save interval / POS highlight (#1448, #1466)                            |
-| `lib/tab-manager/save-executor.ts`                                                   | Single save pipeline for all save flows + per-path save lock (#1432)                                               |
-| `lib/auth/` (token-storage / \*-session / session-epoch)                             | Auth platform adapters + session control; logout = hard session boundary (#1437)                                   |
-| `lib/services/history-service.ts` (facade: `history-policy.ts` / `history-store.ts`) | Snapshot history facade over policy / persistence layers (#1438)                                                   |
-| `lib/services/persisted-json-list.ts`                                                | Shared persisted-JSON-list base (user dictionary, ignored corrections) (#1436)                                     |
-| `lib/menu/menu-template.js`                                                          | Single source for Web + Electron menus and accelerators (#1433)                                                    |
-| `packages/milkdown-plugin-japanese-novel/mdi-document.ts`                            | MDI single-entry API: raw / analysis / export / editor derivations (#1449)                                         |
-| `lib/storage/storage-service.ts`                                                     | Storage singleton                                                                                                  |
-| `lib/vfs/`                                                                           | Filesystem abstraction                                                                                             |
-| `electron/preload.js`                                                                | IPC security boundary — declarative bridge over `electron/lib/ipc-channels.js` (#1434)                             |
-| `electron/lib/`                                                                      | Main-process shared primitives: path-policy / approved-paths / url-policy / index-lock / ipc-bridge (#1435, #1567) |
-
-Key references: `docs/architecture/storage-system.md`, `docs/MDI/spec.md`, `MDI.md`, `types/electron.d.ts`
+Large duplicated policy sections that previously lived in this file were migrated to `.github/ai/` to prevent drift across Claude/Codex/Copilot flows.

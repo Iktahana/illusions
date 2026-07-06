@@ -7,7 +7,7 @@
   <key>CFBundleExecutable</key>
   <string>MDIQuickLook</string>
   <key>CFBundleIdentifier</key>
-  <string>com.iktahana.illusions.quicklook</string>
+  <string>app.illusions.editor.quicklook</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -30,7 +30,7 @@
     <dict>
       <key>QLSupportedContentTypes</key>
       <array>
-        <string>com.iktahana.illusions.mdi</string>
+        <string>app.illusions.mdi</string>
       </array>
       <key>QLSupportsSearchableItems</key>
       <false/>

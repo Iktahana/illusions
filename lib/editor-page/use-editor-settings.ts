@@ -152,6 +152,7 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
     handleAiBaseUrlChange: aiHandlers.handleAiBaseUrlChange,
     handleAiModelIdChange: aiHandlers.handleAiModelIdChange,
     handleUsageAnalyticsConsentChange: analyticsHandlers.handleUsageAnalyticsConsentChange,
+    handleErrorReportingConsentChange: analyticsHandlers.handleErrorReportingConsentChange,
   };
 
   return {
