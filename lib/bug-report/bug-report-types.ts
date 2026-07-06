@@ -35,21 +35,6 @@ export interface BugReportDiagnostics {
 }
 
 /**
- * バックエンド (bug-report.api.illusions.app) へ POST する本体。
- * フィールド名はバックエンド実装と突合済みであること。
- */
-export interface BugReportPayload {
-  category: BugReportCategory;
-  title: string;
-  description: string;
-  reproductionSteps?: string;
-  email?: string;
-  diagnostics: BugReportDiagnostics;
-  source: "illusions-app";
-  submittedAt: string;
-}
-
-/**
  * フォームからの送信入力（診断情報・メタは submit 側で付与）。
  */
 export interface BugReportInput {
