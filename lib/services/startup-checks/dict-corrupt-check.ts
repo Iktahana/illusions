@@ -7,7 +7,7 @@
  * offers to re-download. This runs alongside {@link dictUpdateCheck}; the
  * corrupt state takes precedence conceptually (a corrupt DB answers no queries).
  *
- * WiFi 等の非従量回線かつ省電力 OFF のときは、10 秒カウントダウンで自動的に
+ * WiFi 等の非従量回線かつ省電力 OFF のときは、3 秒カウントダウンで自動的に
  * 再ダウンロードを開始する（#1639 follow-up）。それ以外は手動ボタンのみ。
  */
 import { getDictAccess } from "@/lib/dict/dict-access";
@@ -28,6 +28,7 @@ function getElectronDict(): ElectronDictApi | undefined {
 }
 
 const REDOWNLOAD_MESSAGE = "辞書を再ダウンロード中...";
+const CORRUPT_DOWNLOAD_KEY = "dict-corrupt";
 
 export const dictCorruptCheck: StartupCheck = {
   id: "dict-corrupt",
@@ -38,11 +39,12 @@ export const dictCorruptCheck: StartupCheck = {
     const health = await getDictAccess().getHealth();
     if (health.state !== "corrupt") return null;
 
-    // 回線・省電力が許せば 10 秒カウントダウンで自動再ダウンロード。
+    // 回線・省電力が許せば 3 秒カウントダウンで自動再ダウンロード。
     // その場合トーストはカウントダウン側が出すので、ここでは notice を返さない。
     if (await isAutoDownloadAllowed()) {
       startCountdownDownload({
-        seconds: 10,
+        key: CORRUPT_DOWNLOAD_KEY,
+        seconds: 3,
         buildMessage: (remaining) =>
           `辞書データが破損しています。${remaining} 秒後に自動で再ダウンロードします。`,
         downloadMessage: REDOWNLOAD_MESSAGE,
@@ -57,7 +59,10 @@ export const dictCorruptCheck: StartupCheck = {
       message: health.message ?? "辞書データが破損しています。再ダウンロードしてください。",
       duration: 0, // keep until dismissed
       actions: [
-        { label: "再ダウンロード", onClick: () => runDictDownloadWithProgress(REDOWNLOAD_MESSAGE) },
+        {
+          label: "再ダウンロード",
+          onClick: () => runDictDownloadWithProgress(REDOWNLOAD_MESSAGE, CORRUPT_DOWNLOAD_KEY),
+        },
       ],
     };
   },
