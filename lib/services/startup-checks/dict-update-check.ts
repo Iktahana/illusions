@@ -15,7 +15,7 @@
  * problems and no error toast is surfaced.
  *
  * 自動化（#1639 follow-up）: WiFi 等の非従量回線かつ省電力 OFF のときは、
- * - 未導入   → 10 秒カウントダウンで自動ダウンロード
+ * - 未導入   → 3 秒カウントダウンで自動ダウンロード
  * - 更新あり → 30 秒カウントダウンで自動更新
  * を行う。条件を満たさない場合は従来どおり手動ボタンのトーストを出す。
  */
@@ -29,6 +29,8 @@ import {
 import type { StartupCheck, StartupNotice } from "../startup-check-queue";
 
 const GENJI_PROVIDER_ID = "genji";
+const NOT_INSTALLED_DOWNLOAD_KEY = "dict-not-installed";
+const UPDATE_DOWNLOAD_KEY = "dict-update";
 const DOWNLOAD_MESSAGE = "辞書をダウンロード中...";
 const UPDATE_MESSAGE = "辞書を更新中...";
 
@@ -51,10 +53,11 @@ export const dictUpdateCheck: StartupCheck = {
     const state = await getDictService().getDownloadState(GENJI_PROVIDER_ID);
 
     if (state.status === "not-installed") {
-      // 回線・省電力が許せば 10 秒カウントダウンで自動ダウンロード。
+      // 回線・省電力が許せば 3 秒カウントダウンで自動ダウンロード。
       if (await isAutoDownloadAllowed()) {
         startCountdownDownload({
-          seconds: 10,
+          key: NOT_INSTALLED_DOWNLOAD_KEY,
+          seconds: 3,
           buildMessage: (remaining) =>
             `日本語辞書が未ダウンロードです。${remaining} 秒後に自動でダウンロードします。`,
           downloadMessage: DOWNLOAD_MESSAGE,
@@ -70,7 +73,8 @@ export const dictUpdateCheck: StartupCheck = {
         actions: [
           {
             label: "今すぐダウンロード",
-            onClick: () => runDictDownloadWithProgress(DOWNLOAD_MESSAGE),
+            onClick: () =>
+              runDictDownloadWithProgress(DOWNLOAD_MESSAGE, NOT_INSTALLED_DOWNLOAD_KEY),
           },
         ],
       };
@@ -115,6 +119,7 @@ export const dictUpdateCheck: StartupCheck = {
     // 回線・省電力が許せば 30 秒カウントダウンで自動更新。
     if (await isAutoDownloadAllowed()) {
       startCountdownDownload({
+        key: UPDATE_DOWNLOAD_KEY,
         seconds: 30,
         buildMessage: (remaining) =>
           `日本語辞書の更新があります（${from} → ${to}）。${remaining} 秒後に自動で更新します。`,
@@ -128,7 +133,12 @@ export const dictUpdateCheck: StartupCheck = {
       type: "info",
       message: `日本語辞書の更新があります（${from} → ${to}）。`,
       duration: 0,
-      actions: [{ label: "更新", onClick: () => runDictDownloadWithProgress(UPDATE_MESSAGE) }],
+      actions: [
+        {
+          label: "更新",
+          onClick: () => runDictDownloadWithProgress(UPDATE_MESSAGE, UPDATE_DOWNLOAD_KEY),
+        },
+      ],
     };
   },
 };
