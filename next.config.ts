@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
     NEXT_PUBLIC_LICENSE_TEXT: readFileSync(resolve(__dirname, "LICENSE"), "utf8"),
     NEXT_PUBLIC_TERMS_TEXT: readFileSync(resolve(__dirname, "TERMS.md"), "utf8"),
+    // DSN の public key は秘匿情報ではない (Sentry/GlitchTip の設計上、クライアント埋め込み前提)
+    NEXT_PUBLIC_ERROR_REPORT_DSN: process.env.ERROR_REPORT_DSN || "",
   },
   images: { unoptimized: true },
   trailingSlash: true,
