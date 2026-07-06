@@ -3,6 +3,10 @@
     "app_launched": {
       "platform": ["aix", "darwin", "freebsd", "linux", "openbsd", "sunos", "win32"]
     },
+    "app_heartbeat": {},
+    "app_closed": {
+      "duration_bucket": ["lt_1m", "1_5m", "5_15m", "15_60m", "gte_60m"]
+    },
     "auth_login_started": {
       "surface": ["settings", "welcome", "menu", "startup", "callback", "unknown"]
     },

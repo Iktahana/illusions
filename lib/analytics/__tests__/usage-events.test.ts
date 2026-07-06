@@ -76,6 +76,20 @@ describe("usage analytics facade", () => {
     expect(bucketTelemetryCount(12)).toBe("11_plus");
   });
 
+  it("buckets session duration instead of sending exact elapsed time", async () => {
+    const { bucketSessionDuration } = await import("../usage-events");
+
+    expect(bucketSessionDuration(0)).toBe("lt_1m");
+    expect(bucketSessionDuration(59_999)).toBe("lt_1m");
+    expect(bucketSessionDuration(60_000)).toBe("1_5m");
+    expect(bucketSessionDuration(5 * 60_000 - 1)).toBe("1_5m");
+    expect(bucketSessionDuration(5 * 60_000)).toBe("5_15m");
+    expect(bucketSessionDuration(15 * 60_000 - 1)).toBe("5_15m");
+    expect(bucketSessionDuration(15 * 60_000)).toBe("15_60m");
+    expect(bucketSessionDuration(60 * 60_000 - 1)).toBe("15_60m");
+    expect(bucketSessionDuration(60 * 60_000)).toBe("gte_60m");
+  });
+
   it("normalizes file extensions without preserving filenames", async () => {
     const { normalizeTelemetryFileType } = await import("../usage-events");
 

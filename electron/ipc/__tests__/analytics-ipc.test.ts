@@ -54,6 +54,33 @@ describe("registerAnalyticsHandlers", () => {
     });
   });
 
+  it("tracks app_heartbeat without props", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "app_heartbeat");
+
+    expect(loadAppStateMock).toHaveBeenCalledOnce();
+    expect(trackEventMock).toHaveBeenCalledWith("app_heartbeat", undefined);
+  });
+
+  it("tracks app_closed with a valid duration bucket", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "app_closed", { duration_bucket: "15_60m" });
+
+    expect(loadAppStateMock).toHaveBeenCalledOnce();
+    expect(trackEventMock).toHaveBeenCalledWith("app_closed", { duration_bucket: "15_60m" });
+  });
+
+  it("rejects app_closed with a non-contract duration bucket before reading consent", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "app_closed", { duration_bucket: "42m" });
+
+    expect(loadAppStateMock).not.toHaveBeenCalled();
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
   it("does not track events when analytics consent is disabled", async () => {
     loadAppStateMock.mockResolvedValue({ usageAnalyticsConsent: false });
     const handler = await createHandler();
@@ -85,6 +112,14 @@ describe("registerAnalyticsHandlers", () => {
 
     expect(loadAppStateMock).not.toHaveBeenCalled();
     expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
+  it("validates app lifecycle analytics props against the contract", async () => {
+    const { isWhitelistedProps } = await loadAnalyticsIpc();
+
+    expect(isWhitelistedProps("app_heartbeat", undefined)).toBe(true);
+    expect(isWhitelistedProps("app_closed", { duration_bucket: "15_60m" })).toBe(true);
+    expect(isWhitelistedProps("app_closed", { duration_bucket: "42m" })).toBe(false);
   });
 
   it("rejects unknown event names before reading consent", async () => {
