@@ -7,7 +7,7 @@
   <key>CFBundleExecutable</key>
   <string>MDIQuickLook</string>
   <key>CFBundleIdentifier</key>
-  <string>app.illusions.editor.quicklook</string>
+  <string>com.iktahana.illusions.quicklook</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
