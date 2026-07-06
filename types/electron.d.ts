@@ -132,6 +132,8 @@ declare global {
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
+    onMenuReportBug?: (callback: () => void) => (() => void) | void;
+    onMenuReportAiInappropriate?: (callback: () => void) => (() => void) | void;
     /** Virtual File System IPC bridge */
     vfs?: {
       /** Open a native directory picker dialog */

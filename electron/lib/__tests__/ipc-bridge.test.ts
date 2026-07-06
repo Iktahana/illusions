@@ -194,6 +194,8 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       exportPdf: "menu-export-pdf",
       exportEpub: "menu-export-epub",
       exportDocx: "menu-export-docx",
+      reportBug: "menu-report-bug",
+      reportAiInappropriate: "menu-report-ai-inappropriate",
     });
   });
 

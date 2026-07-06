@@ -87,6 +87,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMenuExportPDF: eventChannel(MENU_CHANNELS.event.exportPdf, { arity: 0 }),
   onMenuExportEPUB: eventChannel(MENU_CHANNELS.event.exportEpub, { arity: 0 }),
   onMenuExportDOCX: eventChannel(MENU_CHANNELS.event.exportDocx, { arity: 0 }),
+  onMenuReportBug: eventChannel(MENU_CHANNELS.event.reportBug, { arity: 0 }),
+  onMenuReportAiInappropriate: eventChannel(MENU_CHANNELS.event.reportAiInappropriate, {
+    arity: 0,
+  }),
   nlp: {
     init: invokeChannel(NLP_CHANNELS.invoke.init, { arity: 1 }),
     tokenizeParagraph: invokeChannel(NLP_CHANNELS.invoke.tokenizeParagraph, { arity: 1 }),
