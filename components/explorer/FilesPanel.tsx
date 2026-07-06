@@ -10,6 +10,11 @@ import { isElectronRenderer, detectOSPlatform } from "@/lib/utils/runtime-env";
 import { isTextDroppable } from "@/lib/utils/file-type-guard";
 import { notificationManager } from "@/lib/services/notification-manager";
 import {
+  bucketTelemetryCount,
+  normalizeTelemetryFileType,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
+import {
   flattenVisibleRows,
   nextRowPath,
   prevRowPath,
@@ -291,7 +296,7 @@ export function FilesPanel({
   );
 
   const executeDelete = useCallback(
-    async (fullPath: string, kind: "file" | "directory") => {
+    async (fullPath: string, kind: "file" | "directory", affectedTabs: AffectedTab[] = []) => {
       try {
         const { getProjectFileService } = await import("@/lib/services/project-file-service");
         const vfs = getProjectFileService();
@@ -313,6 +318,13 @@ export function FilesPanel({
         // #1868: detach any open tabs at/under the deleted path so the next
         // save cannot recreate the now-deleted file at its old location.
         onFileDeleted?.(toVFSPath(fullPath));
+        trackUsageEvent("project_file_deleted", {
+          surface: "explorer",
+          target_kind: kind === "directory" ? "folder" : "file",
+          dirty_open_tabs_bucket: bucketTelemetryCount(
+            affectedTabs.filter((tab) => tab.isDirty).length,
+          ),
+        });
         refresh();
       } catch (error) {
         console.error("Failed to delete:", error);
@@ -347,6 +359,11 @@ export function FilesPanel({
               await vfs.rename(toVFSPath(fullPath), toVFSPath(newFullPath));
               // #1868: keep open tabs in sync with the new path before refresh.
               onFileRenamed?.(toVFSPath(fullPath), toVFSPath(newFullPath));
+              trackUsageEvent("project_file_renamed", {
+                surface: "explorer",
+                target_kind: "file",
+                result: "completed",
+              });
               refresh();
             },
           });
@@ -356,6 +373,11 @@ export function FilesPanel({
         await vfs.rename(toVFSPath(fullPath), toVFSPath(newFullPath));
         // #1868: keep open tabs in sync with the new path before refresh.
         onFileRenamed?.(toVFSPath(fullPath), toVFSPath(newFullPath));
+        trackUsageEvent("project_file_renamed", {
+          surface: "explorer",
+          target_kind: "file",
+          result: "completed",
+        });
         setEditing(null);
         refresh();
       } catch (error) {
@@ -387,6 +409,11 @@ export function FilesPanel({
             name: copyName,
             execute: async () => {
               await vfs.writeFile(toVFSPath(copyPath), content);
+              trackUsageEvent("project_file_duplicated", {
+                surface: "explorer",
+                file_type: normalizeTelemetryFileType(ext),
+                collision: "confirmed",
+              });
               refresh();
             },
           });
@@ -394,6 +421,11 @@ export function FilesPanel({
         }
 
         await vfs.writeFile(toVFSPath(copyPath), content);
+        trackUsageEvent("project_file_duplicated", {
+          surface: "explorer",
+          file_type: normalizeTelemetryFileType(ext),
+          collision: "none",
+        });
         refresh();
       } catch (error) {
         console.error("Failed to duplicate:", error);
@@ -445,6 +477,11 @@ export function FilesPanel({
             name: finalName,
             execute: async () => {
               await vfs.writeFile(toVFSPath(filePath), "");
+              trackUsageEvent("project_file_created", {
+                surface: "explorer",
+                file_type: normalizeTelemetryFileType(finalName.slice(finalName.lastIndexOf("."))),
+                collision: "confirmed",
+              });
               refresh();
             },
           });
@@ -452,6 +489,11 @@ export function FilesPanel({
         }
 
         await vfs.writeFile(toVFSPath(filePath), "");
+        trackUsageEvent("project_file_created", {
+          surface: "explorer",
+          file_type: normalizeTelemetryFileType(finalName.slice(finalName.lastIndexOf("."))),
+          collision: "none",
+        });
         setEditing(null);
         refresh();
       } catch (error) {
@@ -473,6 +515,7 @@ export function FilesPanel({
         const vfs = getProjectFileService();
         const parentHandle = await vfs.getDirectoryHandle(toVFSPath(parentPath));
         await parentHandle.getDirectoryHandle(name, { create: true });
+        trackUsageEvent("project_folder_created", { surface: "explorer" });
         setEditing(null);
         // Expand the parent so new folder is visible
         setExpandedDirs((prev) => {
@@ -613,6 +656,11 @@ export function FilesPanel({
                 name: file.name,
                 execute: async () => {
                   await vfs.writeFile(toVFSPath(capturedFilePath), capturedContent);
+                  trackUsageEvent("project_file_created", {
+                    surface: "explorer",
+                    file_type: normalizeTelemetryFileType(file.name.split(".").pop() ?? ""),
+                    collision: "confirmed",
+                  });
                   refresh();
                 },
               });
@@ -621,6 +669,11 @@ export function FilesPanel({
             }
 
             await vfs.writeFile(toVFSPath(filePath), content);
+            trackUsageEvent("project_file_created", {
+              surface: "explorer",
+              file_type: normalizeTelemetryFileType(file.name.split(".").pop() ?? ""),
+              collision: "none",
+            });
           } catch (err) {
             console.warn("Failed to read external file:", file.name, err);
           }
@@ -1378,7 +1431,7 @@ export function FilesPanel({
         dangerous={true}
         onConfirm={() => {
           if (deleteConfirm) {
-            void executeDelete(deleteConfirm.path, deleteConfirm.kind);
+            void executeDelete(deleteConfirm.path, deleteConfirm.kind, deleteConfirm.affectedTabs);
           }
           setDeleteConfirm(null);
         }}

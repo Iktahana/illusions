@@ -5,6 +5,11 @@ import { getProjectService } from "@/lib/project/project-service";
 import { getDefaultWorkspaceState } from "@/lib/project/project-types";
 import { getProjectFileService as getVFS } from "@/lib/services/project-file-service";
 import { notificationManager } from "@/lib/services/notification-manager";
+import {
+  classifyTelemetryError,
+  normalizeTelemetryFileType,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 
 import type { ProjectMode, StandaloneMode, WorkspaceTab } from "@/lib/project/project-types";
 import { ensureProjectFiles, readFileHandle } from "./project-file-utils";
@@ -68,6 +73,7 @@ export function useFileOpening({
   restoreProjectTabs,
 }: UseFileOpeningParams): UseFileOpeningResult {
   const handleOpenProject = useCallback(async () => {
+    trackUsageEvent("project_open_started", { surface: "menu", source: "dialog" });
     try {
       const projectService = getProjectService();
       const project = await projectService.openProject();
@@ -81,6 +87,11 @@ export function useFileOpening({
       if (!restored) {
         await loadProjectContent(project);
       }
+      trackUsageEvent("project_open_completed", {
+        surface: "menu",
+        source: "dialog",
+        restore_strategy: restored ? "stored_handle" : "fresh",
+      });
 
       if (isElectron && project.rootPath) {
         const storage = getStorageService();
@@ -94,11 +105,17 @@ export function useFileOpening({
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       if (error instanceof Error && error.message.includes("cancelled")) return;
+      trackUsageEvent("project_open_failed", {
+        surface: "menu",
+        source: "dialog",
+        reason: classifyTelemetryError(error),
+      });
       console.error("Failed to open project:", error);
     }
   }, [setProjectMode, isElectron, loadProjectContent, restoreProjectTabs]);
 
   const handleOpenStandaloneFile = useCallback(async () => {
+    trackUsageEvent("file_open_started", { surface: "menu", source: "dialog" });
     try {
       const projectService = getProjectService();
       const standalone = await projectService.openStandaloneFile();
@@ -109,9 +126,19 @@ export function useFileOpening({
       const tabPath = standalone.filePath ?? standalone.fileName;
       tabLoadSystemFile(tabPath, content);
       incrementEditorKey();
+      trackUsageEvent("file_open_completed", {
+        surface: "menu",
+        source: "dialog",
+        file_type: normalizeTelemetryFileType(standalone.fileExtension),
+      });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       if (error instanceof Error && error.message.includes("キャンセル")) return;
+      trackUsageEvent("file_open_failed", {
+        surface: "menu",
+        source: "dialog",
+        reason: classifyTelemetryError(error),
+      });
       console.error("Failed to open file:", error);
       // #1888: non-UTF-8 manuscript — refuse to open (no editable tab) and tell
       // the user to convert it first, instead of silently loading lossy U+FFFD
@@ -128,12 +155,17 @@ export function useFileOpening({
 
   const handleOpenRecentProject = useCallback(
     async (projectId: string): Promise<boolean> => {
+      trackUsageEvent("project_open_started", {
+        surface: isAutoRestoringRef.current ? "startup" : "menu",
+        source: isAutoRestoringRef.current ? "auto_restore" : "recent",
+      });
       try {
         if (isElectron) {
           const storage = getStorageService();
           const projects = await storage.getRecentProjects();
           const project = projects.find((p) => p.id === projectId);
           if (!project) {
+            trackUsageEvent("project_recent_open_failed", { reason: "not_found" });
             if (!isAutoRestoringRef.current) {
               notificationManager.error("このプロジェクトが見つかりませんでした。");
             }
@@ -202,6 +234,11 @@ export function useFileOpening({
             if (!restored) {
               await loadProjectContent(restoredProject);
             }
+            trackUsageEvent("project_open_completed", {
+              surface: isAutoRestoringRef.current ? "startup" : "menu",
+              source: isAutoRestoringRef.current ? "auto_restore" : "recent",
+              restore_strategy: restored ? "recent" : "fresh",
+            });
 
             // Signal VFS ready AFTER tab restore — this ensures the standalone
             // mount-time restore sees projectTabsRestoredRef=true and skips.
@@ -226,8 +263,14 @@ export function useFileOpening({
             // otherwise the stale recent entry re-triggers the same failure on
             // every launch and the app appears unable to open any project (#1965).
             if (isFileNotFound) {
+              trackUsageEvent("project_recent_open_failed", { reason: "not_found" });
               setConfirmRemoveRecent({ projectId, message });
             } else if (!isAutoRestoringRef.current) {
+              trackUsageEvent("project_open_failed", {
+                surface: "menu",
+                source: "recent",
+                reason: classifyTelemetryError(error),
+              });
               notificationManager.error(message);
             }
             return false;
@@ -255,6 +298,11 @@ export function useFileOpening({
         }
 
         if (!restoreResult.success || !restoreResult.handle) {
+          trackUsageEvent("project_open_failed", {
+            surface: isAutoRestoringRef.current ? "startup" : "menu",
+            source: isAutoRestoringRef.current ? "auto_restore" : "recent",
+            reason: "unknown",
+          });
           console.error("Failed to restore project handle:", restoreResult.error);
           if (!isAutoRestoringRef.current) {
             notificationManager.error(
@@ -265,8 +313,18 @@ export function useFileOpening({
         }
 
         await openRestoredProject(restoreResult.handle);
+        trackUsageEvent("project_open_completed", {
+          surface: isAutoRestoringRef.current ? "startup" : "menu",
+          source: isAutoRestoringRef.current ? "auto_restore" : "recent",
+          restore_strategy: "stored_handle",
+        });
         return true;
       } catch (error) {
+        trackUsageEvent("project_open_failed", {
+          surface: isAutoRestoringRef.current ? "startup" : "menu",
+          source: isAutoRestoringRef.current ? "auto_restore" : "recent",
+          reason: classifyTelemetryError(error),
+        });
         console.error("Failed to open recent project:", error);
         return false;
       }
@@ -287,6 +345,7 @@ export function useFileOpening({
 
   const handleOpenAsProject = useCallback(
     async (projectPath: string, initialFile: string) => {
+      trackUsageEvent("project_open_started", { surface: "system", source: "open_as_project" });
       try {
         const vfs = getVFS();
         if ("setRootPath" in vfs) {
@@ -335,6 +394,11 @@ export function useFileOpening({
         if (!restored) {
           await loadProjectContent(project);
         }
+        trackUsageEvent("project_open_completed", {
+          surface: "system",
+          source: "open_as_project",
+          restore_strategy: restored ? "recent" : "fresh",
+        });
 
         const storage = getStorageService();
         await storage.addRecentProject({
@@ -344,6 +408,11 @@ export function useFileOpening({
         });
         void window.electronAPI?.rebuildMenu?.();
       } catch (error) {
+        trackUsageEvent("project_open_failed", {
+          surface: "system",
+          source: "open_as_project",
+          reason: classifyTelemetryError(error),
+        });
         console.error("[Open as Project] Failed to open project:", error);
         notificationManager.error(
           "プロジェクトを開けませんでした。.illusionsフォルダが正しく設定されているか確認してください。",

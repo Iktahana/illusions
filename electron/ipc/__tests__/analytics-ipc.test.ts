@@ -37,20 +37,28 @@ describe("registerAnalyticsHandlers", () => {
     delete process.env.APTABASE_APP_KEY;
   });
 
-  it("tracks whitelisted events when analytics consent is enabled", async () => {
+  it("tracks contract-approved events when analytics consent is enabled", async () => {
     const handler = await createHandler();
 
-    await handler({}, "feature_used", { feature: "export", count: 1 });
+    await handler({}, "save_completed", {
+      trigger: "manual",
+      mode: "standalone",
+      target_kind: "file",
+    });
 
     expect(loadAppStateMock).toHaveBeenCalledOnce();
-    expect(trackEventMock).toHaveBeenCalledWith("feature_used", { feature: "export", count: 1 });
+    expect(trackEventMock).toHaveBeenCalledWith("save_completed", {
+      trigger: "manual",
+      mode: "standalone",
+      target_kind: "file",
+    });
   });
 
   it("does not track events when analytics consent is disabled", async () => {
     loadAppStateMock.mockResolvedValue({ usageAnalyticsConsent: false });
     const handler = await createHandler();
 
-    await handler({}, "feature_used", { feature: "export" });
+    await handler({}, "auth_login_started", { surface: "settings" });
 
     expect(loadAppStateMock).toHaveBeenCalledOnce();
     expect(trackEventMock).not.toHaveBeenCalled();
@@ -59,7 +67,7 @@ describe("registerAnalyticsHandlers", () => {
   it("does not load app state or track when the app key is unavailable", async () => {
     const handler = await createHandler(false);
 
-    await handler({}, "feature_used", { feature: "export" });
+    await handler({}, "auth_login_started", { surface: "settings" });
 
     expect(loadAppStateMock).not.toHaveBeenCalled();
     expect(trackEventMock).not.toHaveBeenCalled();
@@ -68,7 +76,43 @@ describe("registerAnalyticsHandlers", () => {
   it("rejects non-whitelisted props before reading consent", async () => {
     const handler = await createHandler();
 
-    await handler({}, "feature_used", { feature: "export", nested: { path: "/tmp/file.mdi" } });
+    await handler({}, "file_open_completed", {
+      surface: "menu",
+      source: "dialog",
+      file_type: "mdi",
+      nested: { path: "/tmp/file.mdi" },
+    });
+
+    expect(loadAppStateMock).not.toHaveBeenCalled();
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects unknown event names before reading consent", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "feature_used", { feature: "export" });
+
+    expect(loadAppStateMock).not.toHaveBeenCalled();
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-contract props that could carry account data before reading consent", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "auth_login_completed", { surface: "settings", email: "user@example.com" });
+
+    expect(loadAppStateMock).not.toHaveBeenCalled();
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-contract prop values before reading consent", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "project_file_created", {
+      surface: "explorer",
+      file_type: "chapter-name.mdi",
+      collision: "none",
+    });
 
     expect(loadAppStateMock).not.toHaveBeenCalled();
     expect(trackEventMock).not.toHaveBeenCalled();

@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import {
+  classifySaveOutcome,
+  getTelemetryTargetKind,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 import { getAutoSaveIntervalMs } from "../editor-page/power-policy";
 import { getWindowActivitySnapshot, subscribeWindowActivity } from "../editor-page/window-activity";
 import { notificationManager } from "../services/notification-manager";
@@ -117,6 +122,12 @@ export function useAutoSave(params: UseAutoSaveParams): void {
         // acquires the unified per-target lock synchronously (#1562 a /
         // #1579) and re-checks the conflicted transition right before
         // writing (#1562 b).
+        const activity = getWindowActivitySnapshot();
+        trackUsageEvent("autosave_attempted", {
+          target_kind: getTelemetryTargetKind(tab.file),
+          activity:
+            activity.isWindowFocused && activity.isDocumentVisible ? "foreground" : "background",
+        });
         void (async () => {
           const outcome = await executeTabSave({
             tab,
@@ -130,6 +141,10 @@ export function useAutoSave(params: UseAutoSaveParams): void {
             isMounted: () => mountedRef.current,
           });
           if (outcome.status === "failed") {
+            trackUsageEvent("autosave_failed", {
+              target_kind: getTelemetryTargetKind(tab.file),
+              reason: classifySaveOutcome(outcome),
+            });
             console.error(`自動保存に失敗しました (${tab.file?.name}):`, outcome.error);
             notificationManager.warning(
               `自動保存に失敗しました: ${tab.file?.name ?? "不明なファイル"}`,
