@@ -4,6 +4,14 @@
 const PERSIST_FAILURE_WARNING = "ファイル参照の保存に失敗しました";
 
 import { useCallback, useRef } from "react";
+import {
+  bucketTelemetryCount,
+  classifySaveOutcome,
+  classifyTelemetryError,
+  getTelemetryTargetKind,
+  normalizeTelemetryFileType,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 import { openMdiFile } from "../project/mdi-file";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import { notificationManager } from "../services/notification-manager";
@@ -245,7 +253,18 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
   /** Open a file via system dialog → new tab (or reuse untitled clean tab) */
   const openFile = useCallback(async () => {
-    const result = await openMdiFile();
+    trackUsageEvent("file_open_started", { surface: "menu", source: "dialog" });
+    let result: Awaited<ReturnType<typeof openMdiFile>>;
+    try {
+      result = await openMdiFile();
+    } catch (error) {
+      trackUsageEvent("file_open_failed", {
+        surface: "menu",
+        source: "dialog",
+        reason: classifyTelemetryError(error),
+      });
+      throw error;
+    }
     if (!result) return;
 
     const { descriptor, content: fileContent } = result;
@@ -264,6 +283,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     }
 
     const detectedFileType = inferFileType(descriptor.name);
+    trackUsageEvent("file_open_completed", {
+      surface: "menu",
+      source: "dialog",
+      file_type: normalizeTelemetryFileType(detectedFileType),
+    });
 
     // Reuse current tab if untitled and clean
     const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
@@ -323,6 +347,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
       // Block save if tab has unresolved external conflict
       if (tab.fileSyncStatus === "conflicted") {
+        trackUsageEvent("save_conflict_blocked", {
+          trigger: isAutoSave ? "auto" : "manual",
+          mode: isProjectRef.current ? "project" : "standalone",
+        });
         notificationManager.warning(
           "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
         );
@@ -334,6 +362,15 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         // #1840: serialize the live editor doc before saving so we never write
         // debounce-lagged content (and applySavedTabState compares correctly).
         const tabToSave = flushActiveTabContent(tab);
+        trackUsageEvent(isAutoSave ? "autosave_attempted" : "save_attempted", {
+          ...(isAutoSave
+            ? { target_kind: getTelemetryTargetKind(tabToSave.file), activity: "unknown" }
+            : {
+                trigger: "manual",
+                mode: isProjectRef.current ? "project" : "standalone",
+                target_kind: getTelemetryTargetKind(tabToSave.file),
+              }),
+        });
         const outcome = await executeTabSave({
           tab: tabToSave,
           isProject: isProjectRef.current,
@@ -348,14 +385,49 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         });
 
         if (outcome.status === "saved" && outcome.persistFailed) {
+          trackUsageEvent("save_completed", {
+            trigger: isAutoSave ? "auto" : "manual",
+            mode: isProjectRef.current ? "project" : "standalone",
+            target_kind: getTelemetryTargetKind(outcome.descriptor),
+          });
           notificationManager.warning(PERSIST_FAILURE_WARNING);
+        } else if (outcome.status === "saved") {
+          trackUsageEvent("save_completed", {
+            trigger: isAutoSave ? "auto" : "manual",
+            mode: isProjectRef.current ? "project" : "standalone",
+            target_kind: getTelemetryTargetKind(outcome.descriptor),
+          });
         } else if (outcome.status === "conflicted") {
+          trackUsageEvent("save_conflict_blocked", {
+            trigger: isAutoSave ? "auto" : "manual",
+            mode: isProjectRef.current ? "project" : "standalone",
+          });
           notificationManager.warning(
             "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
           );
         } else if (outcome.status === "failed") {
+          trackUsageEvent(isAutoSave ? "autosave_failed" : "save_failed", {
+            ...(isAutoSave
+              ? {
+                  target_kind: getTelemetryTargetKind(tabToSave.file),
+                  reason: classifySaveOutcome(outcome),
+                }
+              : {
+                  trigger: "manual",
+                  mode: isProjectRef.current ? "project" : "standalone",
+                  target_kind: getTelemetryTargetKind(tabToSave.file),
+                  reason: classifySaveOutcome(outcome),
+                }),
+          });
           console.error("保存に失敗しました:", outcome.error);
           notificationManager.error(`保存に失敗しました: ${getErrorMessage(outcome.error)}`);
+        } else {
+          trackUsageEvent("save_blocked", {
+            trigger: isAutoSave ? "auto" : "manual",
+            mode: isProjectRef.current ? "project" : "standalone",
+            target_kind: getTelemetryTargetKind(tabToSave.file),
+            reason: classifySaveOutcome(outcome),
+          });
         }
         // "cancelled" / "locked" / "skipped": nothing to do
       } finally {
@@ -390,6 +462,12 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
   const saveAllDirtyTabs = useCallback(async (): Promise<SaveAllDirtyResult> => {
     if (isSavingRef.current) {
       // A save is already in flight; report locked so the caller blocks.
+      trackUsageEvent("save_blocked", {
+        trigger: "save_all",
+        mode: isProjectRef.current ? "project" : "standalone",
+        target_kind: "unknown",
+        reason: "locked",
+      });
       return { allSaved: false, outcomes: [{ status: "locked" }] };
     }
 
@@ -397,6 +475,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       (t): t is EditorTabState => isEditorTab(t) && t.isDirty,
     );
     if (dirtyTabs.length === 0) {
+      trackUsageEvent("save_all_completed", {
+        dirty_count_bucket: "0",
+        result: "all_saved",
+      });
       return { allSaved: true, outcomes: [] };
     }
 
@@ -406,6 +488,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       for (const tab of dirtyTabs) {
         // Block conflicted tabs up front (mirrors saveFile's guard).
         if (tab.fileSyncStatus === "conflicted") {
+          trackUsageEvent("save_conflict_blocked", {
+            trigger: "save_all",
+            mode: isProjectRef.current ? "project" : "standalone",
+          });
           notificationManager.warning(
             "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
           );
@@ -415,6 +501,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
         // #1840: flush live editor content for the active tab before saving.
         const tabToSave = flushActiveTabContent(tab);
+        trackUsageEvent("save_attempted", {
+          trigger: "save_all",
+          mode: isProjectRef.current ? "project" : "standalone",
+          target_kind: getTelemetryTargetKind(tabToSave.file),
+        });
         const outcome = await executeTabSave({
           tab: tabToSave,
           isProject: isProjectRef.current,
@@ -428,6 +519,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         outcomes.push(outcome);
 
         if (outcome.status === "saved") {
+          trackUsageEvent("save_completed", {
+            trigger: "save_all",
+            mode: isProjectRef.current ? "project" : "standalone",
+            target_kind: getTelemetryTargetKind(outcome.descriptor),
+          });
           if (outcome.persistFailed) {
             notificationManager.warning(PERSIST_FAILURE_WARNING);
           }
@@ -436,12 +532,29 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
         // Non-saved: surface the right notification and stop saving the rest.
         if (outcome.status === "conflicted") {
+          trackUsageEvent("save_conflict_blocked", {
+            trigger: "save_all",
+            mode: isProjectRef.current ? "project" : "standalone",
+          });
           notificationManager.warning(
             "ファイルが外部で変更されています。保存する前にコンフリクトを解決してください。",
           );
         } else if (outcome.status === "failed") {
+          trackUsageEvent("save_failed", {
+            trigger: "save_all",
+            mode: isProjectRef.current ? "project" : "standalone",
+            target_kind: getTelemetryTargetKind(tabToSave.file),
+            reason: classifySaveOutcome(outcome),
+          });
           console.error("保存に失敗しました:", outcome.error);
           notificationManager.error(`保存に失敗しました: ${getErrorMessage(outcome.error)}`);
+        } else {
+          trackUsageEvent("save_blocked", {
+            trigger: "save_all",
+            mode: isProjectRef.current ? "project" : "standalone",
+            target_kind: getTelemetryTargetKind(tabToSave.file),
+            reason: classifySaveOutcome(outcome),
+          });
         }
         // "cancelled" (user dismissed Save As) / "locked" / "skipped":
         // no notification, but still blocks the pending action.
@@ -453,6 +566,14 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
     const allSaved =
       outcomes.length === dirtyTabs.length && outcomes.every((o) => o.status === "saved");
+    trackUsageEvent("save_all_completed", {
+      dirty_count_bucket: bucketTelemetryCount(dirtyTabs.length),
+      result: allSaved
+        ? "all_saved"
+        : outcomes.some((o) => o.status === "saved")
+          ? "partial"
+          : "blocked",
+    });
     return { allSaved, outcomes };
   }, [
     persistFileReference,
@@ -477,6 +598,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
     try {
       // #1840: flush live editor content before Save As as well.
       const tabToSave = flushActiveTabContent(tab);
+      trackUsageEvent("save_attempted", {
+        trigger: "save_as",
+        mode: isProjectRef.current ? "project" : "standalone",
+        target_kind: getTelemetryTargetKind(tabToSave.file),
+      });
       const outcome = await executeTabSave({
         tab: tabToSave,
         isProject: isProjectRef.current,
@@ -492,6 +618,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
       });
 
       if (outcome.status === "saved") {
+        trackUsageEvent("save_completed", {
+          trigger: "save_as",
+          mode: isProjectRef.current ? "project" : "standalone",
+          target_kind: getTelemetryTargetKind(outcome.descriptor),
+        });
         if (outcome.persistFailed) {
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         }
@@ -531,10 +662,23 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           }
         }
       } else if (outcome.status === "failed") {
+        trackUsageEvent("save_failed", {
+          trigger: "save_as",
+          mode: isProjectRef.current ? "project" : "standalone",
+          target_kind: getTelemetryTargetKind(tabToSave.file),
+          reason: classifySaveOutcome(outcome),
+        });
         console.error("名前を付けて保存に失敗しました:", outcome.error);
         notificationManager.error(
           `名前を付けて保存に失敗しました: ${getErrorMessage(outcome.error)}`,
         );
+      } else {
+        trackUsageEvent("save_blocked", {
+          trigger: "save_as",
+          mode: isProjectRef.current ? "project" : "standalone",
+          target_kind: getTelemetryTargetKind(tabToSave.file),
+          reason: classifySaveOutcome(outcome),
+        });
       }
       // "cancelled" / "locked": nothing to do
     } finally {
@@ -567,6 +711,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
 
       const sysFileName = path.split("/").pop() || "無題";
       const sysFileType = inferFileType(sysFileName);
+      trackUsageEvent("file_open_completed", {
+        surface: "system",
+        source: "system_open",
+        file_type: normalizeTelemetryFileType(sysFileType),
+      });
 
       // Reuse current tab if untitled and clean
       const cur = tabsRef.current.find((t) => t.id === activeTabIdRef.current);
@@ -677,6 +826,10 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
           notificationManager.error(
             `ファイルを開けませんでした: ${vfsPath.split("/").pop() || vfsPath}`,
           );
+          trackUsageEvent("project_file_open_failed", {
+            surface: "explorer",
+            reason: classifyTelemetryError(error),
+          });
           return;
         }
 
@@ -691,6 +844,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         const fileName = vfsPath.split("/").pop() || "無題";
         const vfsFileType = inferFileType(fileName);
         const effectivePreview = openingPathsRef.current.get(vfsPath) ?? preview;
+        trackUsageEvent("project_file_open_completed", {
+          surface: "explorer",
+          file_type: normalizeTelemetryFileType(vfsFileType),
+          preview: effectivePreview ? "true" : "false",
+        });
 
         if (effectivePreview) {
           // Replace existing preview tab, or create new preview tab

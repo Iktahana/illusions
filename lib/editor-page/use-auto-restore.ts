@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 interface UseAutoRestoreParams {
   autoRestoreProjectId: string | null;
@@ -39,6 +40,9 @@ export function useAutoRestore({
       } catch {
         // handleOpenRecentProject catches its own errors internally
       }
+      trackUsageEvent(success ? "project_auto_restore_completed" : "project_auto_restore_failed", {
+        ...(success ? { restore_strategy: "recent" } : { reason: "unknown" }),
+      });
       isAutoRestoringRef.current = false;
       signalVfsReady();
       timerId = setTimeout(() => {
