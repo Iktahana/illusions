@@ -122,6 +122,9 @@
     "vitest": "^4.0.18",
     "wait-on": "^9.0.10"
   },
+  "overrides": {
+    "node-abi": "^4.31.0"
+  },
   "lint-staged": {
     "*.{ts,tsx}": [
       "prettier --write",
