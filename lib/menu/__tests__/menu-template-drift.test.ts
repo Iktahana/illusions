@@ -460,6 +460,7 @@ describe("WEB_MENU_STRUCTURE preserves the pre-#1433 structure", () => {
           { label: `バージョン ${APP_VERSION}`, enabled: false },
           { type: "separator" },
           { label: "公式サイトへ", action: "open-website" },
+          { label: "バグ・ご要望を報告", action: "report-bug" },
           { label: "AI回答の不適切を報告", action: "report-ai-inappropriate" },
         ],
       },

@@ -153,6 +153,8 @@ const MENU_CHANNELS = Object.freeze({
     exportPdf: "menu-export-pdf",
     exportEpub: "menu-export-epub",
     exportDocx: "menu-export-docx",
+    reportBug: "menu-report-bug",
+    reportAiInappropriate: "menu-report-ai-inappropriate",
   }),
 });
 

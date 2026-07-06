@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import type { EditorView } from "@milkdown/prose/view";
+import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
 
 interface UseWebMenuHandlersProps {
   onNew: () => void;
@@ -28,6 +29,8 @@ interface UseWebMenuHandlersProps {
   onNewTab?: () => void;
   /** Handler for closing the active tab */
   onCloseTab?: () => void;
+  /** Handler for opening the bug/feedback report dialog with a preset category */
+  onReportBug?: (category: BugReportCategory) => void;
 }
 
 export function useWebMenuHandlers({
@@ -49,6 +52,7 @@ export function useWebMenuHandlers({
   onThemeChange,
   onNewTab,
   onCloseTab,
+  onReportBug,
 }: UseWebMenuHandlersProps) {
   const handleMenuAction = useCallback(
     (action: string) => {
@@ -238,8 +242,11 @@ export function useWebMenuHandlers({
         case "open-website":
           window.open("https://www.illusions.app/", "_blank");
           break;
+        case "report-bug":
+          onReportBug?.("bug");
+          break;
         case "report-ai-inappropriate":
-          window.open("https://github.com/Iktahana/illusions/issues/new", "_blank");
+          onReportBug?.("ai-inappropriate");
           break;
 
         default:
@@ -270,6 +277,7 @@ export function useWebMenuHandlers({
       onThemeChange,
       onNewTab,
       onCloseTab,
+      onReportBug,
     ],
   );
 
