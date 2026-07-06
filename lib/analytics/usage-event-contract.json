@@ -1,0 +1,470 @@
+{
+  "events": {
+    "app_launched": {
+      "platform": ["aix", "darwin", "freebsd", "linux", "openbsd", "sunos", "win32"]
+    },
+    "auth_login_started": {
+      "surface": ["settings", "welcome", "menu", "startup", "callback", "unknown"]
+    },
+    "auth_login_completed": {
+      "surface": ["settings", "welcome", "menu", "startup", "callback", "unknown"]
+    },
+    "auth_login_failed": {
+      "surface": ["settings", "welcome", "menu", "startup", "callback", "unknown"],
+      "stage": ["start", "callback", "exchange", "restore", "refresh", "logout", "unknown"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "auth_session_restored": {
+      "surface": ["startup"],
+      "strategy": ["electron_tokens", "web_cookie"]
+    },
+    "auth_session_restore_failed": {
+      "surface": ["startup"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "auth_refresh_completed": {
+      "surface": ["startup"]
+    },
+    "auth_refresh_failed": {
+      "surface": ["startup"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "auth_logout_completed": {
+      "surface": ["settings", "menu", "unknown"]
+    },
+    "auth_logout_failed": {
+      "surface": ["settings", "menu", "unknown"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "save_attempted": {
+      "trigger": ["manual", "save_as", "auto", "close_tab", "window_close", "save_all"],
+      "mode": ["project", "standalone"],
+      "target_kind": ["file", "untitled", "handle", "unknown"]
+    },
+    "save_completed": {
+      "trigger": ["manual", "save_as", "auto", "close_tab", "window_close", "save_all"],
+      "mode": ["project", "standalone"],
+      "target_kind": ["file", "untitled", "handle", "unknown"]
+    },
+    "save_failed": {
+      "trigger": ["manual", "save_as", "auto", "close_tab", "window_close", "save_all"],
+      "mode": ["project", "standalone"],
+      "target_kind": ["file", "untitled", "handle", "unknown"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "save_blocked": {
+      "trigger": ["manual", "save_as", "auto", "close_tab", "window_close", "save_all"],
+      "mode": ["project", "standalone"],
+      "target_kind": ["file", "untitled", "handle", "unknown"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "save_all_completed": {
+      "dirty_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"],
+      "result": ["all_saved", "blocked", "partial"]
+    },
+    "autosave_attempted": {
+      "target_kind": ["file", "untitled", "handle", "unknown"],
+      "activity": ["foreground", "background", "unknown"]
+    },
+    "autosave_failed": {
+      "target_kind": ["file", "untitled", "handle", "unknown"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "save_conflict_blocked": {
+      "trigger": ["manual", "save_as", "auto", "close_tab", "window_close", "save_all"],
+      "mode": ["project", "standalone"]
+    },
+    "project_create_started": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "mode": ["project", "standalone"]
+    },
+    "project_create_completed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "mode": ["project", "standalone"],
+      "initial_file_type": ["mdi", "md", "txt", "unknown"]
+    },
+    "project_create_failed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "mode": ["project", "standalone"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "project_open_started": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "source": ["dialog", "recent", "system_open", "auto_restore", "open_as_project"]
+    },
+    "project_open_completed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "source": ["dialog", "recent", "system_open", "auto_restore", "open_as_project"],
+      "restore_strategy": ["fresh", "recent", "stored_handle", "none"]
+    },
+    "project_open_failed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "source": ["dialog", "recent", "system_open", "auto_restore", "open_as_project"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "project_recent_open_failed": {
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "project_auto_restore_completed": {
+      "restore_strategy": ["fresh", "recent", "stored_handle", "none"]
+    },
+    "project_auto_restore_failed": {
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "file_new_created": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "file_type": ["mdi", "md", "txt", "unknown"],
+      "context": ["standalone", "project"]
+    },
+    "file_open_started": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "source": ["dialog", "recent", "system_open", "auto_restore", "open_as_project"]
+    },
+    "file_open_completed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "source": ["dialog", "recent", "system_open", "auto_restore", "open_as_project"],
+      "file_type": ["mdi", "md", "txt", "unknown"]
+    },
+    "file_open_failed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "source": ["dialog", "recent", "system_open", "auto_restore", "open_as_project"],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "project_file_open_completed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "file_type": ["mdi", "md", "txt", "unknown"],
+      "preview": ["true", "false"]
+    },
+    "project_file_open_failed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "reason": [
+        "cancelled",
+        "conflict",
+        "invalid_project",
+        "io_error",
+        "locked",
+        "not_found",
+        "permission_denied",
+        "unknown"
+      ]
+    },
+    "project_file_created": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "file_type": ["mdi", "md", "txt", "unknown"],
+      "collision": ["none", "confirmed", "blocked"]
+    },
+    "project_folder_created": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ]
+    },
+    "project_file_renamed": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "target_kind": ["file", "folder"],
+      "result": ["completed", "blocked", "failed"]
+    },
+    "project_file_deleted": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "target_kind": ["file", "folder"],
+      "dirty_open_tabs_bucket": ["0", "1", "2_5", "6_10", "11_plus"]
+    },
+    "project_file_duplicated": {
+      "surface": [
+        "wizard",
+        "welcome",
+        "menu",
+        "settings",
+        "sidebar",
+        "explorer",
+        "system",
+        "startup",
+        "shortcut",
+        "unknown"
+      ],
+      "file_type": ["mdi", "md", "txt", "unknown"],
+      "collision": ["none", "confirmed", "blocked"]
+    }
+  }
+}

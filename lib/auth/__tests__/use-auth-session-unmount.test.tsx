@@ -29,6 +29,10 @@ const { loadTokensMock, saveTokensMock, clearTokensMock } = vi.hoisted(() => ({
   clearTokensMock: vi.fn(async () => undefined),
 }));
 
+const { trackUsageEventMock } = vi.hoisted(() => ({
+  trackUsageEventMock: vi.fn(),
+}));
+
 vi.mock("../token-storage", () => ({
   loadTokens: loadTokensMock,
   saveTokens: saveTokensMock,
@@ -38,6 +42,14 @@ vi.mock("../token-storage", () => ({
 vi.mock("@/lib/utils/runtime-env", () => ({
   isElectronRenderer: () => true,
 }));
+
+vi.mock("@/lib/analytics/usage-events", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/analytics/usage-events")>();
+  return {
+    ...actual,
+    trackUsageEvent: trackUsageEventMock,
+  };
+});
 
 const USER_INFO = {
   sub: "user-1",
@@ -154,6 +166,10 @@ describe("#1567 — refresh timer lifecycle in useAuthSession", () => {
     });
 
     expect(sessionRef.current?.user?.id).toBe("user-1");
+    expect(trackUsageEventMock).toHaveBeenCalledWith("auth_session_restored", {
+      surface: "startup",
+      strategy: "electron_tokens",
+    });
     expect(vi.getTimerCount()).toBe(1);
 
     await act(async () => {
@@ -177,6 +193,9 @@ describe("#1567 — refresh timer lifecycle in useAuthSession", () => {
       await sessionRef.current?.logout();
     });
 
+    expect(trackUsageEventMock).toHaveBeenCalledWith("auth_logout_completed", {
+      surface: "settings",
+    });
     expect(vi.getTimerCount()).toBe(0);
     expect(sessionRef.current?.user).toBeNull();
     expect(clearTokensMock).toHaveBeenCalled();
