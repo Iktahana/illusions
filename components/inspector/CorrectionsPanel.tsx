@@ -252,7 +252,9 @@ export default function CorrectionsPanel({
       for (const ruleId of group.ruleIds) {
         const current = lintingRuleConfigs[ruleId];
         const severity = current?.severity ?? "warning";
-        onLintingRuleConfigChange(ruleId, { enabled: false, severity });
+        // Spread `current` so per-rule extras (skipDialogue / options, #2048)
+        // survive; the replace-style persistence would otherwise drop them.
+        onLintingRuleConfigChange(ruleId, { ...current, enabled: false, severity });
       }
     },
     [onLintingRuleConfigChange, lintingRuleConfigs],

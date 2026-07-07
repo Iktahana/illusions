@@ -32,7 +32,12 @@ export function useLinting(
   lintingEnabled: boolean,
   lintingRuleConfigs: Record<
     string,
-    { enabled: boolean; severity: Severity; skipDialogue?: boolean }
+    {
+      enabled: boolean;
+      severity: Severity;
+      skipDialogue?: boolean;
+      options?: Record<string, unknown>;
+    }
   >,
   editorViewInstance: EditorView | null,
   // Reserved for future throttling / mode-aware logic; kept in the
@@ -153,12 +158,16 @@ export function useLinting(
   useEffect(() => {
     if (!ruleRunner) return;
 
-    // Apply user overrides from settings
+    // Apply user overrides from settings. `options` must be forwarded so
+    // rule-specific overrides (e.g. genji-out-of-dict's
+    // includeVerbsAdjectives, #2048) actually reach the rule at lint time;
+    // when omitted (undefined) the runner preserves the manifest defaults.
     for (const [ruleId, config] of Object.entries(lintingRuleConfigs)) {
       ruleRunner.setConfig(ruleId, {
         enabled: config.enabled,
         severity: config.severity,
         skipDialogue: config.skipDialogue,
+        options: config.options,
       });
     }
 

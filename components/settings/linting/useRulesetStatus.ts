@@ -17,7 +17,12 @@ export interface RulesetRuleMeta {
   descriptionJa?: string;
   guidelineId?: string;
   level?: string;
-  defaultConfig?: { enabled?: boolean; severity?: string };
+  defaultConfig?: {
+    enabled?: boolean;
+    severity?: string;
+    skipDialogue?: boolean;
+    options?: Record<string, unknown>;
+  };
   applicableModes?: string[];
   supportsSkipDialogue?: boolean;
 }

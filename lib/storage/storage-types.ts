@@ -80,7 +80,13 @@ export interface AppState {
   lintingEnabled?: boolean;
   lintingRuleConfigs?: Record<
     string,
-    { enabled: boolean; severity: Severity; skipDialogue?: boolean }
+    {
+      enabled: boolean;
+      severity: Severity;
+      skipDialogue?: boolean;
+      /** Rule-specific option overrides (e.g. genji-out-of-dict's includeVerbsAdjectives, #2048). */
+      options?: Record<string, unknown>;
+    }
   >;
   /**
    * One-time migration marker for mode-derived rule config recovery.
@@ -133,7 +139,15 @@ export interface AppState {
   autoPowerSaveOnBattery?: boolean;
   prePowerSaveState?: {
     lintingEnabled: boolean;
-    lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
+    lintingRuleConfigs: Record<
+      string,
+      {
+        enabled: boolean;
+        severity: Severity;
+        skipDialogue?: boolean;
+        options?: Record<string, unknown>;
+      }
+    >;
   } | null;
 
   // 読み上げ（TTS）設定

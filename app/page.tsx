@@ -1623,7 +1623,11 @@ export default function EditorPage() {
     onCorrectionModeChange: (modeId: CorrectionModeId) => {
       const mode = CORRECTION_MODES[modeId];
       handleCorrectionConfigChange({ mode: modeId, guidelines: [...mode.defaultGuidelines] });
-      handleLintingRuleConfigsBatchChange(buildModeRuleConfigsFromRules(modeId, loadedRules));
+      // Pass the current configs so user rule-option overrides (#2048)
+      // survive the whole-map replace a mode switch performs.
+      handleLintingRuleConfigsBatchChange(
+        buildModeRuleConfigsFromRules(modeId, loadedRules, lintingRuleConfigs),
+      );
     },
     switchToCorrectionsTrigger,
     previousDayStats,

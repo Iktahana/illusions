@@ -109,6 +109,84 @@ describe("buildModeRuleConfigsFromRules — runtime applicableModes wiring", () 
     expect(configs["x-skip"].skipDialogue).toBe(true);
   });
 
+  it("carries manifest defaultConfig.options into the mode config (#1975 non-regression)", () => {
+    const configs = buildModeRuleConfigsFromRules("novel", [
+      {
+        ruleId: "genji-out-of-dict",
+        applicableModes: ["novel"],
+        defaultConfig: {
+          enabled: true,
+          severity: "info",
+          options: { includeVerbsAdjectives: false },
+        },
+      },
+    ]);
+    expect(configs["genji-out-of-dict"].options).toEqual({ includeVerbsAdjectives: false });
+  });
+
+  it("merges user option overrides from prevConfigs over manifest defaults (#2048)", () => {
+    const rules: ModeRuleMetaInput[] = [
+      {
+        ruleId: "genji-out-of-dict",
+        applicableModes: ["novel"],
+        defaultConfig: {
+          enabled: true,
+          severity: "info",
+          options: { includeVerbsAdjectives: false, minLength: 2 },
+        },
+      },
+    ];
+    const prev = {
+      "genji-out-of-dict": {
+        enabled: true,
+        severity: "info",
+        options: { includeVerbsAdjectives: true },
+      },
+    };
+    const configs = buildModeRuleConfigsFromRules("novel", rules, prev);
+    // User's true wins over the manifest false; untouched keys keep defaults.
+    expect(configs["genji-out-of-dict"].options).toEqual({
+      includeVerbsAdjectives: true,
+      minLength: 2,
+    });
+  });
+
+  it("user option overrides survive a mode switch even for rules leaving the mode (#2048)", () => {
+    const rules: ModeRuleMetaInput[] = [
+      {
+        ruleId: "genji-out-of-dict",
+        applicableModes: ["novel"],
+        defaultConfig: {
+          enabled: true,
+          severity: "info",
+          options: { includeVerbsAdjectives: false },
+        },
+      },
+    ];
+    const prev = {
+      "genji-out-of-dict": {
+        enabled: true,
+        severity: "info" as const,
+        options: { includeVerbsAdjectives: true },
+      },
+    };
+    // Switch to a mode the rule does NOT opt into: enabled flips off (strict
+    // membership), but the user's option override must be retained so it is
+    // still there when the user switches back.
+    const official = buildModeRuleConfigsFromRules("official", rules, prev);
+    expect(official["genji-out-of-dict"].enabled).toBe(false);
+    expect(official["genji-out-of-dict"].options).toEqual({ includeVerbsAdjectives: true });
+  });
+
+  it("emits no options key when neither manifest nor prevConfigs define one", () => {
+    const configs = buildModeRuleConfigsFromRules(
+      "novel",
+      [{ ruleId: "plain", applicableModes: ["novel"], defaultConfig: { severity: "warning" } }],
+      { plain: { options: undefined } },
+    );
+    expect("options" in configs["plain"]).toBe(false);
+  });
+
   it("an empty rule list yields an empty map (Web has no rulesets)", () => {
     for (const mode of CORRECTION_MODE_IDS) {
       expect(buildModeRuleConfigsFromRules(mode, [])).toEqual({});

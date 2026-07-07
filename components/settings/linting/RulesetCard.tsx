@@ -27,6 +27,11 @@ export interface RulesetCardRule {
   nameJa: string;
   level?: RuleLevel;
   supportsSkipDialogue?: boolean;
+  /**
+   * Manifest default of the rule's `includeVerbsAdjectives` option;
+   * `undefined` = the rule does not declare it (no sub-toggle). See RuleRow.
+   */
+  includeVerbsAdjectivesDefault?: boolean;
 }
 
 export interface RulesetCardProps {
@@ -50,13 +55,10 @@ export interface RulesetCardProps {
   /** If true, delete button is disabled (built-in and official packs) */
   deletable?: boolean;
   /** Config keyed by ruleId */
-  ruleConfigs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>;
+  ruleConfigs: Record<string, RuleConfig>;
   defaultConfigs?: Record<string, { enabled: boolean; severity: Severity }>;
   disabled?: boolean;
-  onRuleConfigChange: (
-    ruleId: string,
-    config: { enabled: boolean; severity: Severity; skipDialogue?: boolean },
-  ) => void;
+  onRuleConfigChange: (ruleId: string, config: RuleConfig) => void;
   onPackToggle: (ruleIds: string[], enabled: boolean) => void;
   onCheckUpdate?: () => Promise<void>;
   onRedownload?: () => Promise<void>;
@@ -73,7 +75,7 @@ const LEGACY_LEVEL_MAP: ReadonlyMap<string, RuleLevel> | null = (() => {
 
 function getEffectiveConfig(
   ruleId: string,
-  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
+  configs: Record<string, RuleConfig>,
   defaults?: Record<string, { enabled: boolean; severity: Severity }>,
 ): RuleConfig {
   return (
@@ -294,6 +296,7 @@ export default function RulesetCard({
                     nameJa={rule.nameJa}
                     level={level}
                     supportsSkipDialogue={rule.supportsSkipDialogue}
+                    includeVerbsAdjectivesDefault={rule.includeVerbsAdjectivesDefault}
                     config={config}
                     onChange={onRuleConfigChange}
                   />
