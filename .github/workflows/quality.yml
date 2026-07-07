@@ -7,6 +7,9 @@ on:
     branches: [dev, beta, alpha, main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint

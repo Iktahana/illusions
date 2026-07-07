@@ -181,7 +181,26 @@ async function apiDelete(token, path) {
  * @returns {string}
  */
 function stripHtmlComments(text) {
-  return text.replace(/<!--[\s\S]*?-->/g, "");
+  let result = "";
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const open = text.indexOf("<!--", cursor);
+    if (open === -1) {
+      result += text.slice(cursor);
+      break;
+    }
+
+    result += text.slice(cursor, open);
+    const close = text.indexOf("-->", open + 4);
+    if (close === -1) {
+      result += text.slice(open);
+      break;
+    }
+    cursor = close + 3;
+  }
+
+  return result;
 }
 
 /**
