@@ -25,6 +25,8 @@ export interface ModeRuleConfig {
   enabled: boolean;
   severity: Severity;
   skipDialogue?: boolean;
+  /** Rule-specific options: manifest defaults overlaid with user overrides. */
+  options?: Record<string, unknown>;
 }
 
 /**
@@ -36,7 +38,12 @@ export interface ModeRuleMetaInput {
   ruleId: string;
   /** Modes this rule opts into. Missing/empty = never auto-enabled by a mode. */
   applicableModes?: readonly string[];
-  defaultConfig?: { enabled?: boolean; severity?: string; skipDialogue?: boolean };
+  defaultConfig?: {
+    enabled?: boolean;
+    severity?: string;
+    skipDialogue?: boolean;
+    options?: Record<string, unknown>;
+  };
   /** Declares that the rule's issues can be resolved by adding the word to the user dictionary. */
   suggestsDictionaryEntry?: boolean;
 }
@@ -56,17 +63,23 @@ function normalizeSeverity(value: string | undefined): Severity {
  * - `enabled = applicableModes.includes(modeId)` (strict membership)
  * - `severity = defaultConfig.severity ?? "warning"`
  * - `skipDialogue` is carried over from `defaultConfig` when present
+ * - `options = { ...defaultConfig.options, ...prevConfigs[ruleId].options }` —
+ *   rule options have no per-mode semantics, so user overrides (e.g.
+ *   genji-out-of-dict's `includeVerbsAdjectives`, #2048) must survive the
+ *   whole-map replace a mode switch performs, layered over manifest defaults.
  *
  * The result intentionally covers every rule in `rules` so callers may replace
  * the whole `lintingRuleConfigs` object. Duplicate ruleIds keep the first entry.
  *
  * @param modeId Selected correction mode.
  * @param rules Flattened metadata of every loaded rule (across all rulesets).
+ * @param prevConfigs Current per-rule configs; only user `options` are carried over.
  * @returns ruleId → config map covering every supplied rule.
  */
 export function buildModeRuleConfigsFromRules(
   modeId: CorrectionModeId,
   rules: readonly ModeRuleMetaInput[],
+  prevConfigs?: Record<string, { options?: Record<string, unknown> }>,
 ): Record<string, ModeRuleConfig> {
   const out: Record<string, ModeRuleConfig> = {};
   for (const rule of rules) {
@@ -78,6 +91,11 @@ export function buildModeRuleConfigsFromRules(
     };
     if (rule.defaultConfig?.skipDialogue !== undefined) {
       config.skipDialogue = rule.defaultConfig.skipDialogue;
+    }
+    const defaultOptions = rule.defaultConfig?.options;
+    const userOptions = prevConfigs?.[rule.ruleId]?.options;
+    if (defaultOptions !== undefined || userOptions !== undefined) {
+      config.options = { ...defaultOptions, ...userOptions };
     }
     out[rule.ruleId] = config;
   }

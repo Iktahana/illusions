@@ -26,6 +26,7 @@ export class RuleRunner {
 
   /** Update the config for a specific rule. */
   setConfig(ruleId: string, config: LintRuleConfig): void {
+    const prev = this.configs.get(ruleId);
     // Preserve rule-specific `options` from the registered manifest defaultConfig
     // when the caller omits them. The renderer's config pipeline only carries
     // enabled/severity/skipDialogue (mode switching rebuilds the whole config
@@ -33,13 +34,21 @@ export class RuleRunner {
     // noun-only `includeVerbsAdjectives:false` — would revert to its internal
     // default and over-detect verbs/adjectives after every mode switch (#1962).
     if (config.options === undefined) {
-      const prev = this.configs.get(ruleId);
       if (prev?.options !== undefined) {
         this.configs.set(ruleId, { ...config, options: prev.options });
         return;
       }
+      this.configs.set(ruleId, config);
+      return;
     }
-    this.configs.set(ruleId, config);
+    // Explicit options are a per-key override MERGED over the existing
+    // (manifest-default) options: a user toggling one key (e.g.
+    // genji-out-of-dict's `includeVerbsAdjectives`) must not wipe the rule's
+    // other default option keys (#2048).
+    this.configs.set(ruleId, {
+      ...config,
+      options: { ...prev?.options, ...config.options },
+    });
   }
 
   /** Get the current config for a specific rule. */

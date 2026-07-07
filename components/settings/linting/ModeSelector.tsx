@@ -24,9 +24,32 @@ interface ModeSelectorProps {
    * regression this prop exists to fix).
    */
   loadedRules: readonly ModeRuleMetaInput[];
+  /**
+   * Current per-rule configs. Mode switching replaces the whole config map,
+   * so user rule-option overrides (`options`, #2048) must be read from here
+   * and carried into the rebuilt map — enabled/severity are intentionally
+   * mode-derived and NOT carried over.
+   */
+  lintingRuleConfigs: Record<
+    string,
+    {
+      enabled: boolean;
+      severity: Severity;
+      skipDialogue?: boolean;
+      options?: Record<string, unknown>;
+    }
+  >;
   onCorrectionConfigChange: (config: Partial<CorrectionConfig>) => void;
   onLintingRuleConfigsBatchChange: (
-    configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
+    configs: Record<
+      string,
+      {
+        enabled: boolean;
+        severity: Severity;
+        skipDialogue?: boolean;
+        options?: Record<string, unknown>;
+      }
+    >,
   ) => void;
 }
 
@@ -34,6 +57,7 @@ export default function ModeSelector({
   correctionConfig,
   disabled,
   loadedRules,
+  lintingRuleConfigs,
   onCorrectionConfigChange,
   onLintingRuleConfigsBatchChange,
 }: ModeSelectorProps): React.ReactElement {
@@ -48,10 +72,12 @@ export default function ModeSelector({
       // Build a complete config map (every loaded rule) from the rules'
       // applicableModes so the batch handler's replace semantics is correct:
       // rules opting into this mode are enabled, all others disabled.
-      const configs = buildModeRuleConfigsFromRules(mode.id, loadedRules);
+      // Passing the current configs preserves user rule-option overrides
+      // across the replace (#2048).
+      const configs = buildModeRuleConfigsFromRules(mode.id, loadedRules, lintingRuleConfigs);
       onLintingRuleConfigsBatchChange(configs);
     },
-    [loadedRules, onCorrectionConfigChange, onLintingRuleConfigsBatchChange],
+    [loadedRules, lintingRuleConfigs, onCorrectionConfigChange, onLintingRuleConfigsBatchChange],
   );
 
   return (
