@@ -69,7 +69,7 @@ const storage = getStorageService();
 
 ## 7. Framework Rules
 
-- **Electron**: Typed IPC channels from `types/electron.d.ts`, validate IPC input, use `electron-storage.ts`
+- **Electron**: Typed IPC channels from `types/electron.d.ts`, validate IPC input, use `platform/electron-renderer/storage.ts`
 - **Next.js**: `"use client"` for browser APIs/hooks, default to server components, dynamic imports for splitting
 - **Milkdown**: Follow patterns in `packages/milkdown-plugin-japanese-novel/`, type ProseMirror schemas, use kuromoji for tokenization, follow `MDI.md` for `.mdi` syntax
 
