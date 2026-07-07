@@ -3,7 +3,7 @@ title: タブ管理
 slug: tab-manager
 type: architecture
 status: active
-updated: 2026-06-11
+updated: 2026-07-07
 tags:
   - architecture
   - tabs
@@ -230,9 +230,11 @@ Handles all file operations through the VFS abstraction.
 - `saveFileAs()` -- save with a new name/path (shows dialog)
 - `loadFileContent()` -- read file content into a tab
 
+Each file-open and save path emits anonymous usage events via `trackUsageEvent()` (`lib/analytics/usage-events.ts`): `file_open_started`, `file_open_completed`, `file_open_failed`, `save_attempted`, `save_completed`, `save_failed`, `save_blocked`, `save_conflict_blocked`, and `save_all_completed`. Events are only sent when the user has consented to usage analytics.
+
 ### `useAutoSave()`
 
-Manages the auto-save timer with power-aware throttling. In the foreground, ticks every 5 seconds; when power-save mode is enabled and the window is backgrounded, the interval is extended to 20 seconds (`BACKGROUND_AUTO_SAVE_INTERVAL_MS` from `lib/editor-page/power-policy.ts`). On each tick, iterates through all tabs and saves any that are dirty and not currently in a save operation. Actual save logic is delegated to `save-executor.ts` (#1432).
+Manages the auto-save timer with power-aware throttling. In the foreground, ticks every 5 seconds; when power-save mode is enabled and the window is backgrounded, the interval is extended to 20 seconds (`BACKGROUND_AUTO_SAVE_INTERVAL_MS` from `lib/editor-page/power-policy.ts`). On each tick, iterates through all tabs and saves any that are dirty and not currently in a save operation. Actual save logic is delegated to `save-executor.ts` (#1432). Each auto-save attempt emits `autosave_attempted`; failures emit `autosave_failed` via `trackUsageEvent()`.
 
 ### `useTabPersistence()`
 
@@ -285,5 +287,5 @@ On first use (no persisted tabs), the tab manager loads a demo file to provide a
 
 ---
 
-**Last Updated**: 2026-06-11
+**Last Updated**: 2026-07-07
 **Version**: 1.1.0
