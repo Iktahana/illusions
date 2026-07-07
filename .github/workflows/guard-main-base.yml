@@ -1,0 +1,42 @@
+name: Guard Main Base
+
+# Enforces .github/ai/release-policy.md: `main` only receives the weekly
+# beta -> main promotion PR. Any other PR base'd on `main` (bot-authored
+# docs PRs, dependabot, stray manual PRs, etc.) fails this required check.
+#
+# Emergency hotfixes are still allowed: apply the `emergency-hotfix` label
+# (a human with write access must add it) to bypass.
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  guard-main-base:
+    name: guard-main-base
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR is beta promotion or labeled hotfix
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HAS_HOTFIX_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'emergency-hotfix') }}
+        run: |
+          if [ "$HEAD_REF" = "beta" ]; then
+            echo "OK: beta -> main promotion PR."
+            exit 0
+          fi
+
+          if [ "$HAS_HOTFIX_LABEL" = "true" ]; then
+            echo "OK: labeled emergency-hotfix, bypassing."
+            exit 0
+          fi
+
+          echo "::error::Only 'beta' may target 'main' (see .github/ai/release-policy.md)."
+          echo "::error::This PR's head branch is '$HEAD_REF'. Regular PRs must target 'dev' instead."
+          echo "::error::If this really is an emergency hotfix, a maintainer must add the 'emergency-hotfix' label to bypass this check."
+          exit 1
