@@ -279,7 +279,7 @@ declare global {
     };
     errorReporting?: {
       captureRendererError: (payload: {
-        source: "error-boundary" | "window-error" | "unhandledrejection";
+        source: "error-boundary" | "window-error" | "unhandledrejection" | "csp-violation";
         name?: string;
         message?: string;
         stack?: string;

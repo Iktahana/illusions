@@ -31,6 +31,20 @@ describe("createCaptureRendererErrorHandler", () => {
     expect(captureRendererError).toHaveBeenCalledWith({ source: "window-error", message: "boom" });
   });
 
+  it("forwards csp-violation payloads", async () => {
+    const { handler, captureRendererError } = await createHandler();
+
+    await handler(
+      {},
+      { source: "csp-violation", message: "CSP violation: connect-src blocked https://x" },
+    );
+
+    expect(captureRendererError).toHaveBeenCalledWith({
+      source: "csp-violation",
+      message: "CSP violation: connect-src blocked https://x",
+    });
+  });
+
   it("ignores non-object payloads", async () => {
     const { handler, captureRendererError } = await createHandler();
 

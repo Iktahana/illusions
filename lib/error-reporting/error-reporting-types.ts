@@ -1,4 +1,5 @@
-export type RendererErrorSource = "error-boundary" | "window-error" | "unhandledrejection";
+export type RendererErrorSource =
+  "error-boundary" | "window-error" | "unhandledrejection" | "csp-violation";
 
 export interface RendererErrorPayload {
   source: RendererErrorSource;
