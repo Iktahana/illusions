@@ -18,7 +18,34 @@ import type { Change } from "diff";
  * その他のHTMLタグは削除する。
  */
 export function stripHtmlForDiff(text: string): string {
-  return text.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
+  let result = "";
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const open = text.indexOf("<", cursor);
+    if (open === -1) {
+      result += text.slice(cursor);
+      break;
+    }
+
+    result += text.slice(cursor, open);
+    const close = text.indexOf(">", open + 1);
+    if (close === -1) {
+      result += text.slice(open);
+      break;
+    }
+
+    const tag = text
+      .slice(open + 1, close)
+      .trim()
+      .toLowerCase();
+    if (tag === "br" || tag === "br/") {
+      result += "\n";
+    }
+    cursor = close + 1;
+  }
+
+  return result;
 }
 
 /** A single diff chunk with type and value */

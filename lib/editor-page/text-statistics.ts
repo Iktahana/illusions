@@ -116,7 +116,7 @@ export function extractVisibleText(
   }
 
   // 10. HTML タグ → タグ記号を除去、内容は残す
-  text = text.replace(/<[^>]*>/g, "");
+  text = stripHtmlTags(text);
 
   // 11. Markdown 見出し記号（行頭の # 記号と直後のスペース）
   text = text.replace(/^#{1,6} /gm, "");
@@ -135,6 +135,29 @@ export function extractVisibleText(
   text = text.replace(/\\(.)/g, "$1");
 
   return text;
+}
+
+function stripHtmlTags(text: string): string {
+  let result = "";
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const open = text.indexOf("<", cursor);
+    if (open === -1) {
+      result += text.slice(cursor);
+      break;
+    }
+
+    result += text.slice(cursor, open);
+    const close = text.indexOf(">", open + 1);
+    if (close === -1) {
+      result += text.slice(open);
+      break;
+    }
+    cursor = close + 1;
+  }
+
+  return result;
 }
 
 // ---------------------------------------------------------------------------
