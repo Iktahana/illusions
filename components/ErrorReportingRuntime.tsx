@@ -25,11 +25,21 @@ export function ErrorReportingRuntime(): null {
       });
     };
 
+    const onCspViolation = (event: SecurityPolicyViolationEvent): void => {
+      void window.electronAPI?.errorReporting?.captureRendererError({
+        source: "csp-violation",
+        name: "SecurityPolicyViolation",
+        message: `CSP violation: ${event.violatedDirective} blocked ${event.blockedURI}`,
+      });
+    };
+
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onUnhandledRejection);
+    document.addEventListener("securitypolicyviolation", onCspViolation);
     return () => {
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onUnhandledRejection);
+      document.removeEventListener("securitypolicyviolation", onCspViolation);
     };
   }, []);
 

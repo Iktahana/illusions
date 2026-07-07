@@ -1,7 +1,12 @@
 const { ipcMain } = require("electron");
 const { ERROR_REPORTING_CHANNELS } = require("../lib/ipc-channels");
 
-const VALID_SOURCES = new Set(["error-boundary", "window-error", "unhandledrejection"]);
+const VALID_SOURCES = new Set([
+  "error-boundary",
+  "window-error",
+  "unhandledrejection",
+  "csp-violation",
+]);
 
 function isValidPayload(payload) {
   return (
