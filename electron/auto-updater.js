@@ -100,7 +100,7 @@ function setupAutoUpdater() {
         .showMessageBox(mainWindow, {
           type: "warning",
           title: "サポート終了のお知らせ",
-          message: "illusions 1.2 はSunset（サポート終了）となりました",
+          message: "illusions 1.2 は Sunset（サポート終了）となりました",
           detail: `最新バージョン ${info.version} が公開されています。公式サイトから最新版をダウンロードしてください。\n${DOWNLOAD_PAGE_URL}`,
           buttons: ["公式サイトを開く", "後で"],
           defaultId: 0,
