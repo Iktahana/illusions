@@ -270,3 +270,42 @@ describe("saveAllBeforeQuitAndInstall — functional (mocked electron)", () => {
     expect(windowManagerSrc).toMatch(/return true/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// macOS 1.2.x sunset 通知 (1.3.0 正式版検出時、auto-update ダイアログを置き換える)
+// ---------------------------------------------------------------------------
+
+describe("auto-updater.js — macOS sunset 通知の結線 (drift guard)", () => {
+  it("純粋ポリシー isSunsetDetected を update-policy から import している", () => {
+    expect(autoUpdaterSrc).toContain('require("./lib/update-policy")');
+    expect(autoUpdaterSrc).toMatch(/isSunsetDetected/);
+  });
+
+  it("update-available ハンドラ内で isSunsetDetected を呼び、platform/currentVersion/availableVersion を渡す", () => {
+    const handlerIdx = autoUpdaterSrc.indexOf('autoUpdater.on("update-available"');
+    const sunsetCallIdx = autoUpdaterSrc.indexOf("isSunsetDetected({", handlerIdx);
+    expect(handlerIdx).toBeGreaterThan(-1);
+    expect(sunsetCallIdx).toBeGreaterThan(handlerIdx);
+    expect(autoUpdaterSrc).toMatch(/platform:\s*process\.platform/);
+    expect(autoUpdaterSrc).toMatch(/currentVersion:\s*app\.getVersion\(\)/);
+    expect(autoUpdaterSrc).toMatch(/availableVersion:\s*info\.version/);
+  });
+
+  it("sunset 判定が true のときは autoUpdater.downloadUpdate() を呼ばない（早期 return する）", () => {
+    const sunsetCallIdx = autoUpdaterSrc.indexOf("isSunsetDetected({");
+    const nextReturnIdx = autoUpdaterSrc.indexOf("return;", sunsetCallIdx);
+    const downloadCallIdx = autoUpdaterSrc.indexOf("autoUpdater.downloadUpdate()");
+    expect(nextReturnIdx).toBeGreaterThan(sunsetCallIdx);
+    expect(nextReturnIdx).toBeLessThan(downloadCallIdx);
+  });
+
+  it("sunset ダイアログは公式ダウンロードページを開く導線を持つ", () => {
+    expect(autoUpdaterSrc).toContain("https://www.illusions.app/downloads/");
+    expect(autoUpdaterSrc).toMatch(/shell\.openExternal\(DOWNLOAD_PAGE_URL\)/);
+  });
+
+  it("electron の shell モジュールを import している", () => {
+    expect(autoUpdaterSrc).toMatch(/require\("electron"\)/);
+    expect(autoUpdaterSrc).toMatch(/const\s*\{[^}]*shell[^}]*\}\s*=\s*require\("electron"\)/);
+  });
+});
