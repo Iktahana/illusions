@@ -21,7 +21,7 @@
 
 ### 1.2 保持対象（範囲外）
 
-- `lib/storage/` 全般（`storage-service.ts` / `electron-storage*.ts` / `web-storage.ts` / `app-state-manager.ts` / `db.ts` / `local-preferences.ts`）  
+- `lib/storage/` 全般（`storage-service.ts` / `platform/electron-renderer/storage.ts` / `platform/browser/storage.ts` / `app-state-manager.ts` / `local-preferences.ts`）  
   → 最近開いたファイル・ユーザー辞書・キーマップ・dockview レイアウト・無視リスト等で利用中。**削除しない**。
   - ただし「StorageService の `saveSession` / `saveAppState` / `saveEditorBuffer`」はユーザーが指す「保存」ではない（セッション・アプリ状態のメタ永続化）ため、本リファクタの「保存削除」スコープからは **除外**。命名が紛らわしいため計画中に都度明示する。
 - `components/HistoryPanel.tsx`、`components/HistoryPanel/SnapshotItem.tsx`、`useSaveToast`、`useUnsavedWarning`  
