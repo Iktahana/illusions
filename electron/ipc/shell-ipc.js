@@ -1,43 +1,18 @@
 // Shell and OS integration IPC handlers
 
 const { ipcMain, BrowserWindow, Menu, shell, app } = require("electron");
-const path = require("path");
 const { SHELL_CHANNELS } = require("../lib/ipc-channels");
+const { createOpenPathHandler, createRevealPathHandler } = require("../lib/shell-path-policy");
 
 function registerShellHandlers() {
-  ipcMain.handle(SHELL_CHANNELS.invoke.showInFileManager, async (_event, dirPath) => {
-    if (!dirPath || typeof dirPath !== "string") return false;
-    // Reject relative paths and paths containing traversal sequences
-    if (!path.isAbsolute(dirPath) || dirPath.includes("..")) {
-      console.warn("[Security] Invalid path in show-in-file-manager:", dirPath);
-      return false;
-    }
-    const normalizedPath = path.normalize(dirPath);
-    const result = await shell.openPath(normalizedPath);
-    return result === ""; // empty string = success
-  });
+  ipcMain.handle(SHELL_CHANNELS.invoke.showInFileManager, createOpenPathHandler(shell.openPath));
 
-  ipcMain.handle(SHELL_CHANNELS.invoke.revealInFileManager, async (_event, filePath) => {
-    if (!filePath || typeof filePath !== "string") return false;
-    // Reject relative paths and paths containing traversal sequences
-    if (!path.isAbsolute(filePath) || filePath.includes("..")) {
-      console.warn("[Security] Invalid path in reveal-in-file-manager:", filePath);
-      return false;
-    }
-    const normalizedPath = path.normalize(filePath);
-    shell.showItemInFolder(normalizedPath);
-    return true;
-  });
+  ipcMain.handle(
+    SHELL_CHANNELS.invoke.revealInFileManager,
+    createRevealPathHandler(shell.showItemInFolder),
+  );
 
-  ipcMain.handle(SHELL_CHANNELS.invoke.openWithDefaultApp, async (_event, filePath) => {
-    if (!filePath || typeof filePath !== "string") return false;
-    if (!path.isAbsolute(filePath) || filePath.includes("..")) {
-      console.warn("[Security] Invalid path in open-with-default-app:", filePath);
-      return false;
-    }
-    const result = await shell.openPath(path.normalize(filePath));
-    return result === ""; // empty string = success on macOS/Windows
-  });
+  ipcMain.handle(SHELL_CHANNELS.invoke.openWithDefaultApp, createOpenPathHandler(shell.openPath));
 
   ipcMain.handle(SHELL_CHANNELS.invoke.openExternal, async (_event, url) => {
     if (typeof url !== "string") return false;
@@ -143,4 +118,8 @@ function registerShellHandlers() {
   });
 }
 
-module.exports = { registerShellHandlers };
+module.exports = {
+  registerShellHandlers,
+  createOpenPathHandler,
+  createRevealPathHandler,
+};
