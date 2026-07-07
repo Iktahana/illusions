@@ -17,28 +17,37 @@ import type { RulesetCardRule } from "./RulesetCard";
 import type { UseRulesetStatusReturn } from "./useRulesetStatus";
 import { buildBulkConfig, collectAllRuleIds } from "./bulk-toggle";
 
+type RuleConfig = {
+  enabled: boolean;
+  severity: Severity;
+  skipDialogue?: boolean;
+  options?: Record<string, unknown>;
+};
+
 interface RulesetListProps {
-  lintingRuleConfigs: Record<
-    string,
-    { enabled: boolean; severity: Severity; skipDialogue?: boolean }
-  >;
-  onLintingRuleConfigChange: (
-    ruleId: string,
-    config: { enabled: boolean; severity: Severity; skipDialogue?: boolean },
-  ) => void;
-  onLintingRuleConfigsBatchChange: (
-    configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
-  ) => void;
+  lintingRuleConfigs: Record<string, RuleConfig>;
+  onLintingRuleConfigChange: (ruleId: string, config: RuleConfig) => void;
+  onLintingRuleConfigsBatchChange: (configs: Record<string, RuleConfig>) => void;
   disabled?: boolean;
   /** Undefined on Web (no-op; only Electron provides this) */
   rulesetStatus?: UseRulesetStatusReturn;
 }
 
-function getConfig(
-  ruleId: string,
-  configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
-): { enabled: boolean; severity: Severity; skipDialogue?: boolean } {
+function getConfig(ruleId: string, configs: Record<string, RuleConfig>): RuleConfig {
   return configs[ruleId] ?? LINT_DEFAULT_CONFIGS[ruleId] ?? { enabled: true, severity: "warning" };
+}
+
+/**
+ * Manifest default of a rule's boolean `includeVerbsAdjectives` option, or
+ * `undefined` when the rule does not declare it. Presence gates the per-rule
+ * 「動詞・形容詞も照合する」 sub-toggle (#2048) — data-driven, so any rule that
+ * declares the option (currently genji-out-of-dict) gets the toggle.
+ */
+function includeVerbsAdjectivesDefault(defaultConfig?: {
+  options?: Record<string, unknown>;
+}): boolean | undefined {
+  const value = defaultConfig?.options?.includeVerbsAdjectives;
+  return typeof value === "boolean" ? value : undefined;
 }
 
 export default function RulesetList({
@@ -117,13 +126,11 @@ export default function RulesetList({
     rules: cat.rules
       .map((ruleId) => ruleMetaMap.get(ruleId))
       .filter((meta): meta is (typeof LINT_RULES_META)[number] => meta != null)
-      .map(
-        (meta): RulesetCardRule => ({
-          ruleId: meta.id,
-          nameJa: meta.nameJa,
-          supportsSkipDialogue: meta.supportsSkipDialogue,
-        }),
-      ),
+      .map((meta): RulesetCardRule => ({
+        ruleId: meta.id,
+        nameJa: meta.nameJa,
+        supportsSkipDialogue: meta.supportsSkipDialogue,
+      })),
   }));
 
   return (
@@ -212,6 +219,7 @@ export default function RulesetList({
               nameJa: r.nameJa,
               level: r.level as RulesetCardRule["level"],
               supportsSkipDialogue: r.supportsSkipDialogue,
+              includeVerbsAdjectivesDefault: includeVerbsAdjectivesDefault(r.defaultConfig),
             }))}
             updateAvailable={rs.updateAvailable}
             syncing={rs.syncing}

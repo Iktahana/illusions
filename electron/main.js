@@ -45,6 +45,12 @@ const { getDictManager } = require("./dict-manager");
 const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
 const { getRulesetsManager } = require("./rulesets-manager");
 const { registerAnalyticsHandlers } = require("./ipc/analytics-ipc");
+const { registerErrorReportingHandlers } = require("./ipc/error-reporting-ipc");
+const {
+  initializeErrorReporting,
+  captureMainError,
+  captureRendererError,
+} = require("./error-reporting");
 const { DICT_CHANNELS, POWER_CHANNELS, RULESETS_CHANNELS } = require("./lib/ipc-channels");
 
 // --- Aptabase（匿名使用統計）初期化 ---
@@ -57,11 +63,36 @@ if (APTABASE_APP_KEY) {
   initializeAnalytics(APTABASE_APP_KEY);
 }
 
+const HEARTBEAT_INTERVAL_MS = 10 * 60 * 1000;
+let sessionStartedAt = null;
+let heartbeatTimer = null;
+let hadFocusEventSinceLastHeartbeat = false;
+let hasHandledAppClosed = false;
+
+// Keep these boundaries in sync with lib/analytics/usage-events.ts bucketSessionDuration.
+function bucketSessionDuration(ms) {
+  const minutes = ms / 60000;
+  if (minutes < 1) return "lt_1m";
+  if (minutes < 5) return "1_5m";
+  if (minutes < 15) return "5_15m";
+  if (minutes < 60) return "15_60m";
+  return "gte_60m";
+}
+
+initializeErrorReporting({
+  dsn: process.env.ERROR_REPORT_DSN || "",
+  getStorageManager,
+  getRelease: () => app.getVersion(),
+  environment: app.isPackaged ? "production" : "development",
+});
+
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
+  void captureMainError(err, { source: "uncaughtException" });
 });
 process.on("unhandledRejection", (reason) => {
   console.error("[FATAL] Unhandled rejection:", reason);
+  void captureMainError(reason, { source: "unhandledRejection" });
 });
 
 // --- Single-instance lock ---
@@ -185,7 +216,7 @@ app.whenReady().then(async () => {
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
-            `connect-src 'self' https://my.illusions.app https://api.dict.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com${extraAiConnectSrc} ws://localhost:*`,
+            `connect-src 'self' https://my.illusions.app https://api.dict.illusions.app https://bug-report.api.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com${extraAiConnectSrc} ws://localhost:*`,
             "worker-src 'self' blob:",
             "object-src blob:",
             "frame-src blob:",
@@ -220,6 +251,7 @@ app.whenReady().then(async () => {
   registerDictHandlers();
   registerRulesetsHandlers();
   registerAnalyticsHandlers({ hasAppKey: () => Boolean(APTABASE_APP_KEY) });
+  registerErrorReportingHandlers({ captureRendererError });
 
   // 匿名使用統計：起動イベント（同意フラグ未設定時はデフォルト ON）
   if (APTABASE_APP_KEY) {
@@ -227,9 +259,35 @@ app.whenReady().then(async () => {
       const appState = await getStorageManager().loadAppState();
       if (appState?.usageAnalyticsConsent !== false) {
         const { trackEvent } = require("@aptabase/electron/main");
+        // Fire-and-forget: a failed/offline beacon must not stop sessionStartedAt
+        // and the heartbeat timer from being set up below (they're purely local
+        // clock/state and don't depend on this network call succeeding).
         void trackEvent("app_launched", { platform: process.platform }).catch((trackError) => {
           console.warn("[Analytics] Failed to send app_launched event:", trackError);
         });
+        sessionStartedAt = Date.now();
+
+        heartbeatTimer = setInterval(() => {
+          const isFocusedNow = BrowserWindow.getAllWindows().some((w) => w.isFocused());
+          const shouldSend = hadFocusEventSinceLastHeartbeat || isFocusedNow;
+          hadFocusEventSinceLastHeartbeat = false;
+          if (!shouldSend) return;
+
+          // Re-check consent on every tick: the user can toggle it off mid-session
+          // from Settings, and unlike the one-shot app_launched event, this timer
+          // keeps firing for the rest of the session unless we recheck.
+          void (async () => {
+            try {
+              const currentState = await getStorageManager().loadAppState();
+              if (currentState?.usageAnalyticsConsent === false) return;
+            } catch {
+              // Unreadable — fail open, same default-on convention as above.
+            }
+            trackEvent("app_heartbeat").catch((err) => {
+              console.warn("[Analytics] Failed to send app_heartbeat event:", err);
+            });
+          })();
+        }, HEARTBEAT_INTERVAL_MS);
       }
     } catch (err) {
       console.warn("[Analytics] Failed to send app_launched event:", err);
@@ -324,6 +382,35 @@ app.whenReady().then(async () => {
 app.on("before-quit", () => {
   // Kill all active PTY sessions before the process exits
   killAllSessions();
+
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+
+  if (!APTABASE_APP_KEY || sessionStartedAt === null || hasHandledAppClosed) return;
+  hasHandledAppClosed = true;
+
+  // Deliberately does NOT preventDefault()/delay quit: window-manager.js's
+  // per-window `close` handler owns the unsaved-changes save dialog and state
+  // flush (see the quitAndInstall backstop at #1839), and this must never race
+  // or get skipped for an analytics beacon. Fire-and-forget, same as
+  // app_launched — losing an occasional app_closed event on a fast quit is a
+  // fine trade-off; losing a user's unsaved manuscript is not.
+  const duration_bucket = bucketSessionDuration(Date.now() - sessionStartedAt);
+  void (async () => {
+    try {
+      // Re-check consent: it may have been toggled off after app_launched.
+      const appState = await getStorageManager().loadAppState();
+      if (appState?.usageAnalyticsConsent === false) return;
+    } catch {
+      // Unreadable — fail open, same default-on convention as elsewhere.
+    }
+    const { trackEvent } = require("@aptabase/electron/main");
+    trackEvent("app_closed", { duration_bucket }).catch((err) => {
+      console.warn("[Analytics] Failed to send app_closed event:", err);
+    });
+  })();
 });
 
 // Per-window menu state lifecycle: focus → swap active state; closed → cleanup
@@ -337,6 +424,13 @@ app.on("browser-window-focus", (_event, win) => {
 app.on("browser-window-created", (_event, win) => {
   const wcId = win.webContents.id;
   const winId = win.id;
+
+  if (APTABASE_APP_KEY) {
+    win.on("focus", () => {
+      hadFocusEventSinceLastHeartbeat = true;
+    });
+    if (win.isFocused()) hadFocusEventSinceLastHeartbeat = true;
+  }
 
   win.on("closed", () => {
     killSessionsForWindow(wcId);

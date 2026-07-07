@@ -7,10 +7,12 @@ import { persistAppState } from "@/lib/storage/app-state-manager";
 
 export interface AnalyticsSettings {
   usageAnalyticsConsent: boolean;
+  errorReportingConsent: boolean;
 }
 
 export interface AnalyticsSettingsHandlers {
   handleUsageAnalyticsConsentChange: (value: boolean) => void;
+  handleErrorReportingConsentChange: (value: boolean) => void;
 }
 
 export interface UseAnalyticsSettingsResult {
@@ -21,10 +23,14 @@ export interface UseAnalyticsSettingsResult {
 
 export function useAnalyticsSettings(): UseAnalyticsSettingsResult {
   const [usageAnalyticsConsent, setUsageAnalyticsConsent] = useState(true);
+  const [errorReportingConsent, setErrorReportingConsent] = useState(true);
 
   const applyPersistedAnalyticsSettings = useCallback((appState: Record<string, unknown>) => {
     if (typeof appState.usageAnalyticsConsent === "boolean") {
       setUsageAnalyticsConsent(appState.usageAnalyticsConsent);
+    }
+    if (typeof appState.errorReportingConsent === "boolean") {
+      setErrorReportingConsent(appState.errorReportingConsent);
     }
   }, []);
 
@@ -35,9 +41,17 @@ export function useAnalyticsSettings(): UseAnalyticsSettingsResult {
     );
   }, []);
 
+  const handleErrorReportingConsentChange = useCallback((value: boolean) => {
+    setErrorReportingConsent(value);
+    void persistAppState({
+      errorReportingConsent: value,
+      errorReportingConsentPromptedAt: new Date().toISOString(),
+    }).catch((e: unknown) => console.error("プライバシー設定の保存に失敗しました", e));
+  }, []);
+
   return {
-    analyticsSettings: { usageAnalyticsConsent },
-    analyticsHandlers: { handleUsageAnalyticsConsentChange },
+    analyticsSettings: { usageAnalyticsConsent, errorReportingConsent },
+    analyticsHandlers: { handleUsageAnalyticsConsentChange, handleErrorReportingConsentChange },
     applyPersistedAnalyticsSettings,
   };
 }

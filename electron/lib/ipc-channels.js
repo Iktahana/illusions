@@ -153,6 +153,8 @@ const MENU_CHANNELS = Object.freeze({
     exportPdf: "menu-export-pdf",
     exportEpub: "menu-export-epub",
     exportDocx: "menu-export-docx",
+    reportBug: "menu-report-bug",
+    reportAiInappropriate: "menu-report-ai-inappropriate",
   }),
 });
 
@@ -204,6 +206,13 @@ const SAFE_STORAGE_CHANNELS = Object.freeze({
 const ANALYTICS_CHANNELS = Object.freeze({
   invoke: Object.freeze({
     trackEvent: "analytics:track-event",
+  }),
+  event: Object.freeze({}),
+});
+
+const ERROR_REPORTING_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    captureRendererError: "error-reporting:capture-renderer-error",
   }),
   event: Object.freeze({}),
 });
@@ -304,6 +313,7 @@ module.exports = {
   AUTH_CHANNELS,
   SAFE_STORAGE_CHANNELS,
   ANALYTICS_CHANNELS,
+  ERROR_REPORTING_CHANNELS,
   POWER_CHANNELS,
   EDITOR_CHANNELS,
   NLP_CHANNELS,

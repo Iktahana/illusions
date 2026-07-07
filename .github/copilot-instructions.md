@@ -1,285 +1,39 @@
 # Illusions Project - GitHub Copilot Instructions
 
-> **⚠️ CRITICAL — READ BEFORE OPENING ANY PULL REQUEST ⚠️**
->
-> **All PRs MUST target the `dev` branch. NEVER target `main`.**
->
-> - Default repository branch is `main` for historical reasons, but **do not use it as the PR base**.
-> - `main` only receives merges via the weekly release PR (`dev → main`, every Monday).
-> - When opening a PR via `gh pr create`, always pass `--base dev` explicitly.
-> - If you open a PR against `main`, it will be rebased onto `dev` or closed.
->
-> Full rules in the [Branch Strategy](#branch-strategy-critical) section below.
+This file is a transition entrypoint.
+Canonical AI policy now lives under `.github/ai/`.
 
-## Project Overview
+## Canonical Entry
 
-**Illusions** is a Japanese novel writing application with advanced typesetting support.
+- Shared rules: `.github/ai/base-policy.md`
+- Release truth: `.github/ai/release-policy.md`
+- Copilot-specific overlay: `.github/ai/overlays/copilot.md`
+- Governance workflow: `.github/ai/governance.md`
+- Component map: `.github/ai/domain/component-map.md`
 
-- **Purpose**: Professional Japanese novel editor with vertical writing, ruby notation, and AI-powered proofreading
-- **Target Users**: Japanese novelists, writers, and content creators
-- **Key Features**:
-  - Vertical writing mode (縦書き) with proper scroll handling
-  - Ruby notation (振り仮名): `{漢字|かんじ}` syntax
-  - Tate-chu-yoko (縦中横): Horizontal digits in vertical text
-  - Part-of-speech highlighting using Kuromoji morphological analyzer
-  - AI-assisted proofreading via browser native AI
-  - Local-first data storage (no cloud)
+## Critical Reminder
 
-## Technology Stack
+- All regular PRs must target `dev`.
+- Do not use `main` as PR base except emergency hotfixes.
+- Use `gh pr create --base dev` explicitly.
 
-### Frontend
+## Project Snapshot
 
-- **Framework**: Next.js 16 (App Router), React 18
-- **Language**: TypeScript (strict mode enabled)
-- **Editor**: Milkdown 7 (ProseMirror-based) with custom Japanese plugin
-- **Styling**: Tailwind CSS 3, CSS custom properties for theming
-- **State**: React Context API, custom hooks
+Illusions is a Japanese novel writing editor with vertical writing, ruby notation, and local-first storage.
 
-### Desktop
+Main stack:
 
-- **Runtime**: Electron 32
-- **Storage**: SQLite (better-sqlite3) via StorageService abstraction
-- **IPC**: Typed channels with contextIsolation enabled
+- Next.js + React + TypeScript (strict)
+- Electron desktop shell
+- Milkdown-based editor plugins
+- Storage via unified StorageService
 
-### Web
+## Agent Discovery
 
-- **Storage**: IndexedDB via Dexie (same StorageService API)
-- **PWA**: Serwist service worker for offline support
+Custom agents live in `.github/agents/`.
+Use them for focused workflows (review, maintenance, CI diagnostics, docs upkeep).
 
-### NLP & Analysis
+## Migration Note
 
-- **Tokenizer**: Kuromoji (Japanese morphological analyzer)
-- **Backend**: Node.js workers for heavy processing
-- **Cache**: In-memory LRU cache for tokenization results
-
-## Coding Standards
-
-### Language Policy (CRITICAL)
-
-**STRICTLY FORBIDDEN in code/documentation:**
-
-- ❌ Chinese (中文/中国語)
-- ❌ Korean (한국어/韓国語)
-- ❌ Any other languages except English and Japanese
-
-**ALLOWED:**
-
-- ✅ English: Code logic (variables, functions, types, comments)
-- ✅ Japanese (日本語): UI strings, user-facing text, internal comments
-
-**User-facing text MUST be in Japanese:**
-
-- Menu items, dialog boxes, buttons, labels, tooltips
-- Error messages, notifications, status text
-- Documentation for end users
-
-### Naming Conventions
-
-- **Components/Classes**: PascalCase (`EditorComponent`, `StorageManager`)
-- **Functions/Variables**: camelCase (`handleClick`, `isLoading`)
-- **Constants**: UPPER_SNAKE_CASE (`MAX_FILE_SIZE`, `DEFAULT_FONT_SIZE`)
-- **Types/Interfaces**: PascalCase with descriptive names (`EditorProps`, `FileMetadata`)
-- **Files**:
-  - Components: PascalCase (`Editor.tsx`)
-  - Utilities: kebab-case (`use-mdi-file.ts`)
-
-### TypeScript Requirements
-
-- **Strict mode**: All files must work with `strict: true`
-- **Avoid `any`**: Use `unknown` or specific types
-- **Type imports**: Use `import type` for type-only imports
-- **Return types**: Public functions must have explicit return types
-- **No implicit any**: All parameters and variables must be typed
-
-### React Best Practices
-
-- **Functional components**: Prefer function components over class components
-- **Hooks dependencies**: Always verify `useEffect`, `useCallback`, `useMemo` dependency arrays
-- **Event handlers**: Name with `handle` prefix (`handleClick`, `handleChange`)
-- **Memory leaks**: Clean up event listeners, subscriptions in `useEffect` return functions
-- **Performance**: Use `React.memo`, `useCallback`, `useMemo` where appropriate
-
-### Storage Service (MANDATORY)
-
-**DO NOT implement custom storage logic. ALWAYS use StorageService.**
-
-```typescript
-import { getStorageService } from "@/lib/storage/storage-service";
-
-const storage = getStorageService();
-
-// Save session
-await storage.saveSession({
-  appState: { lastOpenedMdiPath: "/path/to/file.mdi" },
-  recentFiles: [],
-  editorBuffer: { content: "...", timestamp: Date.now() },
-});
-
-// Load session
-const session = await storage.loadSession();
-```
-
-**12 Core Methods:**
-
-- Session: `saveSession()`, `loadSession()`
-- App State: `saveAppState()`, `loadAppState()`
-- Recent Files: `addToRecent()`, `getRecentFiles()`, `removeFromRecent()`, `clearRecent()`
-- Editor Buffer: `saveEditorBuffer()`, `loadEditorBuffer()`, `clearEditorBuffer()`
-- Utility: `clearAll()`
-
-**Storage Locations:**
-
-- Electron: SQLite at `~/Library/Application Support/illusions/illusions-storage.db`
-- Web: Browser IndexedDB via Dexie
-
-**What NOT to do:**
-
-- ❌ Use localStorage directly
-- ❌ Use IndexedDB directly
-- ❌ Implement custom storage logic in components
-- ❌ Manually interact with SQLite
-
-### Security Standards
-
-- **No hardcoded secrets**: Never commit API keys, passwords, tokens
-- **Electron IPC security**:
-  - Verify `contextIsolation: true` in preload config
-  - Check `nodeIntegration: false` in BrowserWindow
-  - Validate all IPC message handlers
-- **XSS prevention**: No `dangerouslySetInnerHTML` without sanitization
-- **Code injection**: No `eval()`, `Function()`, dynamic script execution
-
-## Branch Strategy (CRITICAL)
-
-**All PRs MUST target `dev`, NOT `main`.**
-
-```
-feature/<name>  →  dev  →  (weekly PR, every Monday)  →  main
-hotfix/<name>   →  main  (emergency only, then cherry-pick to dev)
-```
-
-- **`main`**: Production branch — receives merges only via weekly release PR
-- **`dev`**: Integration branch — all feature/fix PRs target `dev`
-- **Hotfix**: Branch from `main`, merge directly to `main`, then cherry-pick into `dev`
-
-When creating a PR:
-
-- Base branch: **always** `dev` (the repo default branch is `main`, but that is NOT the PR target)
-- Use `gh pr create --base dev ...` — never rely on the default
-- Only use `main` as base for emergency hotfixes
-- Include `Closes #<issue>` in PR body for auto-closing
-
-Enforcement:
-
-- Dependabot is configured via `.github/dependabot.yml` with `target-branch: dev`
-- PRs opened against `main` by Copilot/agents will be rebased to `dev` during the patrol sweep
-
-## Build & Development
-
-### Common Commands
-
-```bash
-# Development
-npm run dev                  # Next.js dev server (port 3010)
-npm run electron:dev         # Electron dev mode with hot reload
-
-# Type checking (MUST pass before commit)
-npm run type-check          # TypeScript validation
-npx tsc --noEmit           # Same as above
-
-# Building
-npm run build              # Next.js production build
-npm run electron:build     # Electron production build
-
-# Dependencies
-npm run download:fonts     # Download local fonts (required for build)
-npm install                # Install dependencies
-```
-
-### Pre-commit Checklist
-
-- [ ] `npx tsc --noEmit` passes with zero errors
-- [ ] No Chinese/Korean in code or documentation
-- [ ] All UI text is in Japanese
-- [ ] Using StorageService (not custom storage)
-- [ ] React hooks dependencies are correct
-- [ ] No security vulnerabilities or hardcoded secrets
-
-## File Structure
-
-```
-illusions/
-├── app/                    # Next.js App Router pages
-├── components/            # React components
-│   ├── Editor.tsx        # Main Milkdown editor
-│   ├── Inspector.tsx     # Right sidebar (stats, AI)
-│   └── ...
-├── lib/                   # Business logic
-│   ├── storage/                  # Unified storage service and platform adapters
-│   ├── nlp-backend/              # Japanese text processing
-│   └── nlp-client/               # Client-side NLP interface
-├── packages/
-│   └── milkdown-plugin-japanese-novel/  # Custom Milkdown plugin
-│       ├── index.ts              # Plugin entry
-│       ├── nodes/                # Custom ProseMirror nodes (ruby, tcy)
-│       ├── pos-highlight/        # Part-of-speech highlighting
-│       └── scroll-progress.ts    # Vertical/horizontal scroll abstraction
-├── electron/              # Electron main process
-├── public/               # Static assets
-├── .github/
-│   ├── copilot-instructions.md   # This file
-│   ├── agents/                   # Custom Copilot agents
-│   └── workflows/                # GitHub Actions
-└── docs/                 # Documentation
-```
-
-## Project-Specific Context
-
-### Vertical Writing Mode (縦書き)
-
-- Writing mode: `writing-mode: vertical-rl`
-- Scroll direction: Right-to-left (rightmost = beginning)
-- Scroll handling: Use `scroll-progress.ts` abstraction
-- **CRITICAL**: Never hardcode horizontal-only logic
-
-### MDI File Format
-
-- Custom format: `.mdi` (Markdown with ruby syntax)
-- Ruby notation: `{漢字|かんじ}` → `<ruby><rb>漢字</rb><rt>かんじ</rt></ruby>`
-- Syntax spec: See `docs/MDI/spec.md`
-
-### Part-of-Speech Highlighting
-
-- Uses Kuromoji for tokenization
-- 12 POS categories with color coding
-- Viewport-based rendering for performance
-- Cache tokenization results
-
-## Testing Philosophy
-
-- TypeScript strict mode is our primary test
-- Manual testing for UI/UX
-- E2E tests for critical user flows (future)
-
-## Documentation References
-
-- Documentation index: `docs/README.md`
-- Storage architecture and API: `docs/architecture/storage-system.md`
-- VFS architecture: `docs/architecture/vfs.md`
-
-## Custom Agents Available
-
-Use `@agent-name` in GitHub Copilot Chat:
-
-- **@reviewer**: Pragmatic PR reviewer (focus on critical issues only)
-- **@maintainer**: Issue triage and bug fixing
-- **@ci-debugger**: CI/CD failure analysis
-- **@readme-updater**: Automatic README.md updates on push
-
-## Questions?
-
-For project-specific questions:
-
-1. Check `CLAUDE.md` for code review standards
-2. Check `docs/` folder for technical documentation
-3. Ask `@maintainer` agent for guidance
+Long duplicated policy blocks were intentionally removed from this file.
+If a policy is missing here, treat `.github/ai/` as source of truth.

@@ -132,6 +132,8 @@ declare global {
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
+    onMenuReportBug?: (callback: () => void) => (() => void) | void;
+    onMenuReportAiInappropriate?: (callback: () => void) => (() => void) | void;
     /** Virtual File System IPC bridge */
     vfs?: {
       /** Open a native directory picker dialog */
@@ -274,6 +276,15 @@ declare global {
        * the actual send happen in main process.
        */
       trackEvent: (eventName: string, props?: Record<string, string | number>) => Promise<void>;
+    };
+    errorReporting?: {
+      captureRendererError: (payload: {
+        source: "error-boundary" | "window-error" | "unhandledrejection" | "csp-violation";
+        name?: string;
+        message?: string;
+        stack?: string;
+        sectionName?: string;
+      }) => Promise<void>;
     };
     power?: {
       /**

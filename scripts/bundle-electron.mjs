@@ -9,6 +9,7 @@ import * as esbuild from "esbuild";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import fs from "fs";
+import { execSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -46,6 +47,7 @@ await esbuild.build({
   ],
   define: {
     "process.env.APTABASE_APP_KEY": JSON.stringify(process.env.APTABASE_APP_KEY || ""),
+    "process.env.ERROR_REPORT_DSN": JSON.stringify(process.env.ERROR_REPORT_DSN || ""),
   },
   format: "cjs",
   minify: false, // Keep readable for debugging
@@ -178,19 +180,26 @@ function resolvePackageDir(dep) {
 async function prepareNativeModulesForArch(arch) {
   if (arch === process.arch) return;
 
-  const { execSync } = await import("child_process");
-
   // --- better-sqlite3: download correct prebuild for target arch ---
   const bsqlDir = resolvePackageDir("better-sqlite3");
   if (bsqlDir) {
     const electronPkgPath = join(projectRoot, "node_modules", "electron", "package.json");
     const electronPkg = JSON.parse(fs.readFileSync(electronPkgPath, "utf-8"));
     console.log(`  📥 Downloading better-sqlite3 prebuild for win32-${arch}...`);
-    execSync(
-      `npx prebuild-install --arch ${arch} --platform win32 --runtime electron --target ${electronPkg.version}`,
-      { cwd: bsqlDir, stdio: "inherit" },
-    );
-    console.log(`  ✅ better-sqlite3 prebuild ready for ${arch}`);
+    try {
+      execSync(
+        `npx prebuild-install --arch ${arch} --platform win32 --runtime electron --target ${electronPkg.version}`,
+        { cwd: bsqlDir, stdio: "inherit" },
+      );
+      console.log(`  ✅ better-sqlite3 prebuild ready for ${arch}`);
+    } catch {
+      console.log(`  ⚙️  No better-sqlite3 prebuild for ${arch}; rebuilding from source...`);
+      execSync(
+        `npx electron-rebuild --force --only better-sqlite3 --arch ${arch} --version ${electronPkg.version} --module-dir ${projectRoot} --build-from-source`,
+        { cwd: projectRoot, stdio: "inherit" },
+      );
+      console.log(`  ✅ better-sqlite3 rebuilt from source for ${arch}`);
+    }
   }
 
   // --- node-pty: remove build/Release so runtime uses prebuilds/win32-<arch> ---

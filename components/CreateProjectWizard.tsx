@@ -3,6 +3,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { FolderPlus, Check, Loader2, AlertCircle, ChevronDown } from "lucide-react";
 import { getProjectService, validateProjectName } from "@/lib/project/project-service";
+import {
+  classifyTelemetryError,
+  normalizeTelemetryFileType,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 import GlassDialog from "@/shared/ui/GlassDialog";
 
 import type { ProjectMode, SupportedFileExtension } from "@/lib/project/project-types";
@@ -92,6 +97,7 @@ export default function CreateProjectWizard({
     setIsCreating(true);
     setErrorMessage(null);
     setCreationSuccess(false);
+    trackUsageEvent("project_create_started", { surface: "wizard", mode: "project" });
 
     try {
       const projectService = getProjectService();
@@ -101,6 +107,11 @@ export default function CreateProjectWizard({
 
       setCreationSuccess(true);
       setIsCreating(false);
+      trackUsageEvent("project_create_completed", {
+        surface: "wizard",
+        mode: "project",
+        initial_file_type: normalizeTelemetryFileType(selectedExtension),
+      });
 
       // Brief delay to show success message before closing
       setTimeout(() => {
@@ -112,6 +123,11 @@ export default function CreateProjectWizard({
       if (!mountedRef.current) return;
 
       setIsCreating(false);
+      trackUsageEvent("project_create_failed", {
+        surface: "wizard",
+        mode: "project",
+        reason: classifyTelemetryError(error),
+      });
 
       // Handle user cancellation of directory picker
       if (error instanceof DOMException && error.name === "AbortError") {

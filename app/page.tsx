@@ -26,6 +26,8 @@ import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
 import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import TxtExportDialog from "@/components/TxtExportDialog";
+import BugReportDialog from "@/components/BugReportDialog";
+import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
 import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
@@ -66,6 +68,7 @@ import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
+import { useErrorReportingConsentToast } from "@/lib/error-reporting/use-error-reporting-consent-toast";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -315,6 +318,13 @@ export default function EditorPage() {
     handleOpenPowerSettings,
     triggerSwitchToCorrections,
   } = panelHandlers;
+
+  useErrorReportingConsentToast({
+    openPrivacySettings: () => {
+      setSettingsInitialCategory("privacy");
+      setShowSettingsModal(true);
+    },
+  });
 
   // #1840: save flows call flushActiveEditorRef right before persisting so they
   // never write debounce-lagged content. The mounted MilkdownEditor registers
@@ -789,6 +799,9 @@ export default function EditorPage() {
   const [exportDialogState, setExportDialogState] = useState<ExportDialogState | null>(null);
   const exportDialogStateRef = useRef<ExportDialogState | null>(null);
 
+  // Bug/feedback report dialog state (null = closed; category = open with preset)
+  const [bugReportCategory, setBugReportCategory] = useState<BugReportCategory | null>(null);
+
   // Print dialog state
   interface PrintDialogState {
     content: string;
@@ -1164,6 +1177,7 @@ export default function EditorPage() {
     fontScale,
     onFontScaleChange: (scale: number) => fontScaleChangeRef.current(scale),
     isEditorTabActive: !!activeEditorTab,
+    onReportBug: (category) => setBugReportCategory(category),
   });
 
   // Global shortcuts for Web (only when not in Electron)
@@ -1213,6 +1227,7 @@ export default function EditorPage() {
     handleOpenRecentProject,
     handleOpenAsProject,
     confirmBeforeAction: unsavedWarning.confirmBeforeAction,
+    onReportBug: (category) => setBugReportCategory(category),
   });
 
   contentRef.current = content;
@@ -1608,7 +1623,11 @@ export default function EditorPage() {
     onCorrectionModeChange: (modeId: CorrectionModeId) => {
       const mode = CORRECTION_MODES[modeId];
       handleCorrectionConfigChange({ mode: modeId, guidelines: [...mode.defaultGuidelines] });
-      handleLintingRuleConfigsBatchChange(buildModeRuleConfigsFromRules(modeId, loadedRules));
+      // Pass the current configs so user rule-option overrides (#2048)
+      // survive the whole-map replace a mode switch performs.
+      handleLintingRuleConfigsBatchChange(
+        buildModeRuleConfigsFromRules(modeId, loadedRules, lintingRuleConfigs),
+      );
     },
     switchToCorrectionsTrigger,
     previousDayStats,
@@ -1796,6 +1815,11 @@ export default function EditorPage() {
           void pending?.execute();
         }}
         onCancel={() => setRenameCollision(null)}
+      />
+      <BugReportDialog
+        isOpen={bugReportCategory != null}
+        initialCategory={bugReportCategory ?? "bug"}
+        onClose={() => setBugReportCategory(null)}
       />
     </>
   );

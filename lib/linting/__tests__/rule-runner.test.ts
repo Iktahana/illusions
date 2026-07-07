@@ -138,11 +138,57 @@ describe("RuleRunner", () => {
       expect(runner.getConfig("opt-rule")?.options).toEqual({ includeVerbsAdjectives: false });
     });
 
-    it("lets an explicit options object override the preserved one (#1962)", () => {
+    it("merges explicit options over the preserved ones per key (#2048)", () => {
       const runner = new RuleRunner();
       runner.setConfig("r", { enabled: true, severity: "info", options: { a: 1 } });
       runner.setConfig("r", { enabled: true, severity: "info", options: { b: 2 } });
-      expect(runner.getConfig("r")?.options).toEqual({ b: 2 });
+      // Per-key merge: setting `b` must not wipe the previously-set `a`.
+      expect(runner.getConfig("r")?.options).toEqual({ a: 1, b: 2 });
+
+      // Same-key override: the newest explicit value wins.
+      runner.setConfig("r", { enabled: true, severity: "info", options: { a: 9 } });
+      expect(runner.getConfig("r")?.options).toEqual({ a: 9, b: 2 });
+    });
+
+    it("a user override of one key keeps the other manifest-default keys (#2048)", () => {
+      class OptionRule extends AbstractLintRule {
+        readonly id = "opt-rule";
+        readonly name = "Opt";
+        readonly nameJa = "Opt";
+        readonly description = "";
+        readonly descriptionJa = "";
+        readonly level = "L2" as const;
+        readonly defaultConfig: LintRuleConfig = {
+          enabled: true,
+          severity: "info",
+          options: { includeVerbsAdjectives: false, minLength: 2 },
+        };
+        lint(): LintIssue[] {
+          return [];
+        }
+      }
+      const runner = new RuleRunner();
+      runner.registerRule(new OptionRule());
+
+      // The settings UI writes ONLY the toggled key (#2048).
+      runner.setConfig("opt-rule", {
+        enabled: true,
+        severity: "info",
+        options: { includeVerbsAdjectives: true },
+      });
+
+      expect(runner.getConfig("opt-rule")?.options).toEqual({
+        includeVerbsAdjectives: true,
+        minLength: 2,
+      });
+
+      // A later mode-switch replay that omits options (the #1962/#1975 path)
+      // must not clobber the user's override.
+      runner.setConfig("opt-rule", { enabled: true, severity: "warning" });
+      expect(runner.getConfig("opt-rule")?.options).toEqual({
+        includeVerbsAdjectives: true,
+        minLength: 2,
+      });
     });
   });
 

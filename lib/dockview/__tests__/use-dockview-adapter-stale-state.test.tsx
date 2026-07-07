@@ -56,14 +56,16 @@ interface FakeApiBundle {
   api: DockviewApi;
   panels: Map<string, FakePanel>;
   addPanel: ReturnType<typeof vi.fn>;
-  fireActivePanelChange: (e: { id: string } | undefined) => void;
+  fireActivePanelChange: (e: { panel: { id: string } | undefined } | undefined) => void;
   /** Panel ids that should report isActive=true immediately after addPanel. */
   markActiveOnAdd: Set<string>;
 }
 
 function createFakeApi(): FakeApiBundle {
   const panels = new Map<string, FakePanel>();
-  const activeChangeHandlers: Array<(e: { id: string } | undefined) => void> = [];
+  const activeChangeHandlers: Array<
+    (e: { panel: { id: string } | undefined } | undefined) => void
+  > = [];
   const markActiveOnAdd = new Set<string>();
 
   const addPanel = vi.fn((opts: { id: string; title?: string }) => {
@@ -102,7 +104,7 @@ function createFakeApi(): FakeApiBundle {
     },
     width: 800,
     height: 600,
-    onDidActivePanelChange: (h: (e: { id: string } | undefined) => void) => {
+    onDidActivePanelChange: (h: (e: { panel: { id: string } | undefined } | undefined) => void) => {
       activeChangeHandlers.push(h);
       return { dispose: () => undefined };
     },
@@ -248,11 +250,11 @@ describe("#1567 — useDockviewAdapter stale-state fixes", () => {
     });
 
     // dockview reports tabB active — already the live activeTabId → no switch.
-    fake.fireActivePanelChange({ id: tabB.id });
+    fake.fireActivePanelChange({ panel: { id: tabB.id } });
     expect(shared.switchTab).not.toHaveBeenCalled();
 
     // dockview reports tabA active — differs from live activeTabId → switch.
-    fake.fireActivePanelChange({ id: tabA.id });
+    fake.fireActivePanelChange({ panel: { id: tabA.id } });
     expect(shared.switchTab).toHaveBeenCalledTimes(1);
     expect(shared.switchTab).toHaveBeenCalledWith(tabA.id);
   });

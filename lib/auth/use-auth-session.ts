@@ -20,6 +20,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { classifyTelemetryError, trackUsageEvent } from "@/lib/analytics/usage-events";
 import {
   completeElectronOAuthCallback,
   getElectronAuthApi,
@@ -64,10 +65,15 @@ export function useAuthSession(): AuthSessionState {
         // Unmounted or logged out while refreshing — discard the result.
         if (!schedulerRef.current || getSessionEpoch() !== epochAtStart) return;
         setUser(session.user);
+        trackUsageEvent("auth_refresh_completed", { surface: "startup" });
         scheduleElectronRefresh(session.expiresAt, session.refreshToken);
       } catch (err) {
         // Logout fenced this refresh — tokens already handled, never retry.
         if (isSessionInvalidatedError(err) || getSessionEpoch() !== epochAtStart) return;
+        trackUsageEvent("auth_refresh_failed", {
+          surface: "startup",
+          reason: classifyTelemetryError(err),
+        });
         if (isElectronAuthErrorPermanent(err)) {
           // Permanent failure (4xx / invalid_grant): token is invalid — log out
           if (schedulerRef.current) setUser(null);
@@ -89,6 +95,7 @@ export function useAuthSession(): AuthSessionState {
       if (!schedulerRef.current || getSessionEpoch() !== epochAtStart) return;
       if (me.authenticated && me.user) {
         setUser(me.user);
+        trackUsageEvent("auth_refresh_completed", { surface: "startup" });
         if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
       } else if (me.permanent) {
         // Permanent failure (401/403): token is invalid — log out
@@ -118,6 +125,10 @@ export function useAuthSession(): AuthSessionState {
           if (cancelled || getSessionEpoch() !== epochAtStart) return;
           if (session) {
             setUser(session.user);
+            trackUsageEvent("auth_session_restored", {
+              surface: "startup",
+              strategy: "electron_tokens",
+            });
             scheduleElectronRefresh(session.expiresAt, session.refreshToken);
           }
         } else {
@@ -126,11 +137,21 @@ export function useAuthSession(): AuthSessionState {
           if (cancelled || getSessionEpoch() !== epochAtStart) return;
           if (me.authenticated && me.user) {
             setUser(me.user);
+            trackUsageEvent("auth_session_restored", {
+              surface: "startup",
+              strategy: "web_cookie",
+            });
             if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
           }
         }
-      } catch {
+      } catch (err) {
         // Silently fail — startup restore must never crash the provider
+        if (!cancelled) {
+          trackUsageEvent("auth_session_restore_failed", {
+            surface: "startup",
+            reason: classifyTelemetryError(err),
+          });
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -159,6 +180,11 @@ export function useAuthSession(): AuthSessionState {
     const unsubscribe = authApi.onCallback(async (data) => {
       if (data.error) {
         console.error("[auth] OAuth error:", data.error);
+        trackUsageEvent("auth_login_failed", {
+          surface: "callback",
+          stage: "callback",
+          reason: "unknown",
+        });
         return;
       }
 
@@ -174,10 +200,16 @@ export function useAuthSession(): AuthSessionState {
         // Unmounted or logged out during the exchange — discard the result.
         if (!schedulerRef.current || getSessionEpoch() !== epochAtStart) return;
         setUser(session.user);
+        trackUsageEvent("auth_login_completed", { surface: "callback" });
         scheduleElectronRefresh(session.expiresAt, session.refreshToken);
       } catch (err) {
         if (isSessionInvalidatedError(err)) return;
         console.error("[auth] Token exchange failed:", err);
+        trackUsageEvent("auth_login_failed", {
+          surface: "callback",
+          stage: "exchange",
+          reason: classifyTelemetryError(err),
+        });
       }
     });
 
@@ -186,14 +218,33 @@ export function useAuthSession(): AuthSessionState {
 
   // --- Login ---
   const login = useCallback(async (): Promise<void> => {
+    trackUsageEvent("auth_login_started", { surface: "settings" });
     if (isElectron.current) {
       const authApi = getElectronAuthApi();
       if (!authApi) return;
-      await authApi.startLogin();
+      try {
+        await authApi.startLogin();
+      } catch (err) {
+        trackUsageEvent("auth_login_failed", {
+          surface: "settings",
+          stage: "start",
+          reason: classifyTelemetryError(err),
+        });
+        throw err;
+      }
     } else {
       // Dynamic import to avoid bundling web-auth in Electron builds
       const { startWebLogin } = await import("./web-auth");
-      await startWebLogin();
+      try {
+        await startWebLogin();
+      } catch (err) {
+        trackUsageEvent("auth_login_failed", {
+          surface: "settings",
+          stage: "start",
+          reason: classifyTelemetryError(err),
+        });
+        throw err;
+      }
     }
   }, []);
 
@@ -208,16 +259,25 @@ export function useAuthSession(): AuthSessionState {
     // Reset single-flight/permanent-failure state so a subsequent login starts clean.
     resetRefreshState();
 
-    if (isElectron.current) {
-      const authApi = getElectronAuthApi();
-      if (!authApi) return;
-      await authApi.logout();
-      await clearTokens();
-    } else {
-      await webLogout();
+    try {
+      if (isElectron.current) {
+        const authApi = getElectronAuthApi();
+        if (!authApi) return;
+        await authApi.logout();
+        await clearTokens();
+      } else {
+        await webLogout();
+      }
+    } catch (err) {
+      trackUsageEvent("auth_logout_failed", {
+        surface: "settings",
+        reason: classifyTelemetryError(err),
+      });
+      throw err;
     }
 
     setUser(null);
+    trackUsageEvent("auth_logout_completed", { surface: "settings" });
   }, []);
 
   return { user, isLoading, login, logout };

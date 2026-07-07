@@ -14,6 +14,7 @@ import { mdibreakSchema } from "./nodes/mdibreak";
 import { blankParagraphSchema } from "./nodes/blank-paragraph";
 import { headingAnchorSchema } from "./nodes/heading-anchor";
 import {
+  remarkFullWidthMarkdownPlugin,
   remarkHeadingAnchorPlugin,
   remarkRubyPlugin,
   remarkTcyPlugin,
@@ -92,6 +93,11 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     "japaneseNovelHeadingAnchor",
     () => remarkHeadingAnchorPlugin,
   );
+  const remarkFullWidthMarkdown = $remark(
+    "japaneseNovelFullWidthMarkdown",
+    () => remarkFullWidthMarkdownPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
+    { enable: !plainText },
+  );
 
   const stylePlugin = $prose(() => {
     const classList = [...classes];
@@ -133,6 +139,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
   });
 
   const plugins: MilkdownPlugin[] = [
+    remarkFullWidthMarkdown,
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),
     ...(enableMdiBreak ? [remarkMdiBreak, mdibreakSchema] : []),

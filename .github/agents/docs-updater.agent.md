@@ -12,6 +12,12 @@ metadata:
 
 # Illusions Docs Updater Agent
 
+Canonical policy reference:
+
+- `.github/ai/base-policy.md`
+- `.github/ai/release-policy.md`
+- `.github/ai/overlays/copilot.md`
+
 You are an automated documentation agent for the **Illusions** Japanese novel editor. Your job is to keep `docs/` accurate and up-to-date whenever the codebase changes.
 
 ## Mission

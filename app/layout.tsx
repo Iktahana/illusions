@@ -4,6 +4,7 @@ import { EditorModeProvider } from "../contexts/EditorModeContext";
 import { AuthProvider } from "../contexts/AuthContext";
 import { KeymapProvider } from "../contexts/KeymapContext";
 import { NotificationContainer } from "@/components/NotificationContainer";
+import { ErrorReportingRuntime } from "@/components/ErrorReportingRuntime";
 import AnalyticsLoader from "@/components/AnalyticsLoader";
 
 export default function RootLayout({
@@ -37,6 +38,7 @@ export default function RootLayout({
           </AuthProvider>
         </ThemeProvider>
         <NotificationContainer />
+        <ErrorReportingRuntime />
         {/* Only load analytics in web environment (client-side check) */}
         <AnalyticsLoader />
       </body>
