@@ -24,7 +24,12 @@ import { isElectronRenderer } from "@/lib/utils/runtime-env";
 interface ManifestRule {
   ruleId: string;
   applicableModes?: string[];
-  defaultConfig?: { enabled?: boolean; severity?: string; skipDialogue?: boolean };
+  defaultConfig?: {
+    enabled?: boolean;
+    severity?: string;
+    skipDialogue?: boolean;
+    options?: Record<string, unknown>;
+  };
   suggestsDictionaryEntry?: boolean;
 }
 

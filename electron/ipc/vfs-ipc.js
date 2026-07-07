@@ -19,6 +19,7 @@ const { readFileStrictUtf8 } = require("../lib/text-decode");
 // #1476: rehydration — begin
 const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
 const { createIndexLockManager } = require("../lib/index-lock");
+const { setVfsRoot, clearVfsRoot } = require("../lib/vfs-root-registry");
 // #1476: rehydration — end
 
 function registerVFSHandlers() {
@@ -163,6 +164,7 @@ function registerVFSHandlers() {
       path: dirPath,
       realPath: await resolveRootRealPath(dirPath),
     });
+    setVfsRoot(event.sender.id, allowedRoots.get(event.sender.id));
     approveDialogPath(event.sender.id, dirPath);
 
     return {
@@ -468,7 +470,9 @@ function registerVFSHandlers() {
 
     // #1559: store the realpath alongside the lexical root so per-I/O
     // symlink-collapsed containment checks have a trusted physical root
-    allowedRoots.set(event.sender.id, { path: resolved, realPath: resolvedReal });
+    const rootEntry = { path: resolved, realPath: resolvedReal };
+    allowedRoots.set(event.sender.id, rootEntry);
+    setVfsRoot(event.sender.id, rootEntry);
     return { path: resolved, name: path.basename(resolved) };
   });
 
@@ -476,6 +480,7 @@ function registerVFSHandlers() {
   app.on("web-contents-created", (_, contents) => {
     contents.on("destroyed", () => {
       allowedRoots.delete(contents.id);
+      clearVfsRoot(contents.id);
       dialogApprovedPaths.revokeWindow(contents.id);
       // #1476: rehydration — clean up projectId association
       senderProjectId.delete(contents.id);

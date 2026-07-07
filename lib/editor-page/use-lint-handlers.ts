@@ -4,6 +4,24 @@ import type { EditorView } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting/types";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
 
+/**
+ * Get the exact text a lint issue flagged.
+ *
+ * Prefers `issue.originalText`, captured by the lint pipeline at detection
+ * time: issue positions held in React state are frozen at lint-dispatch time
+ * and are not remapped when the document changes, so slicing the current
+ * document with them can return a drifted, wrong string (#2047). Falls back
+ * to extracting from the document only when `originalText` is absent.
+ */
+function getIssueText(issue: LintIssue, view: EditorView): string | null {
+  if (issue.originalText) return issue.originalText;
+  try {
+    return view.state.doc.textBetween(issue.from, Math.min(issue.to, view.state.doc.content.size));
+  } catch {
+    return null;
+  }
+}
+
 interface UseLintHandlersOptions {
   editorViewInstance: EditorView | null;
   lintIssues: LintIssue[];
@@ -19,11 +37,18 @@ export function useLintHandlers({
   addWordToUserDictionary,
   triggerSwitchToCorrections,
 }: UseLintHandlersOptions) {
-  // Enrich lint issues with original text from the document
+  // Enrich lint issues with original text from the document.
+  // The lint pipeline already records `originalText` at detection time (the
+  // exact string the rule flagged, extracted in the linter's own coordinate
+  // space). Positions in React state are frozen at lint-dispatch time and are
+  // NOT remapped when the document changes, so re-extracting via textBetween
+  // can yield drifted garbage (#2047). Never clobber an existing originalText;
+  // only fill it in for issues that lack one.
   const enrichedLintIssues = useMemo(() => {
     if (!editorViewInstance || lintIssues.length === 0) return lintIssues;
     const doc = editorViewInstance.state.doc;
     return lintIssues.map((issue: LintIssue) => {
+      if (issue.originalText != null) return issue;
       try {
         const originalText = doc.textBetween(issue.from, Math.min(issue.to, doc.content.size));
         return { ...issue, originalText };
@@ -86,16 +111,7 @@ export function useLintHandlers({
   const handleIgnoreCorrection = useCallback(
     (issue: LintIssue, ignoreAll: boolean) => {
       if (!editorViewInstance) return;
-      // Extract original text from the document
-      let issueText: string;
-      try {
-        issueText = editorViewInstance.state.doc.textBetween(
-          issue.from,
-          Math.min(issue.to, editorViewInstance.state.doc.content.size),
-        );
-      } catch {
-        return;
-      }
+      const issueText = getIssueText(issue, editorViewInstance);
       if (!issueText) return;
 
       if (ignoreAll) {
@@ -126,15 +142,7 @@ export function useLintHandlers({
   const handleAddToUserDictionary = useCallback(
     (issue: LintIssue) => {
       if (!editorViewInstance) return;
-      let issueText: string;
-      try {
-        issueText = editorViewInstance.state.doc.textBetween(
-          issue.from,
-          Math.min(issue.to, editorViewInstance.state.doc.content.size),
-        );
-      } catch {
-        return;
-      }
+      const issueText = getIssueText(issue, editorViewInstance);
       if (!issueText) return;
       void addWordToUserDictionary(issueText);
     },

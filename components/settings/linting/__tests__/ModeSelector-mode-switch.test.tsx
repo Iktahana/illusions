@@ -77,6 +77,7 @@ describe("ModeSelector — mode switch actually toggles rules (regression #1809/
         <ModeSelector
           correctionConfig={BASE_CONFIG}
           loadedRules={LOADED_RULES}
+          lintingRuleConfigs={{}}
           onCorrectionConfigChange={() => {}}
           onLintingRuleConfigsBatchChange={onBatch}
         />,
@@ -104,6 +105,7 @@ describe("ModeSelector — mode switch actually toggles rules (regression #1809/
         <ModeSelector
           correctionConfig={{ ...BASE_CONFIG, mode: "official" }}
           loadedRules={LOADED_RULES}
+          lintingRuleConfigs={{}}
           onCorrectionConfigChange={() => {}}
           onLintingRuleConfigsBatchChange={onBatch}
         />,
@@ -115,5 +117,55 @@ describe("ModeSelector — mode switch actually toggles rules (regression #1809/
     const configs = onBatch.mock.calls[0][0];
     expect(configs["me2-17-repetition-symbols"].enabled).toBe(true);
     expect(configs["jtf-1-2-1"].enabled).toBe(false);
+  });
+
+  it("carries user rule-option overrides through a mode switch (#2048)", () => {
+    const onBatch =
+      vi.fn<
+        (
+          configs: Record<
+            string,
+            { enabled: boolean; severity: Severity; options?: Record<string, unknown> }
+          >,
+        ) => void
+      >();
+
+    const rules: ModeRuleMetaInput[] = [
+      ...LOADED_RULES,
+      {
+        ruleId: "genji-out-of-dict",
+        applicableModes: ["novel"],
+        defaultConfig: {
+          enabled: true,
+          severity: "info",
+          options: { includeVerbsAdjectives: false },
+        },
+      },
+    ];
+
+    act(() => {
+      root.render(
+        <ModeSelector
+          correctionConfig={{ ...BASE_CONFIG, mode: "official" }}
+          loadedRules={rules}
+          lintingRuleConfigs={{
+            "genji-out-of-dict": {
+              enabled: true,
+              severity: "info",
+              options: { includeVerbsAdjectives: true },
+            },
+          }}
+          onCorrectionConfigChange={() => {}}
+          onLintingRuleConfigsBatchChange={onBatch}
+        />,
+      );
+    });
+
+    clickModeButton("小説");
+
+    const configs = onBatch.mock.calls[0][0];
+    // The whole-map replace must NOT drop the user's option override.
+    expect(configs["genji-out-of-dict"].options).toEqual({ includeVerbsAdjectives: true });
+    expect(configs["genji-out-of-dict"].enabled).toBe(true);
   });
 });

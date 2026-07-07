@@ -11,9 +11,22 @@ import type {
 import { DEFAULT_CORRECTION_CONFIG } from "@/lib/linting/correction-config";
 import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
 
+/**
+ * Per-rule proofreading config as persisted in app state and edited from the
+ * settings UI. `options` carries rule-specific overrides (e.g.
+ * genji-out-of-dict's `includeVerbsAdjectives`, #2048) that are merged over the
+ * rule manifest's defaultConfig.options at lint time.
+ */
+export interface PersistedRuleConfig {
+  enabled: boolean;
+  severity: Severity;
+  skipDialogue?: boolean;
+  options?: Record<string, unknown>;
+}
+
 export interface AiSettings {
   lintingEnabled: boolean;
-  lintingRuleConfigs: Record<string, { enabled: boolean; severity: Severity }>;
+  lintingRuleConfigs: Record<string, PersistedRuleConfig>;
   /** One-time mode-config migration marker (see use-mode-config-migration.ts). */
   lintingModeConfigVersion: number;
   characterExtractionBatchSize: number;
@@ -31,13 +44,8 @@ export interface AiSettings {
 
 export interface AiSettingsHandlers {
   handleLintingEnabledChange: (value: boolean) => void;
-  handleLintingRuleConfigChange: (
-    ruleId: string,
-    config: { enabled: boolean; severity: Severity },
-  ) => void;
-  handleLintingRuleConfigsBatchChange: (
-    configs: Record<string, { enabled: boolean; severity: Severity }>,
-  ) => void;
+  handleLintingRuleConfigChange: (ruleId: string, config: PersistedRuleConfig) => void;
+  handleLintingRuleConfigsBatchChange: (configs: Record<string, PersistedRuleConfig>) => void;
   /** Persist the one-time mode-config migration version. */
   handleLintingModeConfigVersionChange: (version: number) => void;
   handleCharacterExtractionBatchSizeChange: (value: number) => void;
@@ -52,9 +60,7 @@ export interface AiSettingsHandlers {
   handleAiModelIdChange: (modelId: string) => void;
   /** Expose setters so power-save restore can update linting state */
   setLintingEnabled: (value: boolean) => void;
-  setLintingRuleConfigs: (
-    configs: Record<string, { enabled: boolean; severity: Severity }>,
-  ) => void;
+  setLintingRuleConfigs: (configs: Record<string, PersistedRuleConfig>) => void;
 }
 
 export interface UseAiSettingsResult {
@@ -70,9 +76,9 @@ export interface UseAiSettingsResult {
  */
 export function useAiSettings(): UseAiSettingsResult {
   const [lintingEnabled, setLintingEnabled] = useState(true);
-  const [lintingRuleConfigs, setLintingRuleConfigs] = useState<
-    Record<string, { enabled: boolean; severity: Severity }>
-  >({});
+  const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, PersistedRuleConfig>>(
+    {},
+  );
   const [lintingModeConfigVersion, setLintingModeConfigVersion] = useState(0);
   const [characterExtractionBatchSize, setCharacterExtractionBatchSize] = useState(3);
   const [characterExtractionConcurrency, setCharacterExtractionConcurrency] = useState(4);
@@ -106,21 +112,28 @@ export function useAiSettings(): UseAiSettingsResult {
     if (appState.lintingRuleConfigs && typeof appState.lintingRuleConfigs === "object") {
       const isSeverity = (v: unknown): v is Severity =>
         v === "error" || v === "warning" || v === "info";
-      const sanitized: Record<
-        string,
-        { enabled: boolean; severity: Severity; skipDialogue?: boolean }
-      > = {};
+      const isPlainOptions = (v: unknown): v is Record<string, unknown> =>
+        typeof v === "object" && v !== null && !Array.isArray(v);
+      const sanitized: Record<string, PersistedRuleConfig> = {};
       for (const [ruleId, config] of Object.entries(
         appState.lintingRuleConfigs as Record<string, unknown>,
       )) {
-        const cfg = config as { enabled?: unknown; severity?: unknown; skipDialogue?: unknown };
+        const cfg = config as {
+          enabled?: unknown;
+          severity?: unknown;
+          skipDialogue?: unknown;
+          options?: unknown;
+        };
         if (typeof cfg.enabled === "boolean" && isSeverity(cfg.severity)) {
-          const entry: { enabled: boolean; severity: Severity; skipDialogue?: boolean } = {
+          const entry: PersistedRuleConfig = {
             enabled: cfg.enabled,
             severity: cfg.severity,
           };
           if (typeof cfg.skipDialogue === "boolean") {
             entry.skipDialogue = cfg.skipDialogue;
+          }
+          if (isPlainOptions(cfg.options)) {
+            entry.options = cfg.options;
           }
           sanitized[ruleId] = entry;
         }
@@ -230,7 +243,7 @@ export function useAiSettings(): UseAiSettingsResult {
   }, [aiApiKey, aiBaseUrl, aiModelId]);
 
   const handleLintingRuleConfigChange = useCallback(
-    (ruleId: string, config: { enabled: boolean; severity: Severity }) => {
+    (ruleId: string, config: PersistedRuleConfig) => {
       setLintingRuleConfigs((prev) => {
         const next = { ...prev, [ruleId]: config };
         void persistAppState({ lintingRuleConfigs: next }).catch((e) =>
@@ -243,7 +256,7 @@ export function useAiSettings(): UseAiSettingsResult {
   );
 
   const handleLintingRuleConfigsBatchChange = useCallback(
-    (configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>) => {
+    (configs: Record<string, PersistedRuleConfig>) => {
       // Replace (not merge): callers pass a COMPLETE map covering every loaded
       // rule (see buildModeRuleConfigsFromRules), so replacement correctly
       // enables the new mode's rules and disables the rest. A partial map here

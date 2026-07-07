@@ -17,20 +17,19 @@ import RulesetAutoUpdateToggle from "./linting/RulesetAutoUpdateToggle";
 import ClearIgnoredCorrectionsButton from "./linting/ClearIgnoredCorrectionsButton";
 import { useRulesetStatus } from "./linting/useRulesetStatus";
 
+type RuleConfig = {
+  enabled: boolean;
+  severity: Severity;
+  skipDialogue?: boolean;
+  options?: Record<string, unknown>;
+};
+
 export interface LintingSettingsProps {
   lintingEnabled: boolean;
   onLintingEnabledChange: (value: boolean) => void;
-  lintingRuleConfigs: Record<
-    string,
-    { enabled: boolean; severity: Severity; skipDialogue?: boolean }
-  >;
-  onLintingRuleConfigChange: (
-    ruleId: string,
-    config: { enabled: boolean; severity: Severity; skipDialogue?: boolean },
-  ) => void;
-  onLintingRuleConfigsBatchChange: (
-    configs: Record<string, { enabled: boolean; severity: Severity; skipDialogue?: boolean }>,
-  ) => void;
+  lintingRuleConfigs: Record<string, RuleConfig>;
+  onLintingRuleConfigChange: (ruleId: string, config: RuleConfig) => void;
+  onLintingRuleConfigsBatchChange: (configs: Record<string, RuleConfig>) => void;
   characterExtractionBatchSize?: number;
   onCharacterExtractionBatchSizeChange?: (value: number) => void;
   characterExtractionConcurrency?: number;
@@ -110,6 +109,7 @@ function LintingSettingsInner({
             correctionConfig={correctionConfig}
             disabled={!lintingEnabled}
             loadedRules={loadedRules}
+            lintingRuleConfigs={lintingRuleConfigs}
             onCorrectionConfigChange={onCorrectionConfigChange}
             onLintingRuleConfigsBatchChange={onLintingRuleConfigsBatchChange}
           />
