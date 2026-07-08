@@ -21,6 +21,6 @@ tags:
 
 ## 運用方針
 
-- 正式な仕様は `architecture/`、`guides/`、`MDI/` に置く
+- 正式な仕様は `architecture/`、`guides/` に置く。MDI フォーマット仕様は [illusions-lab/MDI](https://github.com/illusions-lab/MDI) を参照
 - 外部資料への索引や要約だけをここに置く
 - 単発の検証ログは `archive/` に逃がす

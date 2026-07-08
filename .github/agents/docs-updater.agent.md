@@ -41,7 +41,7 @@ When triggered via an issue from the daily docs-maintenance workflow, analyse th
 
 3. **`docs/README.md`** and **`docs/Home.md`** — Update when structural or high-level architectural changes occur.
 
-4. **`docs/MDI/`** — Update only when `.mdi` file format syntax or implementation changes.
+MDI file format docs (syntax, spec, implementation notes) now live in [illusions-lab/MDI](https://github.com/illusions-lab/MDI), not in this repo's `docs/` — do not create or update `docs/MDI/`.
 
 ### Specific Triggers
 
