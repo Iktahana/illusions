@@ -51,7 +51,9 @@ The fourth MSIX version part is reserved as a channel marker:
 Lower revision numbers are closer to the stable release channel.
 The workflow keeps `package.json.version` at the stable three-part base version
 for SemVer compatibility and writes the four-part MSIX version to
-`build.buildVersion` before invoking the AppX target.
+`build.buildVersion` plus the channel marker to `build.buildNumber` before
+invoking the AppX target. Electron Builder uses `buildNumber` as the fourth
+AppX manifest version part.
 
 Automation note: do not add a package-flight upload workflow until we have a
 verified Partner Center API endpoint or supported CLI path for package flight
