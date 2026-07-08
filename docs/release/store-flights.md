@@ -41,19 +41,11 @@ MSIX package identity versions are four-part numeric versions and cannot contain
 SemVer prerelease labels such as `-beta`. GitHub release asset filenames include
 the full Illusions prerelease version for operator clarity, but Partner Center
 will still show the numeric MSIX package version from the package manifest.
-The fourth MSIX version part is reserved as a channel marker:
-
-- `0`: stable
-- `1`: beta
-- `2`: alpha
-- `3`: dev
-
-Lower revision numbers are closer to the stable release channel.
+Microsoft Store package acceptance requires the fourth MSIX version part
+(`revision`) to be `0`; do not use it as a channel marker.
 The workflow keeps `package.json.version` at the stable three-part base version
-for SemVer compatibility and writes the four-part MSIX version to
-`build.buildVersion` plus the channel marker to `build.buildNumber` before
-invoking the AppX target. Electron Builder uses `buildNumber` as the fourth
-AppX manifest version part only when `appx.setBuildNumber=true`.
+for SemVer compatibility and writes the four-part Store-compatible MSIX version
+to `build.buildVersion` before invoking the AppX target.
 
 Automation note: do not add a package-flight upload workflow until we have a
 verified Partner Center API endpoint or supported CLI path for package flight

@@ -130,15 +130,15 @@ jobs:
               BETA_DATE=$(date -u +%Y%m%d)
               BETA_TIME=$(date -u +%H%M%S)
               FULL_VERSION="${BASE_VERSION}-beta.${BETA_DATE}.$((10#$BETA_TIME))"
-              MSIX_REVISION=1
+              MSIX_REVISION=0
               ;;
             alpha)
               FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
-              MSIX_REVISION=2
+              MSIX_REVISION=0
               ;;
             dev)
               FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
-              MSIX_REVISION=3
+              MSIX_REVISION=0
               ;;
             *)
               echo "::error::Unexpected branch '${BRANCH_NAME}' — only main/alpha/beta/dev are allowed"
@@ -146,9 +146,9 @@ jobs:
               ;;
           esac
 
-          # MSIX requires exactly four numeric parts and cannot contain semver
-          # prerelease labels. Use revision as a channel marker:
-          # stable=0, beta=1, alpha=2, dev=3. Lower means closer to stable.
+          # Microsoft Store package acceptance requires an AppX manifest
+          # revision of 0. Flight/channel identity must come from Partner
+          # Center flights and artifact names, not the package version.
           MSIX_VERSION="${BASE_VERSION}.${MSIX_REVISION}"
 
           echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
@@ -616,7 +616,7 @@ jobs:
 
       - name: Update package.json version for MSIX build
         if: github.event_name != 'pull_request'
-        run: node -e "const p=require('./package.json');const msix='${{ needs.compute-version.outputs.msix }}';const revision=msix.split('.').at(-1);p.version='${{ needs.compute-version.outputs.base }}';p.build={...(p.build||{}),buildVersion:msix,buildNumber:revision,appx:{...((p.build||{}).appx||{}),setBuildNumber:true}};require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.base }}';p.build={...(p.build||{}),buildVersion:'${{ needs.compute-version.outputs.msix }}'};require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
       - name: Download build output
         if: github.event_name != 'pull_request'
