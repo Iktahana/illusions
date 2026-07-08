@@ -17,7 +17,8 @@
  *   MSIX_DIR              - Directory containing .appx packages (default: "msix-packages")
  *
  * Optional:
- *   SUBMISSION_MODE   - "listing-only" or "full-submission" (default: "full-submission")
+ *   SUBMISSION_MODE   - "listing-only", "full-submission", or "flight-submission" (default: "full-submission")
+ *   PACKAGE_FLIGHT_ID - Microsoft Store package flight ID/name (required for flight-submission)
  *   DRY_RUN=true     - Log API calls without mutating state (credentials not required)
  *   POLL_TIMEOUT_MS  - Polling timeout in ms (default: 600000 = 10 min)
  */
@@ -39,10 +40,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DRY_RUN = process.env.DRY_RUN === "true";
 const SUBMISSION_MODE = process.env.SUBMISSION_MODE ?? "full-submission";
 const LISTING_ONLY = SUBMISSION_MODE === "listing-only";
+const FLIGHT_SUBMISSION = SUBMISSION_MODE === "flight-submission";
+const PACKAGE_SUBMISSION = SUBMISSION_MODE === "full-submission" || FLIGHT_SUBMISSION;
 const TENANT_ID = process.env.MSSTORE_TENANT_ID;
 const CLIENT_ID = process.env.MSSTORE_CLIENT_ID;
 const CLIENT_SECRET = process.env.MSSTORE_CLIENT_SECRET;
 const APP_ID = process.env.STORE_PRODUCT_ID;
+const PACKAGE_FLIGHT_ID = process.env.PACKAGE_FLIGHT_ID ?? process.env.MSSTORE_PACKAGE_FLIGHT_ID;
 const MSIX_DIR = resolve(process.env.MSIX_DIR ?? "msix-packages");
 const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 1_200_000);
 
@@ -169,6 +173,22 @@ async function apiDelete(token, path) {
     err.status = res.status;
     throw err;
   }
+}
+
+function getSubmissionCollectionPath() {
+  if (FLIGHT_SUBMISSION) {
+    if (!PACKAGE_FLIGHT_ID) {
+      throw new Error(
+        "PACKAGE_FLIGHT_ID or MSSTORE_PACKAGE_FLIGHT_ID is required for flight-submission mode",
+      );
+    }
+    return `/applications/${APP_ID}/flights/${encodeURIComponent(PACKAGE_FLIGHT_ID)}/submissions`;
+  }
+  return `/applications/${APP_ID}/submissions`;
+}
+
+function getSubmissionPath(submissionId) {
+  return `${getSubmissionCollectionPath()}/${submissionId}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +361,7 @@ async function pollSubmissionStatus(token, submissionId) {
   const intervalMs = 30_000;
 
   while (Date.now() - start < POLL_TIMEOUT_MS) {
-    const sub = await apiGet(token, `/applications/${APP_ID}/submissions/${submissionId}`);
+    const sub = await apiGet(token, getSubmissionPath(submissionId));
     // The Store API uses "status" for newer endpoints and "commitStatus" for legacy
     const status = sub.commitStatus ?? sub.status;
     console.log(`  commitStatus: ${sub.commitStatus}, status: ${sub.status}`);
@@ -369,6 +389,9 @@ async function main() {
   console.log(
     `Mode: ${SUBMISSION_MODE}${LISTING_ONLY ? " (listing metadata only, no package upload)" : ""}`,
   );
+  if (FLIGHT_SUBMISSION) {
+    console.log(`Package flight: ${PACKAGE_FLIGHT_ID ?? "(not set)"}`);
+  }
 
   if (DRY_RUN) {
     console.log("=== DRY RUN MODE — no mutations will be made ===\n");
@@ -379,20 +402,36 @@ async function main() {
     );
   }
 
-  // --- Step 1: Read listing content ---
-  console.log("Reading store listing content...");
-  const description = readListingFile("description.md");
-  const shortDescription = readListingFile("short-description.md");
-  const featuresMarkdown = readListingFile("features.md");
-  const releaseNotes = readListingFile("release-notes.md", { required: false });
-  const licenseTerms = readLicenseTerms();
-  const features = parseBulletList(featuresMarkdown);
+  if (!["listing-only", "full-submission", "flight-submission"].includes(SUBMISSION_MODE)) {
+    throw new Error(
+      `Invalid SUBMISSION_MODE '${SUBMISSION_MODE}' (expected listing-only, full-submission, or flight-submission)`,
+    );
+  }
 
-  console.log(`  description:      ${description.length} chars`);
-  console.log(`  shortDescription: ${shortDescription.length} chars`);
-  console.log(`  features:         ${features.length} items`);
-  console.log(`  releaseNotes:     ${releaseNotes.length} chars`);
-  console.log(`  licenseTerms:     ${licenseTerms.length} chars`);
+  // --- Step 1: Read listing content ---
+  let description = "";
+  let shortDescription = "";
+  let releaseNotes = "";
+  let licenseTerms = "";
+  let features = [];
+
+  if (!FLIGHT_SUBMISSION) {
+    console.log("Reading store listing content...");
+    description = readListingFile("description.md");
+    shortDescription = readListingFile("short-description.md");
+    const featuresMarkdown = readListingFile("features.md");
+    releaseNotes = readListingFile("release-notes.md", { required: false });
+    licenseTerms = readLicenseTerms();
+    features = parseBulletList(featuresMarkdown);
+
+    console.log(`  description:      ${description.length} chars`);
+    console.log(`  shortDescription: ${shortDescription.length} chars`);
+    console.log(`  features:         ${features.length} items`);
+    console.log(`  releaseNotes:     ${releaseNotes.length} chars`);
+    console.log(`  licenseTerms:     ${licenseTerms.length} chars`);
+  } else {
+    console.log("Skipping listing metadata for package flight submission.");
+  }
 
   // --- Step 2: Authenticate ---
   let token = "dry-run-token";
@@ -405,11 +444,12 @@ async function main() {
   // --- Step 3: Get app info + resolve pending submission ---
   let submissionId;
   let fileUploadUrl;
+  const submissionCollectionPath = getSubmissionCollectionPath();
 
   console.log(`\nFetching app info for ${APP_ID}...`);
   const app = await apiGet(token, `/applications/${APP_ID}`);
 
-  if (app.pendingApplicationSubmission?.id) {
+  if (!FLIGHT_SUBMISSION && app.pendingApplicationSubmission?.id) {
     const pendingId = app.pendingApplicationSubmission.id;
 
     if (LISTING_ONLY) {
@@ -466,8 +506,8 @@ async function main() {
 
   // --- Step 4: Create new submission (if no pending submission to reuse) ---
   if (!submissionId) {
-    console.log("\nCreating new submission...");
-    const newSub = await apiPost(token, `/applications/${APP_ID}/submissions`, null);
+    console.log(`\nCreating new ${FLIGHT_SUBMISSION ? "package flight " : ""}submission...`);
+    const newSub = await apiPost(token, submissionCollectionPath, null);
     submissionId = newSub.id;
     fileUploadUrl = newSub.fileUploadUrl;
     console.log(`  Submission ID: ${submissionId}`);
@@ -475,24 +515,28 @@ async function main() {
 
   // --- Step 5: Get full submission details ---
   console.log("\nGetting submission details...");
-  const submission = await apiGet(token, `/applications/${APP_ID}/submissions/${submissionId}`);
+  const submission = await apiGet(token, getSubmissionPath(submissionId));
 
   // --- Step 6: Update listing ---
-  console.log("\nUpdating store listing (ja-JP)...");
-  if (!submission.listings) submission.listings = {};
-  if (!submission.listings["ja-jp"]) {
-    submission.listings["ja-jp"] = { baseListing: {} };
+  if (!FLIGHT_SUBMISSION) {
+    console.log("\nUpdating store listing (ja-JP)...");
+    if (!submission.listings) submission.listings = {};
+    if (!submission.listings["ja-jp"]) {
+      submission.listings["ja-jp"] = { baseListing: {} };
+    }
+
+    const listing = submission.listings["ja-jp"].baseListing;
+    listing.description = description;
+    listing.shortDescription = shortDescription;
+    listing.features = features;
+    listing.releaseNotes = releaseNotes;
+    if (licenseTerms) listing.licenseTerms = licenseTerms;
+  } else {
+    console.log("\nSkipping store listing update for package flight.");
   }
 
-  const listing = submission.listings["ja-jp"].baseListing;
-  listing.description = description;
-  listing.shortDescription = shortDescription;
-  listing.features = features;
-  listing.releaseNotes = releaseNotes;
-  if (licenseTerms) listing.licenseTerms = licenseTerms;
-
   // --- Step 7: Set application packages (full-submission only) ---
-  if (!LISTING_ONLY) {
+  if (PACKAGE_SUBMISSION) {
     const appxFiles = DRY_RUN ? ["example.appx"] : findAppxFiles();
     console.log(`\nPackages to submit: ${appxFiles.join(", ")}`);
 
@@ -518,10 +562,10 @@ async function main() {
 
   // --- Step 8: PUT updated submission ---
   console.log("\nSaving submission changes...");
-  await apiPut(token, `/applications/${APP_ID}/submissions/${submissionId}`, submission);
+  await apiPut(token, getSubmissionPath(submissionId), submission);
 
   // --- Step 9: Upload packages (full-submission only) ---
-  if (!LISTING_ONLY) {
+  if (PACKAGE_SUBMISSION) {
     if (DRY_RUN) {
       console.log("\n[dry-run] Skipping package ZIP creation and upload.");
     } else {
@@ -534,11 +578,7 @@ async function main() {
 
   // --- Step 10: Commit ---
   console.log("\nCommitting submission...");
-  const commitResponse = await apiPost(
-    token,
-    `/applications/${APP_ID}/submissions/${submissionId}/commit`,
-    null,
-  );
+  const commitResponse = await apiPost(token, `${getSubmissionPath(submissionId)}/commit`, null);
   console.log(`  Commit response: ${JSON.stringify(commitResponse)}`);
 
   // --- Step 11: Poll ---
