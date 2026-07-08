@@ -1,16 +1,10 @@
 // Auto-updater setup and manual/automatic update checks
 
-const { app, dialog, shell } = require("electron");
+const { app, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const { isDev, isMicrosoftStoreApp } = require("./app-constants");
-const {
-  resolveUpdaterFlags,
-  isUnpublishedChannelVersion,
-  isSunsetDetected,
-} = require("./lib/update-policy");
-
-const DOWNLOAD_PAGE_URL = "https://www.illusions.app/downloads/";
+const { resolveUpdaterFlags, isUnpublishedChannelVersion } = require("./lib/update-policy");
 
 // dev/alpha ブランチのビルドは GitHub Release を持たない CI 専用成果物のため、
 // auto-updater を走らせると安定版/beta への誤ダウングレードを招く。バージョン文字列で
@@ -86,33 +80,6 @@ function setupAutoUpdater() {
     const { getMainWindow } = require("./window-manager");
     const mainWindow = getMainWindow();
     if (!mainWindow) return;
-
-    // macOS の 1.2.x は 1.3.0 正式版検出時に auto-update を提案せず、公式サイトへの
-    // 手動ダウンロード誘導に置き換える（notarization/bundle ID 変更で追従できない事例があるため）。
-    if (
-      isSunsetDetected({
-        platform: process.platform,
-        currentVersion: app.getVersion(),
-        availableVersion: info.version,
-      })
-    ) {
-      dialog
-        .showMessageBox(mainWindow, {
-          type: "warning",
-          title: "サポート終了のお知らせ",
-          message: "illusions 1.2 は Sunset（サポート終了）となりました",
-          detail: `最新バージョン ${info.version} が公開されています。公式サイトから最新版をダウンロードしてください。\n${DOWNLOAD_PAGE_URL}`,
-          buttons: ["公式サイトを開く", "後で"],
-          defaultId: 0,
-          cancelId: 1,
-        })
-        .then((result) => {
-          if (result.response === 0) {
-            void shell.openExternal(DOWNLOAD_PAGE_URL);
-          }
-        });
-      return;
-    }
 
     dialog
       .showMessageBox(mainWindow, {

@@ -8,16 +8,10 @@ import { describe, expect, it } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
-const { resolveUpdaterFlags, isUnpublishedChannelVersion, isSunsetDetected } =
-  require("../update-policy") as {
-    resolveUpdaterFlags: (v: unknown) => { allowPrerelease: boolean; allowDowngrade: boolean };
-    isUnpublishedChannelVersion: (v: unknown) => boolean;
-    isSunsetDetected: (params: {
-      platform: unknown;
-      currentVersion: unknown;
-      availableVersion: unknown;
-    }) => boolean;
-  };
+const { resolveUpdaterFlags, isUnpublishedChannelVersion } = require("../update-policy") as {
+  resolveUpdaterFlags: (v: unknown) => { allowPrerelease: boolean; allowDowngrade: boolean };
+  isUnpublishedChannelVersion: (v: unknown) => boolean;
+};
 
 describe("resolveUpdaterFlags", () => {
   it("beta ON → プレリリース受信、ダウングレード不可", () => {
@@ -78,63 +72,5 @@ describe("isUnpublishedChannelVersion", () => {
   it("'develop' のような部分一致では誤検出しない（ハイフン区切りのチャンネル接尾辞のみ）", () => {
     expect(isUnpublishedChannelVersion("1.2.20-developer")).toBe(false);
     expect(isUnpublishedChannelVersion("1.2.20-alphabet")).toBe(false);
-  });
-});
-
-describe("isSunsetDetected", () => {
-  it("macOS で 1.2.x 実行中に 1.3.0 正式版を検出したら true", () => {
-    expect(
-      isSunsetDetected({ platform: "darwin", currentVersion: "1.2.22", availableVersion: "1.3.0" }),
-    ).toBe(true);
-  });
-
-  it("1.3.0 より新しい正式版でも true（1.3.x 系はすべて sunset 対象）", () => {
-    expect(
-      isSunsetDetected({ platform: "darwin", currentVersion: "1.2.22", availableVersion: "1.4.5" }),
-    ).toBe(true);
-  });
-
-  it.each(["win32", "linux"])(
-    "macOS 以外 (%s) は常に false（通常の auto-update を継続）",
-    (platform) => {
-      expect(
-        isSunsetDetected({ platform, currentVersion: "1.2.22", availableVersion: "1.3.0" }),
-      ).toBe(false);
-    },
-  );
-
-  it("1.3.0 の beta プレリリースはまだ正式版ではないので false", () => {
-    expect(
-      isSunsetDetected({
-        platform: "darwin",
-        currentVersion: "1.2.22",
-        availableVersion: "1.3.0-beta.20260706.120000",
-      }),
-    ).toBe(false);
-  });
-
-  it("現在バージョンが既に 1.3.0 以降なら false（自身の通常アップデートを sunset 扱いしない）", () => {
-    expect(
-      isSunsetDetected({ platform: "darwin", currentVersion: "1.3.0", availableVersion: "1.3.1" }),
-    ).toBe(false);
-  });
-
-  it("1.3.0 未満の通常アップデート（1.2.x → 1.2.y）は false", () => {
-    expect(
-      isSunsetDetected({
-        platform: "darwin",
-        currentVersion: "1.2.20",
-        availableVersion: "1.2.22",
-      }),
-    ).toBe(false);
-  });
-
-  it.each([undefined, null, 0, {}, "not-a-version"])("不正な値 (%s) は安全側 = false", (value) => {
-    expect(
-      isSunsetDetected({ platform: "darwin", currentVersion: "1.2.22", availableVersion: value }),
-    ).toBe(false);
-    expect(
-      isSunsetDetected({ platform: "darwin", currentVersion: value, availableVersion: "1.3.0" }),
-    ).toBe(false);
   });
 });
