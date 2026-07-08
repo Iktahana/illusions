@@ -658,6 +658,33 @@ jobs:
         if: github.event_name != 'pull_request'
         run: npx electron-builder --win appx --${{ matrix.arch }} --publish never
 
+      - name: Normalize MSIX artifact names
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $fullVersion = "${{ needs.compute-version.outputs.full }}"
+          $arch = "${{ matrix.arch }}"
+          $targetName = "illusions-$fullVersion-$arch.appx"
+          $targetPath = Join-Path "dist-electron" $targetName
+
+          $appxFiles = Get-ChildItem "dist-electron\*.appx"
+          if ($appxFiles.Count -ne 1) {
+            Write-Error "Expected exactly one .appx for $arch, found $($appxFiles.Count)"
+            $appxFiles | ForEach-Object { Write-Host "  - $($_.FullName)" }
+            exit 1
+          }
+
+          $appx = $appxFiles[0]
+          $blockmapPath = "$($appx.FullName).blockmap"
+
+          Rename-Item -Path $appx.FullName -NewName $targetName -Force
+
+          if (Test-Path $blockmapPath) {
+            Rename-Item -Path $blockmapPath -NewName "$targetName.blockmap" -Force
+          }
+
+          Write-Host "Renamed MSIX artifact to $targetPath"
+
       - name: Upload MSIX artifacts
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
