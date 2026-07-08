@@ -124,14 +124,21 @@ jobs:
           case "$BRANCH_NAME" in
             main)
               FULL_VERSION="${BASE_VERSION}"
+              MSIX_REVISION=0
               ;;
             beta)
               BETA_DATE=$(date -u +%Y%m%d)
               BETA_TIME=$(date -u +%H%M%S)
               FULL_VERSION="${BASE_VERSION}-beta.${BETA_DATE}.$((10#$BETA_TIME))"
+              MSIX_REVISION=1
               ;;
-            alpha|dev)
+            alpha)
               FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
+              MSIX_REVISION=2
+              ;;
+            dev)
+              FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
+              MSIX_REVISION=3
               ;;
             *)
               echo "::error::Unexpected branch '${BRANCH_NAME}' — only main/alpha/beta/dev are allowed"
@@ -139,15 +146,16 @@ jobs:
               ;;
           esac
 
-          # MSIX requires exactly four numeric parts; electron-builder handles this
-          # but we compute it here for logging
-          MSIX_VERSION="${BASE_VERSION}.0"
+          # MSIX requires exactly four numeric parts and cannot contain semver
+          # prerelease labels. Use revision as a channel marker:
+          # stable=0, beta=1, alpha=2, dev=3. Lower means closer to stable.
+          MSIX_VERSION="${BASE_VERSION}.${MSIX_REVISION}"
 
           echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
           echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
           echo "msix=${MSIX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "branch=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Version: base=${BASE_VERSION} | full=${FULL_VERSION} | MSIX=${MSIX_VERSION} | Branch=${BRANCH_NAME} | Latest tag patch=${LATEST_PATCH:-none}"
+          echo "Version: base=${BASE_VERSION} | full=${FULL_VERSION} | MSIX=${MSIX_VERSION} | Branch=${BRANCH_NAME} | MSIX revision=${MSIX_REVISION} | Latest tag patch=${LATEST_PATCH:-none}"
 
       - name: Validate version format
         run: |
@@ -608,7 +616,7 @@ jobs:
 
       - name: Update package.json version for MSIX build
         if: github.event_name != 'pull_request'
-        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.base }}';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.base }}';p.build={...(p.build||{}),buildVersion:'${{ needs.compute-version.outputs.msix }}'};require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
       - name: Download build output
         if: github.event_name != 'pull_request'
