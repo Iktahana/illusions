@@ -554,6 +554,15 @@ async function main() {
     if (flight?.pendingFlightSubmission?.id) {
       submissionId = flight.pendingFlightSubmission.id;
       console.log(`  Reusing existing pending package flight submission: ${submissionId}`);
+      const pendingSubmission = await apiGet(token, getSubmissionPath(submissionId));
+      const pendingStatus = pendingSubmission.status ?? pendingSubmission.commitStatus;
+      if (pendingStatus === "PreProcessing" || pendingStatus === "InProgress") {
+        console.log(
+          `  Pending package flight submission is ${pendingStatus}; deleting it before creating a fresh submission.`,
+        );
+        await apiDelete(token, getSubmissionPath(submissionId));
+        submissionId = undefined;
+      }
     }
   } else if (app.pendingApplicationSubmission?.id) {
     const pendingId = app.pendingApplicationSubmission.id;
