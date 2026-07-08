@@ -37,6 +37,11 @@ Center and upload the beta `.appx` artifacts from the GitHub prerelease for the
 `beta` branch. Package flight listing text is shared with the non-flighted Store
 submission; only packages differ.
 
+MSIX package identity versions are four-part numeric versions and cannot contain
+SemVer prerelease labels such as `-beta`. GitHub release asset filenames include
+the full Illusions prerelease version for operator clarity, but Partner Center
+will still show the numeric MSIX package version from the package manifest.
+
 Automation note: do not add a package-flight upload workflow until we have a
 verified Partner Center API endpoint or supported CLI path for package flight
 submissions. The existing submission API script only targets normal app
