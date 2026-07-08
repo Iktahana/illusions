@@ -616,7 +616,7 @@ jobs:
 
       - name: Update package.json version for MSIX build
         if: github.event_name != 'pull_request'
-        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.base }}';p.build={...(p.build||{}),buildVersion:'${{ needs.compute-version.outputs.msix }}'};require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+        run: node -e "const p=require('./package.json');const msix='${{ needs.compute-version.outputs.msix }}';const revision=msix.split('.').at(-1);p.version='${{ needs.compute-version.outputs.base }}';p.build={...(p.build||{}),buildVersion:msix,buildNumber:revision};require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
       - name: Download build output
         if: github.event_name != 'pull_request'
