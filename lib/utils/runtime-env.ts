@@ -4,6 +4,15 @@ export type RuntimeEnvironment = "browser" | "electron-renderer" | "unknown";
 
 export type OSPlatform = "mac" | "windows" | "linux";
 
+export type DistributionProvider = "direct" | "microsoft-store" | "app-store" | "unknown";
+
+export type ReleaseChannel = "stable" | "beta" | "dev" | "alpha" | "unknown";
+
+export interface AppRuntimeInfo {
+  distributionProvider: DistributionProvider;
+  releaseChannel: ReleaseChannel;
+}
+
 /**
  * ブラウザ相当の環境で動いているか判定する
  */
@@ -34,6 +43,36 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
     return "browser";
   }
   return "unknown";
+}
+
+export function detectReleaseChannel(version: string | undefined): ReleaseChannel {
+  if (!version) return "unknown";
+  if (/-beta(?:\.|$)/.test(version)) return "beta";
+  if (/-dev(?:\.|$)/.test(version)) return "dev";
+  if (/-alpha(?:\.|$)/.test(version)) return "alpha";
+  return "stable";
+}
+
+export function getAppRuntimeInfo(): AppRuntimeInfo {
+  const version = process.env.NEXT_PUBLIC_APP_VERSION;
+  const releaseChannel = detectReleaseChannel(version);
+
+  if (!isElectronRenderer()) {
+    return {
+      distributionProvider: "unknown",
+      releaseChannel,
+    };
+  }
+
+  const electronAPI = window.electronAPI;
+
+  return {
+    distributionProvider: electronAPI?.appRuntime?.distributionProvider ?? "direct",
+    releaseChannel:
+      releaseChannel !== "unknown"
+        ? releaseChannel
+        : (electronAPI?.appRuntime?.releaseChannel ?? "unknown"),
+  };
 }
 
 /**

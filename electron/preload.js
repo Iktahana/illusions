@@ -30,8 +30,25 @@ const {
   RULESETS_CHANNELS,
 } = require("./lib/ipc-channels");
 
+function detectDistributionProvider() {
+  if (process.windowsStore === true) return "microsoft-store";
+  if (process.mas === true) return "app-store";
+  return "direct";
+}
+
+function detectReleaseChannel(version) {
+  if (/-beta(?:\.|$)/.test(version)) return "beta";
+  if (/-dev(?:\.|$)/.test(version)) return "dev";
+  if (/-alpha(?:\.|$)/.test(version)) return "alpha";
+  return "stable";
+}
+
 contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
+  appRuntime: {
+    distributionProvider: detectDistributionProvider(),
+    releaseChannel: detectReleaseChannel(process.env.npm_package_version || "0.0.0"),
+  },
   openFile: invokeChannel(FILE_CHANNELS.invoke.openFile, { arity: 0 }),
   saveFile: invokeChannel(FILE_CHANNELS.invoke.saveFile, { arity: 3 }),
   getChromeVersion: invokeChannel(SYSTEM_CHANNELS.invoke.getChromeVersion, { arity: 0 }),

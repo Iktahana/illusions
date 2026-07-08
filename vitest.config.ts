@@ -5,6 +5,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
+    environmentOptions: {
+      jsdom: {
+        url: "http://localhost/",
+      },
+    },
+    setupFiles: ["./test/setup-vitest.ts"],
     include: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
     // stale worktree コピー（.claude/worktrees/agent-*）配下の __tests__ が
     // テスト探索に混入して false-RED を起こすのを防ぐ
