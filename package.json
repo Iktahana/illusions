@@ -13,9 +13,9 @@
   "main": "dist-main/main.js",
   "scripts": {
     "type-check": "tsc --noEmit",
-    "dev": "npm run type-check && node scripts/ensure-credits-stub.mjs && next dev -p 3010",
+    "dev": "npm run electron:dev",
+    "dev:web": "npm run type-check && node scripts/ensure-credits-stub.mjs && next dev -p 3010",
     "build": "npm run type-check && npm run generate:credits && next build",
-    "start": "next start",
     "lint": "eslint .",
     "check:boundaries": "node scripts/check-import-boundaries.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\"",

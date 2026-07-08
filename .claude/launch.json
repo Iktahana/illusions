@@ -2,22 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "next-dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3010
-    },
-    {
       "name": "electron-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "electron:dev"],
+      "runtimeArgs": ["run", "dev"],
       "port": 3020
     },
     {
-      "name": "next-start",
+      "name": "next-dev-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start"],
-      "port": 3000
+      "runtimeArgs": ["run", "dev:web"],
+      "port": 3010
     }
   ]
 }
