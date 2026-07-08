@@ -256,6 +256,30 @@ async function inspectPackageFlights(token, app) {
   }
 }
 
+async function getPackageFlight(token) {
+  const candidatePaths = [
+    `/applications/${APP_ID}/listFlights`,
+    `/applications/${APP_ID}/listflights`,
+  ];
+
+  for (const path of candidatePaths) {
+    try {
+      const response = await apiGet(token, path);
+      const flights = Array.isArray(response?.value) ? response.value : [];
+      const flight = flights.find(
+        (item) =>
+          item.flightId === PACKAGE_FLIGHT_ID ||
+          item.friendlyName?.toLowerCase() === PACKAGE_FLIGHT_ID?.toLowerCase(),
+      );
+      if (flight) return flight;
+    } catch (err) {
+      console.log(`  Could not list package flights via ${path}: ${err.message}`);
+    }
+  }
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Markdown parsing
 // ---------------------------------------------------------------------------
@@ -524,7 +548,14 @@ async function main() {
     return;
   }
 
-  if (!FLIGHT_SUBMISSION && app.pendingApplicationSubmission?.id) {
+  if (FLIGHT_SUBMISSION) {
+    console.log("\nChecking package flight state...");
+    const flight = await getPackageFlight(token);
+    if (flight?.pendingFlightSubmission?.id) {
+      submissionId = flight.pendingFlightSubmission.id;
+      console.log(`  Reusing existing pending package flight submission: ${submissionId}`);
+    }
+  } else if (app.pendingApplicationSubmission?.id) {
     const pendingId = app.pendingApplicationSubmission.id;
 
     if (LISTING_ONLY) {
@@ -591,6 +622,7 @@ async function main() {
   // --- Step 5: Get full submission details ---
   console.log("\nGetting submission details...");
   const submission = await apiGet(token, getSubmissionPath(submissionId));
+  fileUploadUrl ??= submission.fileUploadUrl;
 
   // --- Step 6: Update listing ---
   if (!FLIGHT_SUBMISSION) {
