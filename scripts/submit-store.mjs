@@ -17,7 +17,7 @@
  *   MSIX_DIR              - Directory containing .appx packages (default: "msix-packages")
  *
  * Optional:
- *   SUBMISSION_MODE   - "listing-only", "full-submission", or "flight-submission" (default: "full-submission")
+ *   SUBMISSION_MODE   - "listing-only", "full-submission", "flight-submission", or "inspect-flights" (default: "full-submission")
  *   PACKAGE_FLIGHT_ID - Microsoft Store package flight ID/name (required for flight-submission)
  *   DRY_RUN=true     - Log API calls without mutating state (credentials not required)
  *   POLL_TIMEOUT_MS  - Polling timeout in ms (default: 600000 = 10 min)
@@ -41,6 +41,7 @@ const DRY_RUN = process.env.DRY_RUN === "true";
 const SUBMISSION_MODE = process.env.SUBMISSION_MODE ?? "full-submission";
 const LISTING_ONLY = SUBMISSION_MODE === "listing-only";
 const FLIGHT_SUBMISSION = SUBMISSION_MODE === "flight-submission";
+const INSPECT_FLIGHTS = SUBMISSION_MODE === "inspect-flights";
 const PACKAGE_SUBMISSION = SUBMISSION_MODE === "full-submission" || FLIGHT_SUBMISSION;
 const TENANT_ID = process.env.MSSTORE_TENANT_ID;
 const CLIENT_ID = process.env.MSSTORE_CLIENT_ID;
@@ -189,6 +190,70 @@ function getSubmissionCollectionPath() {
 
 function getSubmissionPath(submissionId) {
   return `${getSubmissionCollectionPath()}/${submissionId}`;
+}
+
+function collectFlightLikeFields(value, path = "$", output = []) {
+  if (!value || typeof value !== "object") return output;
+  if (output.length >= 80) return output;
+
+  if (Array.isArray(value)) {
+    value.slice(0, 20).forEach((item, index) => {
+      collectFlightLikeFields(item, `${path}[${index}]`, output);
+    });
+    return output;
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = `${path}.${key}`;
+    if (/flight|rank|group|audience|id|name/i.test(key)) {
+      if (child == null || typeof child !== "object") {
+        output.push({ path: childPath, value: child });
+      } else if (Array.isArray(child)) {
+        output.push({ path: childPath, type: "array", length: child.length });
+        collectFlightLikeFields(child, childPath, output);
+      } else {
+        output.push({ path: childPath, type: "object", keys: Object.keys(child).slice(0, 20) });
+        collectFlightLikeFields(child, childPath, output);
+      }
+    } else if (child && typeof child === "object") {
+      collectFlightLikeFields(child, childPath, output);
+    }
+    if (output.length >= 80) break;
+  }
+
+  return output;
+}
+
+async function inspectPackageFlights(token, app) {
+  console.log("\nInspecting package flight metadata...");
+  console.log(`  App top-level keys: ${Object.keys(app).sort().join(", ")}`);
+
+  const fields = collectFlightLikeFields(app);
+  if (fields.length === 0) {
+    console.log("  No flight-like fields found in application object.");
+  } else {
+    console.log("  Flight-like fields from application object:");
+    for (const field of fields) {
+      console.log(`    ${JSON.stringify(field)}`);
+    }
+  }
+
+  const candidatePaths = [
+    `/applications/${APP_ID}/flights`,
+    `/applications/${APP_ID}/packageFlights`,
+    `/applications/${APP_ID}/listflights`,
+    `/applications/${APP_ID}/listFlights`,
+  ];
+
+  for (const path of candidatePaths) {
+    try {
+      console.log(`\nTrying GET ${path}...`);
+      const response = await apiGet(token, path);
+      console.log(JSON.stringify(response, null, 2));
+    } catch (err) {
+      console.log(`  ${err.message}`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -402,9 +467,13 @@ async function main() {
     );
   }
 
-  if (!["listing-only", "full-submission", "flight-submission"].includes(SUBMISSION_MODE)) {
+  if (
+    !["listing-only", "full-submission", "flight-submission", "inspect-flights"].includes(
+      SUBMISSION_MODE,
+    )
+  ) {
     throw new Error(
-      `Invalid SUBMISSION_MODE '${SUBMISSION_MODE}' (expected listing-only, full-submission, or flight-submission)`,
+      `Invalid SUBMISSION_MODE '${SUBMISSION_MODE}' (expected listing-only, full-submission, flight-submission, or inspect-flights)`,
     );
   }
 
@@ -448,6 +517,12 @@ async function main() {
 
   console.log(`\nFetching app info for ${APP_ID}...`);
   const app = await apiGet(token, `/applications/${APP_ID}`);
+
+  if (INSPECT_FLIGHTS) {
+    await inspectPackageFlights(token, app);
+    console.log("\nFlight inspection completed.");
+    return;
+  }
 
   if (!FLIGHT_SUBMISSION && app.pendingApplicationSubmission?.id) {
     const pendingId = app.pendingApplicationSubmission.id;
