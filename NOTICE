@@ -1,42 +1,123 @@
-CRITICAL WARNING & PROHIBITION
-厳重警告および禁止事項
+CRITICAL NOTICE REGARDING AI-ASSISTED COPYING, CODE LAUNDERING, AND BRAND MISUSE
+AI支援による複製、コード洗浄、およびブランド不正利用に関する重要通知
+-----
 
-[English Version]
+## English Version
 
-Any form of utilizing this project's achievements (including but not limited to its source code, architectural logic, user interface designs, and page screenshots) to feed into Artificial Intelligence (AI), Large Language Models (LLMs), or any other automated tools for reading, analysis, or the generation of similar functional or visual outcomes is strictly prohibited by the developers.
-We issue this strict warning against "plagiarism" and "code laundering" under the guise of AI. While we deeply respect the open-source spirit, we absolutely do not tolerate the unjust exploitation of our labor disguised as AI generation.
+This project, **illusions**, is released as free software under the **GNU Affero General Public License version 3.0 (AGPL v3.0)**, except for materials that are expressly excluded from the scope of the AGPL.
 
-HOW TO OBTAIN AUTHORIZATION (INCLUDING COMMERCIAL USE)
-We are not rejecting technological development or collaboration. If you wish to use or reference the achievements of this project, please contact us in advance to obtain explicit authorization.
-If proper communication is established, we will gladly grant permission in most cases, even for commercial projects. We welcome approaches that follow the proper channels.
+We respect the spirit of free software and open-source development. Nothing in this notice is intended to restrict any rights granted under the AGPL with respect to the source code covered by that license.
 
-RETROACTIVE AUTHORIZATION & AMNESTY CLAUSE
-If you have already utilized the achievements of this project prior to the publication of this notice (including but not limited to feeding source code, architectural logic, or page screenshots into AI for reading, analysis, or replication), we strongly recommend that you contact us immediately to apply for retroactive authorization.
-Evidence Preservation: Regarding suspected cases of plagiarism or replication of this project's achievements currently in the market, we have already completed the preservation (screening and recording) of all relevant evidence.
+However, the use of Artificial Intelligence (AI), Large Language Models (LLMs), code generation tools, automated transformation tools, or any similar systems does not erase copyright obligations, AGPL obligations, attribution duties, or responsibilities arising from derivative works, adapted works, copied expression, or misleading representation of origin.
 
-LEGAL ACTION
-If unauthorized plagiarism, imitation, or AI-assisted reproduction is discovered without explicit written consent or the completion of retroactive authorization procedures, we will resolutely take all legal measures, including filing lawsuits, seeking injunctions, and claiming damages, to protect our legitimate rights.
+If a work is created by relying on this project’s source code, implementation, structure, architecture, protected expression, documentation, user interface materials, screenshots, or other project assets, the mere fact that AI or automated tools were used to read, analyze, summarize, transform, rewrite, or regenerate the material does not make the resulting work independent or free from applicable legal or license obligations.
 
-Please respect the open-source spirit. Respect for creators is the foundation of a healthy developer community.
+## Scope of Materials Not Covered by the AGPL
 
+Unless expressly stated otherwise, the following materials are not licensed under the AGPL:
 
-[Japanese Version]
+* Project name, product name, service name, logos, icons, symbols, and brand identifiers
+* User interface designs, screen layouts, visual design, screenshots, and presentation materials
+* Website content, promotional text, documentation, explanatory text, copywriting, images, videos, and demo materials
+* Any other materials expressly identified by the developer or rights holder as being outside the scope of the AGPL
 
+All rights to these non-AGPL materials are reserved by the developer or the relevant rights holders.
 
-本プロジェクトの成果物（ソースコード、設計ロジック、UIデザイン、およびページのスクリーンショットを含みますが、これらに限定されません）を、人工知能（AI）、大規模言語モデル（LLM）、またはその他の自動化ツールに読み込ませ、分析・学習させ、類似する機能や視覚的効果を持つ成果物を生成させる行為は、いかなる形式であれ、開発者の意思として固く禁止します。
-AIを隠れ蓑にした「プラグマティズム（盗用）」や「コードロンダリング（成果物の洗浄）」に対し、ここに厳重に警告します。私たちはオープンソースの精神を深く尊重していますが、AI生成という名目のもとで私たちの労働成果を不当に搾取する行為は一切容認しません。
+You may not use these materials without explicit permission in a way that suggests that your work is an official version, certified version, affiliated version, successor version, endorsed version, or compatible version of **illusions**, or in any way that may cause confusion as to origin, sponsorship, approval, or affiliation.
 
-利用許諾の取得について（商用利用を含む）
-私たちは技術の発展や協力を拒絶しているわけではありません。本プロジェクトの成果を利用、または参考にしたい場合は、事前に私たちに連絡し、明示的な許諾を得てください。
+## Warning Against AI-Assisted Plagiarism and Code Laundering
 
-適切なコミュニケーションが行われれば、商用プロジェクトであっても、多くの場合において利用を快く承認します。 筋を通したアプローチを歓迎します。
+We issue this notice against plagiarism, unauthorized imitation, and so-called “code laundering” through AI or other automated tools.
 
-遡及的許諾および免責条項（アムネスティ）
-本通知の公開前に、すでに本プロジェクトの成果を利用されている場合（ソースコード、設計ロジック、ページのスクリーンショットをAIに読み込ませ、分析・模倣させた行為を含みますが、これらに限定されません）、速やかに私たちに連絡し、遡及的な利用許諾を補完（追加申請）することを強く推奨します。
+Using AI, LLMs, code generation tools, or automated transformation systems to read, analyze, rewrite, translate, summarize, restructure, or regenerate this project’s source code or protected materials does not, by itself, remove the obligations imposed by the AGPL or by applicable copyright, trademark, unfair competition, or other laws.
 
-証拠の保全について： 現在、市場で本プロジェクトの成果を盗用・模倣している疑いのある事例については、私たちはすでに関連する全ての証拠の保全（スクリーニングおよび記録）を完了しております。
+In particular, you must not:
 
-法的措置について
-明示的な書面による同意、あるいは遡及的許諾の手続きなしに行われた、無断の盗用、模倣、またはAI支援による複製行為が発覚した場合、私たちは自らの正当な権利を守るため、訴訟の提起、差止請求、および損害賠償請求を含む、あらゆる法的手段を毅然として講じます。
+* Use AI or automated tools to create a substantially similar copy, derivative work, adapted work, or confusingly similar product while attempting to avoid AGPL obligations;
+* Misrepresent the origin of a modified, regenerated, or AI-assisted work;
+* Present a derived or similar project as an official, certified, affiliated, successor, endorsed, or compatible version of **illusions** without permission;
+* Use the project’s name, logo, UI materials, screenshots, documentation, website content, or brand identifiers without authorization;
+* Use AI-assisted transformation as a pretext to exploit, disguise, or launder the creative and technical labor embodied in this project.
 
-オープンソース精神を尊重してください。創作者への敬意こそが、健全な開発者コミュニティの基盤です。
+## How to Obtain Authorization
+
+We do not reject technological development, research, collaboration, or legitimate commercial use.
+
+If you wish to use, reference, reproduce, adapt, or commercially exploit materials outside the scope of the AGPL, including the project’s name, logo, UI materials, screenshots, documentation, website content, or brand assets, please contact us in advance and obtain explicit written authorization.
+
+When proper communication is established, we are willing to consider authorization in good faith, including for commercial projects.
+
+## Retroactive Authorization
+
+If you have already used materials from this project in a way that may fall outside the scope of the AGPL, or if you have used AI or automated tools to reproduce, imitate, transform, or regenerate protected non-AGPL materials, we strongly recommend that you contact us promptly to request retroactive authorization.
+
+This notice does not waive any rights, claims, remedies, or legal positions of the developer or relevant rights holders.
+
+## Evidence Preservation and Legal Action
+
+For suspected cases involving unauthorized plagiarism, imitation, AI-assisted reproduction, code laundering, brand misuse, or confusingly similar products, we may preserve relevant evidence, including public pages, screenshots, repositories, release files, metadata, and other materials.
+
+If unauthorized copying, imitation, AI-assisted reproduction, brand misuse, or violation of applicable license obligations is discovered, we may take appropriate legal measures, including requests for cessation, preservation of evidence, injunctions, claims for damages, and other lawful actions.
+
+Please respect free software. Please also respect creators. A healthy developer community depends on both freedom and responsibility.
+
+---
+
+## 日本語版
+
+本プロジェクト **illusions** は、別途明示される素材を除き、**GNU Affero General Public License version 3.0（AGPL v3.0）** に基づく自由ソフトウェアとして公開されています。
+
+私たちは、自由ソフトウェアおよびオープンソース開発の精神を尊重します。本通知のいかなる内容も、AGPL の対象となるソースコードについて、AGPL により利用者に認められる権利を制限することを意図するものではありません。
+
+ただし、人工知能（AI）、大規模言語モデル（LLM）、コード生成ツール、自動変換ツール、またはこれらに類するシステムを用いたとしても、著作権上の義務、AGPL 上の義務、出所表示義務、派生物または翻案物に関する責任、その他適用される法的責任が当然に消滅するものではありません。
+
+本プロジェクトのソースコード、実装、構造、設計、保護され得る表現、ドキュメント、UI素材、スクリーンショット、その他の成果物に依拠して作成された成果物については、AIまたは自動化ツールを用いて読み込み、分析、要約、変換、書換え、再構成、または再生成した場合であっても、そのことのみを理由として、当該成果物が独立した成果物となるものではなく、適用されるライセンス上または法令上の義務を免れるものではありません。
+
+## AGPL の対象外となる素材
+
+別途明示される場合を除き、以下の素材は AGPL の対象には含まれません。
+
+* プロジェクト名、製品名、サービス名、ロゴ、アイコン、シンボル、ブランド識別要素
+* UIデザイン、画面構成、視覚デザイン、スクリーンショット、プレゼンテーション素材
+* 公式サイトの内容、宣伝文、ドキュメント、説明文、コピー、画像、動画、デモ素材
+* その他、開発者または権利者が AGPL の対象外である旨を明示した素材
+
+これらの AGPL 対象外素材に関する権利は、開発者または正当な権利者が留保します。
+
+利用者は、明示的な許諾なく、これらの素材を用いて、自らの成果物が **illusions** の公式版、認定版、提携版、後継版、推奨版、または互換版であるかのように表示してはなりません。また、出所、協賛、承認、提携、関与について混同を生じさせる態様で使用してはなりません。
+
+## AI支援による剽窃およびコード洗浄への警告
+
+私たちは、AIまたはその他の自動化ツールを隠れ蓑にした剽窃、無断模倣、およびいわゆる「コード洗浄」に対して、本通知をもって警告します。
+
+AI、LLM、コード生成ツール、または自動変換システムを用いて、本プロジェクトのソースコードまたは保護され得る素材を読み込み、分析、書換え、翻訳、要約、再構成、または再生成したとしても、そのことのみを理由として、AGPL、著作権法、商標法、不正競争防止法、その他適用される法令上の義務が消滅するものではありません。
+
+特に、以下の行為を行ってはなりません。
+
+* AGPL 上の義務を回避する目的で、AIまたは自動化ツールを用いて、実質的に類似する複製物、派生物、翻案物、または混同を生じさせる成果物を作成する行為
+* 改変、再生成、またはAI支援によって作成された成果物について、その出所を偽る行為
+* 派生プロジェクトまたは類似プロジェクトを、**illusions** の公式版、認定版、提携版、後継版、推奨版、または互換版であるかのように表示する行為
+* プロジェクト名、ロゴ、UI素材、スクリーンショット、ドキュメント、公式サイトの内容、またはブランド識別要素を無断で使用する行為
+* AI支援による変換を口実として、本プロジェクトに込められた創作上および技術上の労働成果を不当に利用し、隠蔽し、または洗浄する行為
+
+## 利用許諾の取得について
+
+私たちは、技術の発展、研究、協力、または正当な商用利用を拒絶するものではありません。
+
+AGPL の対象外となる素材、すなわちプロジェクト名、ロゴ、UI素材、スクリーンショット、ドキュメント、公式サイトの内容、ブランド資産その他の素材を利用、参照、複製、翻案、または商用利用したい場合は、事前に開発者へ連絡し、明示的な書面による許諾を取得してください。
+
+適切なコミュニケーションが行われる場合、商用プロジェクトを含め、誠実に利用許諾を検討します。
+
+## 遡及的許諾について
+
+すでに本プロジェクトの素材を AGPL の範囲外で利用している可能性がある場合、または AI もしくは自動化ツールを用いて、保護され得る AGPL 対象外素材を複製、模倣、変換、再生成した可能性がある場合は、速やかに開発者へ連絡し、遡及的な利用許諾を申請することを強く推奨します。
+
+本通知は、開発者または正当な権利者が有する権利、請求、救済手段、または法的主張を放棄するものではありません。
+
+## 証拠保全および法的措置について
+
+無断の剽窃、模倣、AI支援による複製、コード洗浄、ブランド不正利用、または混同を生じさせる類似成果物が疑われる事例について、私たちは、公開ページ、スクリーンショット、リポジトリ、配布ファイル、メタデータ、その他関連資料を含む証拠を保全することがあります。
+
+無断の複製、模倣、AI支援による再生成、ブランド不正利用、または適用されるライセンス義務の違反が確認された場合、私たちは、利用停止の要求、証拠保全、差止請求、損害賠償請求、その他適法な措置を講じることがあります。
+
+自由ソフトウェアを尊重してください。同時に、創作者も尊重してください。健全な開発者コミュニティは、自由と責任の両方の上に成り立ちます。
