@@ -32,7 +32,7 @@ illusions は現在 Developer ID 署名 + notarization で DMG/ZIP を GitHub Re
 
 ### Phase A — Apple 側セットアップ（手動）
 
-1. App ID `com.iktahana.illusions` 登録、App Sandbox 有効化
+1. App ID `app.illusions.editor` 登録、App Sandbox 有効化
 2. 証明書 2 種発行: Apple Distribution / Mac Installer Distribution
 3. Mac App Store distribution プロビジョニングプロファイル発行 → `build/illusions.provisionprofile`（コミットしない / CI secret 化）
 4. App Store Connect アプリレコード作成（名称・Bundle ID・SKU）
