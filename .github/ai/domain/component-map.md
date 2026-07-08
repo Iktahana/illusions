@@ -20,4 +20,4 @@
 | `electron/preload.js`                                     | IPC security boundary                                               |
 | `electron/lib/`                                           | Main-process shared primitives                                      |
 
-References: `docs/architecture/storage-system.md`, `docs/MDI/spec.md`, `MDI.md`, `types/electron.d.ts`
+References: `docs/architecture/storage-system.md`, `types/electron.d.ts`. MDI format spec: https://github.com/illusions-lab/MDI

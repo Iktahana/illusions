@@ -15,15 +15,10 @@ illusions の実装・設計・仕様を整理したドキュメントです。
 
 ## 読み始める場所
 
-- [[MDI/README|MDI ドキュメント]]
+- [MDI ドキュメント](https://github.com/illusions-lab/MDI)
 - [[README|GitHub 向けドキュメント一覧]]
 
 ## 主要ドキュメント
-
-### MDI
-
-- [[MDI/README|MDI 概要]]
-- [[MDI/spec|MDI 構文仕様]]
 
 ### アーキテクチャ
 

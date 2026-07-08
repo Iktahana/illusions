@@ -150,6 +150,5 @@ linting は [`linting-plugin/`](../../packages/milkdown-plugin-japanese-novel/li
 
 ## 関連
 
-- [MDI 構文仕様](../MDI/spec.md)
-- [MDI 実装ノート](../MDI/implementation.md)
+- [MDI 構文仕様・実装ノート](https://github.com/illusions-lab/MDI)
 - [lint ルール](./linting-rules.md)

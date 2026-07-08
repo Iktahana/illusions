@@ -292,7 +292,7 @@ In web browser mode, EPUB and DOCX are exported entirely client-side: the export
 
 - [Storage System](./storage-system.md) -- Persistence layer used for export preferences
 - [NLP Backend Architecture](./nlp-backend-architecture.md) -- Text processing backend
-- [MDI Syntax Specification](../MDI/spec.md) -- Full MDI syntax reference
+- [MDI Syntax Specification](https://github.com/illusions-lab/MDI) -- Full MDI syntax reference
 
 ---
 
