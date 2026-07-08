@@ -3,9 +3,8 @@
  * Web Worker.
  *
  * The worker hosts only non-morphological rules (the JSON L1 set);
- * morphological rules stay on the main thread (see plan
- * docs/superpowers/plans/2026-05-05-lint-worker-parallelization.md,
- * Architecture decision 9).
+ * morphological rules stay on the main thread because their dictionary
+ * dependencies are renderer-only.
  */
 
 import type { LintIssue, LintRuleConfig } from "@/lib/linting/types";

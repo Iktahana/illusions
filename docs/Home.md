@@ -42,6 +42,7 @@ illusions の実装・設計・仕様を整理したドキュメントです。
 - [[architecture/readability-scoring|可読性スコアリング]]
 - [[architecture/text-statistics|テキスト統計]]
 - [[architecture/documentation-gap-map|文書化ギャップマップ]]
+- [[architecture/repository-structure|リポジトリ構造]]
 
 ### ガイド
 
@@ -56,3 +57,4 @@ illusions の実装・設計・仕様を整理したドキュメントです。
 ## 管理
 
 - [[architecture/documentation-gap-map|文書化ギャップマップ]]
+- [[architecture/repository-structure|リポジトリ構造]]
