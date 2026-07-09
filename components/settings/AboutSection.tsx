@@ -169,7 +169,7 @@ export default function AboutSection(): React.ReactElement {
               : "border-transparent text-foreground-secondary hover:text-foreground",
           )}
         >
-          利用規約
+          利用規約・プライバシー
         </button>
         <button
           onClick={() => setActiveTab("license")}

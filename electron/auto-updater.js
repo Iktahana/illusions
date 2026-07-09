@@ -3,7 +3,7 @@
 const { app, dialog } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
-const { isDev, isMicrosoftStoreApp } = require("./app-constants");
+const { isDev, isMicrosoftStoreApp, isMasBuild } = require("./app-constants");
 const { resolveUpdaterFlags, isUnpublishedChannelVersion } = require("./lib/update-policy");
 
 // dev/alpha ブランチのビルドは GitHub Release を持たない CI 専用成果物のため、
@@ -67,6 +67,12 @@ function setupAutoUpdater() {
   // Microsoft Store 版ではストア更新と衝突するため無効化
   if (isMicrosoftStoreApp) {
     log.info("Microsoft Store 版のため auto-updater は無効です");
+    return;
+  }
+
+  // Mac App Store 版では electron-updater の使用が規約上禁止されているため無効化
+  if (isMasBuild) {
+    log.info("Mac App Store 版のため auto-updater は無効です");
     return;
   }
 
@@ -228,6 +234,24 @@ async function checkForUpdates(manual = false) {
     return;
   }
 
+  if (isMasBuild) {
+    if (manual) {
+      const { getMainWindow } = require("./window-manager");
+      const mainWindow = getMainWindow();
+      if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: "info",
+          title: "アップデート",
+          message: "Mac App Store 版",
+          detail:
+            "このバージョンは Mac App Store 経由で更新されます。App Store アプリからアップデートを確認してください。",
+          buttons: ["OK"],
+        });
+      }
+    }
+    return;
+  }
+
   isManualUpdateCheck = manual;
   // 設定変更を反映するため、チェック直前に opt-in を再評価して channel を確定する
   await applyBetaOptIn();
@@ -240,7 +264,7 @@ async function checkForUpdates(manual = false) {
  * ダイアログ表示のみ。OFF にした場合も latest へ戻す）。
  */
 async function reevaluateUpdateChannel() {
-  if (isDev || isUnpublishedChannelBuild || isMicrosoftStoreApp) return;
+  if (isDev || isUnpublishedChannelBuild || isMicrosoftStoreApp || isMasBuild) return;
   await checkForUpdates(false);
 }
 

@@ -25,6 +25,7 @@ const {
   killSession,
 } = require("./terminal-session-registry");
 const { PTY_CHANNELS } = require("../lib/ipc-channels");
+const { isMasBuild } = require("../app-constants");
 
 // -----------------------------------------------------------------------
 // node-pty availability guard
@@ -34,11 +35,17 @@ const { PTY_CHANNELS } = require("../lib/ipc-channels");
 let nodePty = null;
 let ptyAvailable = false;
 
-try {
-  nodePty = require("node-pty");
-  ptyAvailable = true;
-} catch (err) {
-  console.warn("[PTY] node-pty not available — terminal feature disabled:", err.message);
+// Mac App Store 版は任意シェル起動が審査で許可されないため、node-pty の
+// require 自体を行わず機能ごと無効化する（App Sandbox 制約）。
+if (isMasBuild) {
+  console.log("[PTY] Mac App Store 版のためターミナル機能は無効です");
+} else {
+  try {
+    nodePty = require("node-pty");
+    ptyAvailable = true;
+  } catch (err) {
+    console.warn("[PTY] node-pty not available — terminal feature disabled:", err.message);
+  }
 }
 
 // -----------------------------------------------------------------------

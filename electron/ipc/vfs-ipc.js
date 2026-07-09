@@ -16,8 +16,12 @@ const {
 const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy");
 const { VFS_CHANNELS } = require("../lib/ipc-channels");
 const { readFileStrictUtf8 } = require("../lib/text-decode");
+const {
+  startSecurityScopedAccess,
+  stopSecurityScopedAccess,
+} = require("../lib/security-scoped-access");
 // #1476: rehydration — begin
-const { loadApprovals, saveApprovals } = require("../lib/vfs-approvals");
+const { loadApprovalEntries, saveApprovals } = require("../lib/vfs-approvals");
 const { createIndexLockManager } = require("../lib/index-lock");
 const { setVfsRoot, clearVfsRoot } = require("../lib/vfs-root-registry");
 // #1476: rehydration — end
@@ -26,8 +30,31 @@ function registerVFSHandlers() {
   // Track the opened root directory per window for path validation.
   // #1559: each entry stores both the lexical root (as seen by the renderer)
   // and its physical realpath so symlink-collapsed containment can be checked.
-  /** @type {Map<number, { path: string, realPath: string }>} */
+  /** @type {Map<number, { path: string, realPath: string, stopAccessing?: () => void }>} */
   const allowedRoots = new Map();
+
+  function getFirstBookmark(result) {
+    const bookmark = result?.bookmarks?.[0];
+    return typeof bookmark === "string" && bookmark ? bookmark : undefined;
+  }
+
+  function replaceAllowedRoot(senderId, rootEntry) {
+    const previous = allowedRoots.get(senderId);
+    if (previous && previous !== rootEntry) {
+      stopSecurityScopedAccess(previous);
+    }
+    allowedRoots.set(senderId, rootEntry);
+    setVfsRoot(senderId, rootEntry);
+  }
+
+  function clearAllowedRoot(senderId) {
+    const previous = allowedRoots.get(senderId);
+    if (previous) {
+      stopSecurityScopedAccess(previous);
+      allowedRoots.delete(senderId);
+    }
+    clearVfsRoot(senderId);
+  }
 
   /**
    * Resolve the realpath of a root directory, falling back to the lexical
@@ -77,12 +104,13 @@ function registerVFSHandlers() {
    * Debounced wrapper for saveApprovals — flushes after 500 ms of inactivity.
    * @param {string} projectId
    * @param {Set<string>} paths
+   * @param {Map<string, string>} [bookmarksByPath]
    */
-  function scheduleSaveApprovals(projectId, paths) {
+  function scheduleSaveApprovals(projectId, paths, bookmarksByPath) {
     if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(() => {
       saveDebounceTimer = null;
-      saveApprovals(APPROVED_PATHS_FILE, projectId, paths).catch((err) => {
+      saveApprovals(APPROVED_PATHS_FILE, projectId, paths, bookmarksByPath).catch((err) => {
         console.error("[VFS IPC] Failed to persist approved paths:", err);
       });
     }, 500);
@@ -94,9 +122,44 @@ function registerVFSHandlers() {
    * Delegates to the shared per-window registry (electron/lib/approved-paths.js).
    * @param {number} senderId - The webContents ID of the approving window
    * @param {string} p - The path to approve
+   * @param {string} [bookmark] - Optional security-scoped bookmark for the path
    */
-  function approveDialogPath(senderId, p) {
+  function approveDialogPath(senderId, p, bookmark) {
     dialogApprovedPaths.approve(senderId, p);
+    if (bookmark) {
+      const bookmarks = dialogApprovedBookmarks.get(senderId) ?? new Map();
+      bookmarks.set(normalizePath(p), bookmark);
+      dialogApprovedBookmarks.set(senderId, bookmarks);
+    }
+  }
+
+  /** @type {Map<number, Map<string, string>>} */
+  const dialogApprovedBookmarks = new Map();
+
+  function getDialogApprovedBookmark(senderId, p) {
+    const bookmarks = dialogApprovedBookmarks.get(senderId);
+    return bookmarks?.get(normalizePath(p));
+  }
+
+  function getDialogApprovedTreeBookmark(senderId, p) {
+    const requested = normalizePath(p);
+    const approvedPath = dialogApprovedPaths
+      .listWindowPaths(senderId)
+      .find((approved) => isWithinApprovedTree([normalizePath(approved)], requested));
+    return approvedPath ? getDialogApprovedBookmark(senderId, approvedPath) : undefined;
+  }
+
+  function listDialogApprovedBookmarks(senderId) {
+    const result = new Map();
+    for (const approvedPath of dialogApprovedPaths.listWindowPaths(senderId)) {
+      const bookmark =
+        getDialogApprovedBookmark(senderId, approvedPath) ??
+        getDialogApprovedTreeBookmark(senderId, approvedPath);
+      if (bookmark) {
+        result.set(approvedPath, bookmark);
+      }
+    }
+    return result;
   }
 
   /**
@@ -149,6 +212,7 @@ function registerVFSHandlers() {
   ipcMain.handle(VFS_CHANNELS.invoke.openDirectory, async (event) => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
+      securityScopedBookmarks: true,
     });
 
     if (result.canceled || !result.filePaths[0]) {
@@ -156,16 +220,17 @@ function registerVFSHandlers() {
     }
 
     const dirPath = result.filePaths[0];
+    const bookmark = getFirstBookmark(result);
     const name = path.basename(dirPath);
 
     // Update the allowed root for this window
     // #1559: store the realpath so symlink-collapsed containment can be checked
-    allowedRoots.set(event.sender.id, {
+    replaceAllowedRoot(event.sender.id, {
       path: dirPath,
       realPath: await resolveRootRealPath(dirPath),
+      stopAccessing: startSecurityScopedAccess(app, bookmark),
     });
-    setVfsRoot(event.sender.id, allowedRoots.get(event.sender.id));
-    approveDialogPath(event.sender.id, dirPath);
+    approveDialogPath(event.sender.id, dirPath, bookmark);
 
     return {
       path: dirPath,
@@ -412,24 +477,32 @@ function registerVFSHandlers() {
         .listWindowPaths(event.sender.id)
         .map((approved) => normalizePath(approved));
       if (isWithinApprovedTree(approvedTrees, normalizedResolved)) {
-        approveDialogPath(event.sender.id, resolved);
+        approveDialogPath(
+          event.sender.id,
+          resolved,
+          getDialogApprovedTreeBookmark(event.sender.id, resolved),
+        );
         alreadyApprovedInSession = true;
       }
     }
 
     let alreadyApprovedFromDisk = false;
     if (!alreadyApprovedInSession && effectiveProjectId) {
-      const persistedSet = await loadApprovals(APPROVED_PATHS_FILE, effectiveProjectId);
+      const persistedEntries = await loadApprovalEntries(APPROVED_PATHS_FILE, effectiveProjectId);
       // Persisted entries were written from earlier dialog confirmations, so on
       // macOS they may carry the on-disk NFD form while the requested path is
       // NFC (or vice versa). Fold both sides to NFC so a Japanese-named project
       // matches its stored approval regardless of Unicode encoding (#1955).
-      const persistedNFC = new Set([...persistedSet].map((p) => normalizePath(p)));
-      alreadyApprovedFromDisk =
-        persistedNFC.has(resolvedReal) || persistedNFC.has(normalizedResolved);
-      if (alreadyApprovedFromDisk) {
+      const persistedByNormalizedPath = new Map(
+        persistedEntries.map((entry) => [normalizePath(entry.path), entry]),
+      );
+      const persistedEntry =
+        persistedByNormalizedPath.get(resolvedReal) ??
+        persistedByNormalizedPath.get(normalizedResolved);
+      if (persistedEntry) {
+        alreadyApprovedFromDisk = true;
         // Restore in-session approval so subsequent calls are fast
-        approveDialogPath(event.sender.id, resolved);
+        approveDialogPath(event.sender.id, resolved, persistedEntry.bookmark);
       }
     }
 
@@ -445,6 +518,7 @@ function registerVFSHandlers() {
         title: "プロジェクトフォルダへのアクセスを許可",
         defaultPath: resolved,
         properties: ["openDirectory"],
+        securityScopedBookmarks: true,
         message: `「${path.basename(resolved)}」フォルダへのアクセスを許可しますか？`,
       });
 
@@ -454,34 +528,55 @@ function registerVFSHandlers() {
 
       // Only accept the exact path the user confirmed in the dialog
       const confirmedPath = path.resolve(result.filePaths[0]);
+      const bookmark = getFirstBookmark(result);
       if (normalizePath(confirmedPath) !== normalizedResolved) {
         throw new Error("選択されたディレクトリが要求されたパスと一致しません");
       }
 
-      approveDialogPath(event.sender.id, confirmedPath);
+      approveDialogPath(event.sender.id, confirmedPath, bookmark);
 
       // #1476: rehydration — persist the newly approved path so restart skips the dialog
       if (effectiveProjectId) {
         const windowPaths = dialogApprovedPaths.listWindowPaths(event.sender.id);
         const pathsToSave = new Set(windowPaths.length > 0 ? windowPaths : [confirmedPath]);
-        scheduleSaveApprovals(effectiveProjectId, pathsToSave);
+        scheduleSaveApprovals(
+          effectiveProjectId,
+          pathsToSave,
+          listDialogApprovedBookmarks(event.sender.id),
+        );
       }
     }
 
     // #1559: store the realpath alongside the lexical root so per-I/O
     // symlink-collapsed containment checks have a trusted physical root
-    const rootEntry = { path: resolved, realPath: resolvedReal };
-    allowedRoots.set(event.sender.id, rootEntry);
-    setVfsRoot(event.sender.id, rootEntry);
+    const rootBookmark =
+      getDialogApprovedBookmark(event.sender.id, resolved) ??
+      getDialogApprovedTreeBookmark(event.sender.id, resolved);
+    const rootEntry = {
+      path: resolved,
+      realPath: resolvedReal,
+      stopAccessing: startSecurityScopedAccess(app, rootBookmark),
+    };
+    replaceAllowedRoot(event.sender.id, rootEntry);
+
+    if (effectiveProjectId) {
+      const windowPaths = dialogApprovedPaths.listWindowPaths(event.sender.id);
+      const pathsToSave = new Set(windowPaths.length > 0 ? windowPaths : [resolved]);
+      scheduleSaveApprovals(
+        effectiveProjectId,
+        pathsToSave,
+        listDialogApprovedBookmarks(event.sender.id),
+      );
+    }
     return { path: resolved, name: path.basename(resolved) };
   });
 
   // Clean up allowedRoots, dialogApprovedPaths, and senderProjectId when a window is destroyed
   app.on("web-contents-created", (_, contents) => {
     contents.on("destroyed", () => {
-      allowedRoots.delete(contents.id);
-      clearVfsRoot(contents.id);
+      clearAllowedRoot(contents.id);
       dialogApprovedPaths.revokeWindow(contents.id);
+      dialogApprovedBookmarks.delete(contents.id);
       // #1476: rehydration — clean up projectId association
       senderProjectId.delete(contents.id);
     });
@@ -493,6 +588,7 @@ function registerVFSHandlers() {
   ipcMain.handle(VFS_CHANNELS.invoke.openFile, async (event, opts) => {
     const result = await dialog.showOpenDialog({
       properties: ["openFile"],
+      securityScopedBookmarks: true,
       filters: opts?.filters ?? [{ name: "テキスト", extensions: ["txt"] }],
     });
 
@@ -501,9 +597,15 @@ function registerVFSHandlers() {
     }
 
     const filePath = result.filePaths[0];
-    // R2: approveDialogPath requires 2-arg (senderId, path) signature
-    approveDialogPath(event.sender.id, filePath);
-    const buf = await fs.readFile(filePath);
+    const bookmark = getFirstBookmark(result);
+    approveDialogPath(event.sender.id, filePath, bookmark);
+    const stopAccessing = startSecurityScopedAccess(app, bookmark);
+    let buf;
+    try {
+      buf = await fs.readFile(filePath);
+    } finally {
+      if (stopAccessing) stopAccessing();
+    }
     return { path: filePath, name: path.basename(filePath), buf };
   });
 

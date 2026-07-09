@@ -158,6 +158,13 @@ exports.default = async function embedQuickLook(context) {
     return;
   }
 
+  if (process.env.MAS_BUILD === "1") {
+    // MAS 版は App Sandbox 内の別署名(Apple Distribution)が必要で、Developer ID
+    // 署名を前提にした本フックでは対応できないため同梱を省略する（将来 appex で再実装）。
+    console.log(`[QuickLook] Skipping ${APPEX_NAME} embed for MAS build`);
+    return;
+  }
+
   const appexSource = path.join(__dirname, "..", "build", "quicklook", APPEX_NAME);
 
   if (!fs.existsSync(appexSource)) {

@@ -52,6 +52,13 @@ exports.default = async function notarizing(context) {
     return;
   }
 
+  if (process.env.MAS_BUILD === "1") {
+    console.log(
+      "[Notarize] Skipping notarization for MAS build (App Store builds are not notarized)",
+    );
+    return;
+  }
+
   const appName = context.packager.appInfo.productFilename;
   const appPath = `${appOutDir}/${appName}.app`;
 
