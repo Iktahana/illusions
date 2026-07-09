@@ -21,6 +21,8 @@
 !/build/mdi-icon.png
 !/build/appx/
 !/build/appx/*.png
+!/build/entitlements.mas.plist
+!/build/entitlements.mas.inherit.plist
 # Quick Look extension is rebuilt by `npm run build:quicklook` in CI
 /build/quicklook/
 /dist*

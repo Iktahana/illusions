@@ -54,7 +54,7 @@ describe("auto-updater.js — opt-in wiring", () => {
     // setup と checkForUpdates と reevaluate の各所でガードに使われていること
     expect(autoUpdaterSrc).toMatch(/if\s*\(\s*isUnpublishedChannelBuild\s*\)/);
     expect(autoUpdaterSrc).toMatch(
-      /if\s*\(\s*isDev\s*\|\|\s*isUnpublishedChannelBuild\s*\|\|\s*isMicrosoftStoreApp\s*\)/,
+      /if\s*\(\s*isDev\s*\|\|\s*isUnpublishedChannelBuild\s*\|\|\s*isMicrosoftStoreApp\s*\|\|\s*isMasBuild\s*\)/,
     );
   });
 });
