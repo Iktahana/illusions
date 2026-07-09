@@ -48,6 +48,7 @@ jobs:
               - '!docs/**'
               - '!README.md'
               - '!TERMS.md'
+              - '!NOTICE'
               - '!MDI.md'
               - '!.github/workflows/sync-ms-store-listing.yml'
               # Keep build.yml included so workflow edits validate desktop builds
