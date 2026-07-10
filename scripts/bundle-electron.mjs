@@ -47,6 +47,7 @@ await esbuild.build({
   ],
   define: {
     "process.env.APTABASE_APP_KEY": JSON.stringify(process.env.APTABASE_APP_KEY || ""),
+    "process.env.APTABASE_HOST": JSON.stringify(process.env.APTABASE_HOST || ""),
     "process.env.ERROR_REPORT_DSN": JSON.stringify(process.env.ERROR_REPORT_DSN || ""),
   },
   format: "cjs",
