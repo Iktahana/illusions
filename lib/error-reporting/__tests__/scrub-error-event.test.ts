@@ -20,6 +20,23 @@ describe("sanitizeErrorText", () => {
     expect(sanitized).toContain("[file].mdi");
     expect(sanitized).toContain("[path]");
   });
+
+  it("keeps source file names and project-relative source paths in stack traces", () => {
+    const value = [
+      "TypeError: failed",
+      "at render (/Users/test/Repos/illusions/components/editor/MilkdownEditor.tsx:42:7)",
+      "at run (C:\\Users\\test\\Repos\\illusions\\electron\\error-reporting.js:12:3)",
+      "at plugin (/Users/test/.config/illusions/plugins/custom-rule.mjs:5:1)",
+    ].join("\n");
+
+    const sanitized = sanitizeErrorText(value);
+
+    expect(sanitized).not.toContain("/Users/test");
+    expect(sanitized).not.toContain("C:\\Users\\test");
+    expect(sanitized).toContain("components/editor/MilkdownEditor.tsx:42:7");
+    expect(sanitized).toContain("electron/error-reporting.js:12:3");
+    expect(sanitized).toContain("[path]/custom-rule.mjs:5:1");
+  });
 });
 
 describe("scrubSentryEvent", () => {
@@ -46,6 +63,10 @@ describe("scrubSentryEvent", () => {
                   filename: "/Users/test/Novel/第三章.mdi",
                   function: "openDocument",
                 },
+                {
+                  filename: "/Users/test/Repos/illusions/lib/error-reporting/scrub-error-event.ts",
+                  function: "sanitizeErrorText",
+                },
               ],
             },
           },
@@ -68,6 +89,9 @@ describe("scrubSentryEvent", () => {
     });
     expect(scrubbed?.exception.values[0].value).toContain("[file].mdi");
     expect(scrubbed?.exception.values[0].stacktrace.frames[0].filename).toBe("[path]/[file].mdi");
+    expect(scrubbed?.exception.values[0].stacktrace.frames[1].filename).toBe(
+      "lib/error-reporting/scrub-error-event.ts",
+    );
   });
 });
 
@@ -88,5 +112,25 @@ describe("scrubRendererErrorPayload", () => {
     expect(scrubbed.message).not.toContain("第三章.mdi");
     expect(scrubbed.stack).toContain("[path]");
     expect(scrubbed.stack).toContain("[file].mdi");
+  });
+
+  it("preserves renderer source filenames for actionable JS stack traces", () => {
+    const payload = {
+      source: "window-error" as const,
+      message: "TypeError: missing",
+      stack: [
+        "at o (C:\\Users\\test\\Repos\\illusions\\components\\editor\\MilkdownEditor.tsx:99065:2)",
+        "at f.get (/Users/test/Repos/illusions/lib/editor-page/use-editor-lifecycle.ts:101783:4)",
+        "at Object.apply (/private/var/folders/app.asar/out/chunks/webpack-runtime.js:224001:1)",
+      ].join("\n"),
+    };
+
+    const scrubbed = scrubRendererErrorPayload(payload);
+
+    expect(scrubbed.stack).not.toContain("C:\\Users\\test");
+    expect(scrubbed.stack).not.toContain("/Users/test");
+    expect(scrubbed.stack).toContain("components/editor/MilkdownEditor.tsx:99065:2");
+    expect(scrubbed.stack).toContain("lib/editor-page/use-editor-lifecycle.ts:101783:4");
+    expect(scrubbed.stack).toContain("[path]/webpack-runtime.js:224001:1");
   });
 });
