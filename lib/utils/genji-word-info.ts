@@ -138,11 +138,25 @@ export type GenjiWordInfoState =
   | { status: "found"; viewModel: GenjiWordInfoViewModel }
   | { status: "not-found" }
   | { status: "unavailable" };
+type CompletedGenjiWordInfoState = Exclude<GenjiWordInfoState, { status: "idle" | "loading" }>;
 
 const IDLE: GenjiWordInfoState = { status: "idle" };
 const LOADING: GenjiWordInfoState = { status: "loading" };
-const NOT_FOUND: GenjiWordInfoState = { status: "not-found" };
-const UNAVAILABLE: GenjiWordInfoState = { status: "unavailable" };
+const NOT_FOUND: CompletedGenjiWordInfoState = { status: "not-found" };
+const UNAVAILABLE: CompletedGenjiWordInfoState = { status: "unavailable" };
+const LOOKUP_CACHE_LIMIT = 128;
+const lookupCache = new Map<string, CompletedGenjiWordInfoState>();
+
+function cacheLookupState(word: string, state: CompletedGenjiWordInfoState): void {
+  if (lookupCache.has(word)) {
+    lookupCache.delete(word);
+  }
+  lookupCache.set(word, state);
+  if (lookupCache.size > LOOKUP_CACHE_LIMIT) {
+    const oldestKey = lookupCache.keys().next().value;
+    if (oldestKey) lookupCache.delete(oldestKey);
+  }
+}
 
 /**
  * Async hook that looks up `selectedWord` in the Genji dictionary and returns
@@ -170,6 +184,12 @@ export function useGenjiWordInfo(selectedWord: string | null | undefined): Genji
       return;
     }
 
+    const cached = lookupCache.get(word);
+    if (cached) {
+      setState(cached);
+      return;
+    }
+
     let cancelled = false;
 
     // Defer the (potentially IPC-backed) lookup until the selection stops
@@ -187,18 +207,23 @@ export function useGenjiWordInfo(selectedWord: string | null | undefined): Genji
           if (cancelled) return;
 
           if (result.providerUnavailable) {
+            cacheLookupState(word, UNAVAILABLE);
             setState(UNAVAILABLE);
             return;
           }
 
           const viewModel = buildGenjiWordInfoViewModel(word, result);
           if (viewModel) {
-            setState({ status: "found", viewModel });
+            const nextState = { status: "found" as const, viewModel };
+            cacheLookupState(word, nextState);
+            setState(nextState);
           } else {
+            cacheLookupState(word, NOT_FOUND);
             setState(NOT_FOUND);
           }
         } catch {
           if (!cancelled) {
+            cacheLookupState(word, UNAVAILABLE);
             setState(UNAVAILABLE);
           }
         }

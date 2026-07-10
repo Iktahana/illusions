@@ -77,6 +77,36 @@ import type { SupportedFileExtension } from "@/lib/project/project-types";
 // lookup. Caps the synchronous textBetween() cost on段落/全選択 and avoids
 // pointless Genji lookups while dragging across大量のテキスト (#1639).
 const SELECTED_WORD_MAX_CHARS = 30;
+const SELECTED_WORD_MAX_DOC_RANGE = 120;
+const SELECTED_WORD_EXTRACT_DEBOUNCE_MS = 120;
+const SELECTED_WORD_EXTRACT_IDLE_TIMEOUT_MS = 800;
+
+type IdleCallbackHandle = number;
+type IdleCallbackDeadline = { didTimeout: boolean; timeRemaining: () => number };
+type WindowWithIdleCallback = Window & {
+  requestIdleCallback?: (
+    callback: (deadline: IdleCallbackDeadline) => void,
+    options?: { timeout?: number },
+  ) => IdleCallbackHandle;
+  cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
+};
+
+function extractSelectedWordForLookup(
+  view: EditorView | null,
+  range: SearchRange | null,
+): string | null {
+  if (!view || !range || range.to <= range.from) return null;
+  // Avoid synchronous text extraction for paragraph/full-document selections.
+  // Dictionary lookup is useful only for a short word-like selection.
+  if (range.to - range.from > SELECTED_WORD_MAX_DOC_RANGE) return null;
+
+  const text = view.state.doc.textBetween(range.from, range.to, "").trim();
+  if (!text) return null;
+
+  const word = text.split(/\s+/)[0] ?? "";
+  if (Array.from(word).length > SELECTED_WORD_MAX_CHARS) return null;
+  return word || null;
+}
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
 // but resets on page refresh (module re-evaluated).
@@ -548,6 +578,9 @@ export default function EditorPage() {
   const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [searchSelectionRange, setSearchSelectionRange] = useState<SearchRange | null>(null);
+  const selectedWordDebounceRef = useRef<number | null>(null);
+  const selectedWordIdleRef = useRef<IdleCallbackHandle | null>(null);
+  const selectedWordJobIdRef = useRef(0);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstanceRaw] = useState<EditorView | null>(null);
@@ -556,6 +589,68 @@ export default function EditorPage() {
     editorViewRef.current = view; // ref FIRST so sync consumers see fresh value
     setEditorViewInstanceRaw(view);
   }, []);
+
+  const clearSelectedWordJob = useCallback(() => {
+    if (selectedWordDebounceRef.current !== null) {
+      window.clearTimeout(selectedWordDebounceRef.current);
+      selectedWordDebounceRef.current = null;
+    }
+    if (selectedWordIdleRef.current !== null) {
+      const idleWindow = window as WindowWithIdleCallback;
+      if (idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(selectedWordIdleRef.current);
+      } else {
+        window.clearTimeout(selectedWordIdleRef.current);
+      }
+      selectedWordIdleRef.current = null;
+    }
+  }, []);
+
+  const scheduleSelectedWordExtraction = useCallback(
+    (range: SearchRange | null) => {
+      clearSelectedWordJob();
+      const jobId = ++selectedWordJobIdRef.current;
+      if (!range) {
+        setSelectedWord(null);
+        return;
+      }
+
+      selectedWordDebounceRef.current = window.setTimeout(() => {
+        selectedWordDebounceRef.current = null;
+
+        const run = () => {
+          selectedWordIdleRef.current = null;
+          const view = editorViewRef.current;
+          if (
+            jobId !== selectedWordJobIdRef.current ||
+            !view ||
+            view.state.selection.from !== range.from ||
+            view.state.selection.to !== range.to
+          ) {
+            return;
+          }
+          setSelectedWord(extractSelectedWordForLookup(view, range));
+        };
+
+        const idleWindow = window as WindowWithIdleCallback;
+        if (idleWindow.requestIdleCallback) {
+          selectedWordIdleRef.current = idleWindow.requestIdleCallback(run, {
+            timeout: SELECTED_WORD_EXTRACT_IDLE_TIMEOUT_MS,
+          });
+        } else {
+          selectedWordIdleRef.current = window.setTimeout(run, 0);
+        }
+      }, SELECTED_WORD_EXTRACT_DEBOUNCE_MS);
+    },
+    [clearSelectedWordJob],
+  );
+
+  useEffect(() => {
+    return () => {
+      clearSelectedWordJob();
+      selectedWordJobIdRef.current += 1;
+    };
+  }, [clearSelectedWordJob]);
 
   // --- 検索ハイライトの単一ソース ---
   // いずれかの検索 UI が表示中か。両方非表示ならハイライトを消す（要求2）。
@@ -1740,23 +1835,11 @@ export default function EditorPage() {
             setSelectedCharCount(count);
             setSelectedManuscriptCells(cells);
             setSelectedManuscriptPages(pages);
-            // 選択語を幻辞ルックアップ用に保持する。
-            // 大きな選択（段落・全選択）では textBetween が O(n) で重く、語の辞書引きにも
-            // 不向きなので閾値を超えたら早期に null。実際の辞書引きの debounce は
-            // useGenjiWordInfo 側で行う（選択ドラッグ中の連続 IPC を抑制）。
-            if (count > 0 && count <= SELECTED_WORD_MAX_CHARS && editorViewRef.current) {
-              const { selection, doc } = editorViewRef.current.state;
-              const text = doc.textBetween(selection.from, selection.to, "").trim();
-              // 単語単位（空白区切り）の先頭語、または選択全体（日本語は空白なし）
-              const word = text.split(/\s+/)[0] ?? null;
-              setSelectedWord(word || null);
-            } else {
-              setSelectedWord(null);
-            }
           },
           onSelectionRangeChange: (range: SearchRange | null) => {
             setSearchSelectionRange(range);
             if (!range) setSelectionOnly(false);
+            scheduleSelectedWordExtraction(range);
           },
           searchOpenTrigger,
           searchInitialTerm,
