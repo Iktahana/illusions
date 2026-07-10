@@ -78,8 +78,7 @@ async function fetchGenjiCandidates(segments: RubySegment[]): Promise<Map<string
   try {
     const access = getDictAccess();
     const health = await access.getHealth();
-    // Proceed for both "ready" (local DB) and "web-fallback" (remote API)
-    if (health.state !== "ready" && health.state !== "web-fallback") {
+    if (health.state !== "ready") {
       return result;
     }
 

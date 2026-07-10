@@ -47,6 +47,7 @@ import {
   getScrollProgress,
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
+import { getLayoutCharsPerLine } from "@/lib/editor-page/chars-per-line-layout";
 import type { LintIssue } from "@/lib/linting";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import {
@@ -610,8 +611,9 @@ export default function MilkdownEditor({
       editorDom.style.margin = "";
 
       if (charsPerLine > 0 && charWidth > 0) {
+        const layoutCharsPerLine = getLayoutCharsPerLine(charsPerLine, isVertical);
         if (isVertical) {
-          const targetHeight = charWidth * charsPerLine;
+          const targetHeight = charWidth * layoutCharsPerLine;
           measureBox.style.height = `${targetHeight}px`;
           measureBox.style.maxHeight = `${targetHeight}px`;
           measureBox.style.minHeight = `${targetHeight}px`;
@@ -622,7 +624,7 @@ export default function MilkdownEditor({
           editorDom.style.maxHeight = `${targetHeight}px`;
           editorDom.style.minHeight = `${targetHeight}px`;
         } else {
-          const targetWidth = charWidth * charsPerLine;
+          const targetWidth = charWidth * layoutCharsPerLine;
           measureBox.style.width = `${targetWidth}px`;
           measureBox.style.maxWidth = `${targetWidth}px`;
         }

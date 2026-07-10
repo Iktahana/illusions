@@ -28,7 +28,7 @@ describe("createRulesetContext", () => {
     expect(ctx.toolkit.dict.ready).toBe(true);
   });
 
-  it.each(["not-installed", "web-fallback", "corrupt", "unknown"] as const)(
+  it.each(["not-installed", "corrupt", "unknown"] as const)(
     "marks dict requirement unmet when health is %s",
     (state) => {
       const ctx = createRulesetContext({ dictHealth: { state } as GenjiHealth, dict: fakeDict });
@@ -49,7 +49,7 @@ describe("createRulesetContext", () => {
 });
 
 describe("resolveRulesetContext", () => {
-  it("builds a context from the live dictionary singleton (web-fallback in node)", async () => {
+  it("builds a context from the live dictionary singleton (not-installed in node)", async () => {
     const ctx = await resolveRulesetContext();
     expect(ctx.engineApi).toBe(1);
     expect(typeof ctx.deps.dictState).toBe("string");
