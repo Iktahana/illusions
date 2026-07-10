@@ -385,17 +385,25 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         });
 
         if (outcome.status === "saved" && outcome.persistFailed) {
-          trackUsageEvent("save_completed", {
-            trigger: isAutoSave ? "auto" : "manual",
-            mode: isProjectRef.current ? "project" : "standalone",
-            target_kind: getTelemetryTargetKind(outcome.descriptor),
+          trackUsageEvent(isAutoSave ? "autosave_completed" : "save_completed", {
+            ...(isAutoSave
+              ? { target_kind: getTelemetryTargetKind(outcome.descriptor), activity: "unknown" }
+              : {
+                  trigger: "manual",
+                  mode: isProjectRef.current ? "project" : "standalone",
+                  target_kind: getTelemetryTargetKind(outcome.descriptor),
+                }),
           });
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         } else if (outcome.status === "saved") {
-          trackUsageEvent("save_completed", {
-            trigger: isAutoSave ? "auto" : "manual",
-            mode: isProjectRef.current ? "project" : "standalone",
-            target_kind: getTelemetryTargetKind(outcome.descriptor),
+          trackUsageEvent(isAutoSave ? "autosave_completed" : "save_completed", {
+            ...(isAutoSave
+              ? { target_kind: getTelemetryTargetKind(outcome.descriptor), activity: "unknown" }
+              : {
+                  trigger: "manual",
+                  mode: isProjectRef.current ? "project" : "standalone",
+                  target_kind: getTelemetryTargetKind(outcome.descriptor),
+                }),
           });
         } else if (outcome.status === "conflicted") {
           trackUsageEvent("save_conflict_blocked", {

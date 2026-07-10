@@ -124,6 +124,10 @@
       "target_kind": ["file", "untitled", "handle", "unknown"],
       "activity": ["foreground", "background", "unknown"]
     },
+    "autosave_completed": {
+      "target_kind": ["file", "untitled", "handle", "unknown"],
+      "activity": ["foreground", "background", "unknown"]
+    },
     "autosave_failed": {
       "target_kind": ["file", "untitled", "handle", "unknown"],
       "reason": [
