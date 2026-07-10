@@ -9,7 +9,6 @@ import { localPreferences } from "@/lib/storage/local-preferences";
 import HistoryPanel from "./HistoryPanel";
 import CorrectionsPanel from "./inspector/CorrectionsPanel";
 import StatsPanel from "./inspector/StatsPanel";
-import GenjiWordInfoSection from "./inspector/GenjiWordInfoSection";
 
 import type { ProjectMode } from "@/lib/project/project-types";
 import type { InspectorProps } from "./inspector/types";
@@ -71,7 +70,6 @@ export default function Inspector({
   onCorrectionModeChange,
   switchToCorrectionsTrigger = 0,
   previousDayStats,
-  selectedWord,
 }: InspectorProps) {
   const { editorMode, isProject } = useEditorMode();
   const projectMode = isProject ? (editorMode as ProjectMode) : null;
@@ -363,10 +361,6 @@ export default function Inspector({
           </button>
         )}
       </div>
-
-      {/* 選択語の辞書情報（幻辞）— タブバー直下に常駐し、どのタブでも表示される（#1639）。
-          語が未選択 / 辞書未導入 / 該当なし のときは null を返し場所を取らない。 */}
-      <GenjiWordInfoSection selectedWord={selectedWord} compact={compactMode} />
 
       {/* 本文 */}
       <div className={clsx("flex-1 overflow-y-auto", compactMode ? "p-3" : "p-4")}>

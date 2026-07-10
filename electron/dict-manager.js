@@ -550,8 +550,7 @@ class DictManager {
 
   /**
    * Project a raw_json string into the lightweight {@link DictLookup} shape
-   * (reading / pos / register / freqRank). Mirrors the analysis projection in
-   * lib/dict/providers/genji-api-backend.ts.
+   * (reading / pos / register / freqRank).
    * @private
    */
   _rawJsonToLookup(rawJson) {
@@ -620,7 +619,6 @@ class DictManager {
 
   /**
    * Parse a raw_json string from the entries table and map it to a DictEntry.
-   * Mirrors mapRawJsonToDictEntry() in lib/dict/providers/genji-api-backend.ts.
    * @private
    */
   _rawJsonToEntry(rawJson) {
