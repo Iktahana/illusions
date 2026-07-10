@@ -10,7 +10,12 @@
  * {
  *   "version": 1,
  *   "approvals": [
- *     { "projectId": "proj_abc123", "path": "/Users/.../novel1", "approvedAt": "2026-..." }
+ *     {
+ *       "projectId": "proj_abc123",
+ *       "path": "/Users/.../novel1",
+ *       "approvedAt": "2026-...",
+ *       "bookmark": "base64..."
+ *     }
  *   ]
  * }
  *
@@ -27,7 +32,7 @@ const fs = require("fs/promises");
 /**
  * In-memory cache so we don't re-read the JSON file on every approval check.
  * Invalidated (set to null) whenever saveApprovals() writes new data.
- * @type {Array<{projectId: string, path: string, approvedAt: string}> | null}
+ * @type {Array<{projectId: string, path: string, approvedAt?: string, bookmark?: string}> | null}
  */
 let approvalsCache = null;
 
@@ -36,7 +41,7 @@ let approvalsCache = null;
  * Returns an empty array when the file is missing or corrupt.
  *
  * @param {string} filePath - Absolute path to approved-vfs-paths.json
- * @returns {Promise<Array<{projectId: string, path: string, approvedAt: string}>>}
+ * @returns {Promise<Array<{projectId: string, path: string, approvedAt?: string, bookmark?: string}>>}
  */
 async function loadAllApprovals(filePath) {
   if (approvalsCache !== null) return approvalsCache;
@@ -46,14 +51,22 @@ async function loadAllApprovals(filePath) {
     if (data?.version !== 1 || !Array.isArray(data.approvals)) {
       approvalsCache = [];
     } else {
-      // Defensive: keep only well-formed entries
-      approvalsCache = data.approvals.filter(
-        (a) =>
-          a !== null &&
-          typeof a === "object" &&
-          typeof a.projectId === "string" &&
-          typeof a.path === "string",
-      );
+      // Defensive: keep only well-formed required fields. bookmark remains
+      // optional so older files and malformed bookmark values still load.
+      approvalsCache = data.approvals
+        .filter(
+          (a) =>
+            a !== null &&
+            typeof a === "object" &&
+            typeof a.projectId === "string" &&
+            typeof a.path === "string",
+        )
+        .map((a) => ({
+          projectId: a.projectId,
+          path: a.path,
+          approvedAt: typeof a.approvedAt === "string" ? a.approvedAt : undefined,
+          ...(typeof a.bookmark === "string" ? { bookmark: a.bookmark } : {}),
+        }));
     }
   } catch {
     approvalsCache = [];
@@ -76,6 +89,33 @@ async function loadApprovals(filePath, projectId) {
 }
 
 /**
+ * Load approved entries for a specific project, including optional bookmark
+ * metadata used to resume macOS security-scoped access.
+ *
+ * @param {string} filePath - Absolute path to approved-vfs-paths.json
+ * @param {string} projectId - Project identifier
+ * @returns {Promise<Array<{projectId: string, path: string, approvedAt?: string, bookmark?: string}>>}
+ */
+async function loadApprovalEntries(filePath, projectId) {
+  if (typeof projectId !== "string" || !projectId) return [];
+  const all = await loadAllApprovals(filePath);
+  return all.filter((a) => a.projectId === projectId);
+}
+
+function getBookmarkForPath(bookmarksByPath, p) {
+  if (!bookmarksByPath) return undefined;
+  if (bookmarksByPath instanceof Map) {
+    const value = bookmarksByPath.get(p);
+    return typeof value === "string" ? value : undefined;
+  }
+  if (typeof bookmarksByPath === "object") {
+    const value = bookmarksByPath[p];
+    return typeof value === "string" ? value : undefined;
+  }
+  return undefined;
+}
+
+/**
  * Persist the approval set for a specific project, replacing any existing entries
  * for that project. Entries for other projects are kept intact.
  * Invalidates the in-memory cache.
@@ -83,16 +123,21 @@ async function loadApprovals(filePath, projectId) {
  * @param {string} filePath - Absolute path to approved-vfs-paths.json
  * @param {string} projectId - Project identifier
  * @param {Set<string>} paths - Set of approved absolute paths
+ * @param {Map<string, string> | Record<string, string>} [bookmarksByPath] - Optional bookmark by path
  */
-async function saveApprovals(filePath, projectId, paths) {
+async function saveApprovals(filePath, projectId, paths, bookmarksByPath) {
   if (typeof projectId !== "string" || !projectId) return;
   const all = await loadAllApprovals(filePath);
   const others = all.filter((a) => a.projectId !== projectId);
-  const fresh = [...paths].map((p) => ({
-    projectId,
-    path: p,
-    approvedAt: new Date().toISOString(),
-  }));
+  const fresh = [...paths].map((p) => {
+    const bookmark = getBookmarkForPath(bookmarksByPath, p);
+    return {
+      projectId,
+      path: p,
+      approvedAt: new Date().toISOString(),
+      ...(bookmark ? { bookmark } : {}),
+    };
+  });
   approvalsCache = [...others, ...fresh];
   await fs.writeFile(
     filePath,
@@ -110,4 +155,10 @@ function clearApprovalsCache() {
 
 // #1476: rehydration — end
 
-module.exports = { loadAllApprovals, loadApprovals, saveApprovals, clearApprovalsCache };
+module.exports = {
+  loadAllApprovals,
+  loadApprovals,
+  loadApprovalEntries,
+  saveApprovals,
+  clearApprovalsCache,
+};

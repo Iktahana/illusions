@@ -36,7 +36,7 @@ describe("createDictToolkit", () => {
     expect(dict.lookupBatch).toHaveBeenCalledOnce();
   });
 
-  it.each(["not-installed", "web-fallback", "corrupt", "unknown"] as const)(
+  it.each(["not-installed", "corrupt", "unknown"] as const)(
     "fails safe (empty results, no calls) when state is %s",
     async (state) => {
       const dict = spyDict();

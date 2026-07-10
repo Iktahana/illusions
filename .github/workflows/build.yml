@@ -17,6 +17,13 @@ on:
     paths-ignore:
       - "store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
+  workflow_dispatch:
+    inputs:
+      run_mas_build:
+        description: "MAS向けpkgをビルドしてApp Store Connectへアップロードする"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -49,6 +56,7 @@ jobs:
               - '!docs/**'
               - '!README.md'
               - '!TERMS.md'
+              - '!NOTICE'
               - '!MDI.md'
               - '!.github/workflows/sync-ms-store-listing.yml'
               # Keep build.yml included so workflow edits validate desktop builds
@@ -334,6 +342,122 @@ jobs:
         with:
           name: illusions-macos-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
           path: dist-electron/**
+
+  build-mas:
+    name: Build (Mac App Store)
+    # 初期移行中は手動入力が明示されたときだけ実行し、タグpushでは走らせない。
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_mas_build == true
+    runs-on: macos-latest
+    environment: Apple
+    env:
+      CSC_LINK: ${{ secrets.MAS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAS_CSC_KEY_PASSWORD }}
+      CSC_INSTALLER_LINK: ${{ secrets.CSC_INSTALLER_LINK }}
+      CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.CSC_INSTALLER_KEY_PASSWORD }}
+      MAS_PROVISIONING_PROFILE: ${{ secrets.MAS_PROVISIONING_PROFILE }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
+      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
+      ERROR_REPORT_DSN: ${{ secrets.ERROR_REPORT_DSN }}
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Restore Electron caches
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-${{ runner.os }}-mas-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-mas-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Prepare MAS credentials
+        shell: bash
+        run: |
+          missing=()
+          [ -z "$CSC_LINK" ] && missing+=("MAS_CSC_LINK")
+          [ -z "$CSC_KEY_PASSWORD" ] && missing+=("MAS_CSC_KEY_PASSWORD")
+          [ -z "$CSC_INSTALLER_LINK" ] && missing+=("CSC_INSTALLER_LINK")
+          [ -z "$CSC_INSTALLER_KEY_PASSWORD" ] && missing+=("CSC_INSTALLER_KEY_PASSWORD")
+          [ -z "$MAS_PROVISIONING_PROFILE" ] && missing+=("MAS_PROVISIONING_PROFILE")
+          [ -z "$ASC_KEY_ID" ] && missing+=("ASC_KEY_ID")
+          [ -z "$ASC_ISSUER_ID" ] && missing+=("ASC_ISSUER_ID")
+          [ -z "$ASC_API_KEY" ] && missing+=("ASC_API_KEY")
+          [ -z "$ASC_APP_ID" ] && missing+=("ASC_APP_ID")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing MAS credentials: ${missing[*]}"
+            exit 1
+          fi
+
+          # electron-builder は build.mas.provisioningProfile のパスをそのまま読む。
+          printf '%s' "$MAS_PROVISIONING_PROFILE" | base64 --decode > build/illusions.provisionprofile
+
+          # altool はこの標準パスから App Store Connect API キーを探す。
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$ASC_API_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Download local fonts
+        run: npm run download:fonts
+
+      - name: Build Quick Look plugin
+        run: npm run build:quicklook
+
+      - name: Build MAS package
+        run: MAS_BUILD=1 npm run electron:build:mas
+        env:
+          DEBUG: electron-builder
+
+      - name: Upload MAS package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: illusions-mas-pkg
+          path: dist-electron/**/*.pkg
+
+      - name: Upload to App Store Connect
+        shell: bash
+        run: |
+          PKG_FILE=$(find dist-electron -name "*.pkg" -type f | head -n 1)
+          if [ -z "$PKG_FILE" ]; then
+            echo "::error::MAS pkg artifact was not found"
+            exit 1
+          fi
+          echo "Uploading $PKG_FILE to App Store Connect app $ASC_APP_ID"
+          xcrun altool --upload-app \
+            -f "$PKG_FILE" \
+            --type macos \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
 
   # ---------------------------------------------------------------------------
   # Windows — shared build step, then separate NSIS / MSIX packaging

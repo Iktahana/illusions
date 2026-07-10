@@ -1,16 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DictLookup } from "../dict-types";
 
 /**
  * Tests for the DictAccess facade (#1624): health resolution, batch lookup with
- * caching + negative caching, membership, web fallback, and invalidate().
+ * caching + negative caching, membership, local-only fallback, and invalidate().
  */
-
-const mockLookupBatchRemote = vi.fn<(terms: string[]) => Promise<Map<string, DictLookup>>>();
-
-vi.mock("../providers/genji-api-backend", () => ({
-  lookupBatchRemote: (terms: string[]) => mockLookupBatchRemote(terms),
-}));
 
 interface DictApiMock {
   lookupBatch: ReturnType<typeof vi.fn>;
@@ -44,10 +37,10 @@ describe("DictAccess (#1624)", () => {
   });
 
   describe("getHealth()", () => {
-    it("reports web-fallback when there is no Electron dict API", async () => {
+    it("reports not-installed when there is no Electron dict API", async () => {
       const access = await importFresh();
       const health = await access.getHealth();
-      expect(health.state).toBe("web-fallback");
+      expect(health.state).toBe("not-installed");
     });
 
     it("reports not-installed", async () => {
@@ -176,15 +169,11 @@ describe("DictAccess (#1624)", () => {
     });
   });
 
-  describe("lookupBatch() — web fallback", () => {
-    it("uses the remote backend when there is no Electron dict", async () => {
-      mockLookupBatchRemote.mockResolvedValue(
-        new Map<string, DictLookup>([["雪", { found: true, reading: "ゆき" }]]),
-      );
+  describe("lookupBatch() — without local Electron dict", () => {
+    it("returns unresolved results without calling a remote backend", async () => {
       const access = await importFresh();
       const result = await access.lookupBatch(["雪"]);
-      expect(mockLookupBatchRemote).toHaveBeenCalledWith(["雪"]);
-      expect(result.get("雪")).toEqual({ found: true, reading: "ゆき" });
+      expect(result.has("雪")).toBe(false);
     });
   });
 

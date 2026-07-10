@@ -9,7 +9,7 @@
  * or trusting renderer-supplied absolute paths.
  */
 
-/** @type {Map<number, { path: string, realPath: string }>} */
+/** @type {Map<number, { path: string, realPath: string, stopAccessing?: () => void }>} */
 const rootsBySender = new Map();
 
 function setVfsRoot(senderId, root) {

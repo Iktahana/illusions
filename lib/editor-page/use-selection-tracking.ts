@@ -41,6 +41,16 @@ interface UseSelectionTrackingOptions {
   onSelectionRangeChange?: (range: SelectionSearchRange | null) => void;
 }
 
+type IdleCallbackHandle = number;
+type IdleCallbackDeadline = { didTimeout: boolean; timeRemaining: () => number };
+type WindowWithIdleCallback = Window & {
+  requestIdleCallback?: (
+    callback: (deadline: IdleCallbackDeadline) => void,
+    options?: { timeout?: number },
+  ) => IdleCallbackHandle;
+  cancelIdleCallback?: (handle: IdleCallbackHandle) => void;
+};
+
 const EMPTY_SELECTION_STATE: EditorSelectionState = {
   hasSelection: false,
   selectionCount: 0,
@@ -52,6 +62,9 @@ const EMPTY_SELECTION_STATE: EditorSelectionState = {
   rangeRect: null,
   pointerClientY: null,
 };
+
+const SELECTION_STATS_DEBOUNCE_MS = 120;
+const SELECTION_STATS_IDLE_TIMEOUT_MS = 800;
 
 function toViewportRect(rect: {
   top: number;
@@ -129,7 +142,18 @@ export function useSelectionTracking({
   // 原稿用紙マス数も保持する。可視文字数が同じでも禁則処理でマス数は変わり得るため、
   // 範囲を選び直したときに古い値が残らないよう、マス数の変化でも callback を発火させる。
   const lastReportedCellsRef = useRef(0);
+  const lastComputedStatsRef = useRef<{
+    doc: unknown;
+    from: number;
+    to: number;
+    selectionCount: number;
+    manuscriptCells: number;
+    manuscriptPages: number;
+  } | null>(null);
   const frameRef = useRef<number | null>(null);
+  const statsDebounceRef = useRef<number | null>(null);
+  const statsIdleRef = useRef<IdleCallbackHandle | null>(null);
+  const statsJobIdRef = useRef(0);
 
   useEffect(() => {
     selectionStateRef.current = selectionState;
@@ -154,11 +178,142 @@ export function useSelectionTracking({
     [],
   );
 
+  const clearScheduledStats = useCallback(() => {
+    if (statsDebounceRef.current !== null) {
+      window.clearTimeout(statsDebounceRef.current);
+      statsDebounceRef.current = null;
+    }
+    if (statsIdleRef.current !== null) {
+      const idleWindow = window as WindowWithIdleCallback;
+      if (idleWindow.cancelIdleCallback) {
+        idleWindow.cancelIdleCallback(statsIdleRef.current);
+      } else {
+        window.clearTimeout(statsIdleRef.current);
+      }
+      statsIdleRef.current = null;
+    }
+  }, []);
+
+  const publishSelectionStats = useCallback(
+    (
+      view: EditorView,
+      doc: unknown,
+      from: number,
+      to: number,
+      selectionCount: number,
+      manuscriptCells: number,
+      manuscriptPages: number,
+    ) => {
+      lastComputedStatsRef.current = {
+        doc,
+        from,
+        to,
+        selectionCount,
+        manuscriptCells,
+        manuscriptPages,
+      };
+
+      setSelectionState((prev) => {
+        if (prev.from !== from || prev.to !== to || !prev.hasSelection) return prev;
+        const next = {
+          ...prev,
+          selectionCount,
+          hasSelection: selectionCount > 0,
+        };
+        return sameSelectionState(prev, next) ? prev : next;
+      });
+
+      if (
+        view.state.doc === doc &&
+        view.state.selection.from === from &&
+        view.state.selection.to === to &&
+        (lastReportedCountRef.current !== selectionCount ||
+          lastReportedCellsRef.current !== manuscriptCells)
+      ) {
+        lastReportedCountRef.current = selectionCount;
+        lastReportedCellsRef.current = manuscriptCells;
+        onSelectionChangeRef.current?.(selectionCount, manuscriptCells, manuscriptPages);
+      }
+    },
+    [],
+  );
+
+  const scheduleSelectionStats = useCallback(
+    (view: EditorView, from: number, to: number) => {
+      const { doc } = view.state;
+      const cachedStats = lastComputedStatsRef.current;
+      if (
+        cachedStats &&
+        cachedStats.doc === doc &&
+        cachedStats.from === from &&
+        cachedStats.to === to
+      ) {
+        publishSelectionStats(
+          view,
+          doc,
+          from,
+          to,
+          cachedStats.selectionCount,
+          cachedStats.manuscriptCells,
+          cachedStats.manuscriptPages,
+        );
+        return;
+      }
+
+      clearScheduledStats();
+      const jobId = ++statsJobIdRef.current;
+      statsDebounceRef.current = window.setTimeout(() => {
+        statsDebounceRef.current = null;
+
+        const run = () => {
+          statsIdleRef.current = null;
+          if (
+            jobId !== statsJobIdRef.current ||
+            view.state.doc !== doc ||
+            view.state.selection.from !== from ||
+            view.state.selection.to !== to
+          ) {
+            return;
+          }
+
+          const selectedText = doc.textBetween(from, to);
+          // MDI 記法を含む可能性があるため extractVisibleText で記法を剥がしてからカウント
+          const visibleText = extractVisibleText(selectedText);
+          const selectionCount = countVisibleChars(visibleText);
+          const manuscriptCells = countManuscriptCells(visibleText);
+          const manuscriptPages = countManuscriptPages(manuscriptCells);
+          publishSelectionStats(
+            view,
+            doc,
+            from,
+            to,
+            selectionCount,
+            manuscriptCells,
+            manuscriptPages,
+          );
+        };
+
+        const idleWindow = window as WindowWithIdleCallback;
+        if (idleWindow.requestIdleCallback) {
+          statsIdleRef.current = idleWindow.requestIdleCallback(run, {
+            timeout: SELECTION_STATS_IDLE_TIMEOUT_MS,
+          });
+        } else {
+          statsIdleRef.current = window.setTimeout(run, 0);
+        }
+      }, SELECTION_STATS_DEBOUNCE_MS);
+    },
+    [clearScheduledStats, publishSelectionStats],
+  );
+
   const updateSelectionState = useCallback(() => {
     if (!editorViewInstance) {
+      clearScheduledStats();
+      statsJobIdRef.current += 1;
       if (lastReportedCountRef.current !== 0 || lastReportedCellsRef.current !== 0) {
         lastReportedCountRef.current = 0;
         lastReportedCellsRef.current = 0;
+        lastComputedStatsRef.current = null;
         onSelectionChangeRef.current?.(0, 0, 0);
       }
       setSelectionState((prev) =>
@@ -181,20 +336,20 @@ export function useSelectionTracking({
     };
 
     if (!selection.empty && belongsToEditor) {
-      const selectedText = state.doc.textBetween(selection.from, selection.to);
-      // MDI 記法を含む可能性があるため extractVisibleText で記法を剥がしてからカウント
-      const visibleText = extractVisibleText(selectedText);
-      const selectionCount = countVisibleChars(visibleText);
-      const selectionManuscriptCells = countManuscriptCells(visibleText);
-      const selectionManuscriptPages = countManuscriptPages(selectionManuscriptCells);
+      const cachedStats = lastComputedStatsRef.current;
+      const hasCachedStats =
+        cachedStats &&
+        cachedStats.doc === state.doc &&
+        cachedStats.from === selection.from &&
+        cachedStats.to === selection.to;
       const range =
         domSelection && domSelection.rangeCount > 0
           ? domSelection.getRangeAt(0).getBoundingClientRect()
           : null;
 
       nextState = {
-        hasSelection: selectionCount > 0,
-        selectionCount,
+        hasSelection: true,
+        selectionCount: hasCachedStats ? cachedStats.selectionCount : 0,
         isCollapsed: false,
         from: selection.from,
         to: selection.to,
@@ -206,26 +361,29 @@ export function useSelectionTracking({
       };
 
       if (
-        lastReportedCountRef.current !== selectionCount ||
-        lastReportedCellsRef.current !== selectionManuscriptCells
+        !hasCachedStats &&
+        (lastReportedCountRef.current !== 0 || lastReportedCellsRef.current !== 0)
       ) {
-        lastReportedCountRef.current = selectionCount;
-        lastReportedCellsRef.current = selectionManuscriptCells;
-        onSelectionChangeRef.current?.(
-          selectionCount,
-          selectionManuscriptCells,
-          selectionManuscriptPages,
-        );
+        lastReportedCountRef.current = 0;
+        lastReportedCellsRef.current = 0;
+        onSelectionChangeRef.current?.(0, 0, 0);
       }
+      scheduleSelectionStats(editorViewInstance, selection.from, selection.to);
     } else if (lastReportedCountRef.current !== 0 || lastReportedCellsRef.current !== 0) {
+      clearScheduledStats();
+      statsJobIdRef.current += 1;
       lastReportedCountRef.current = 0;
       lastReportedCellsRef.current = 0;
+      lastComputedStatsRef.current = null;
       onSelectionChangeRef.current?.(0, 0, 0);
+    } else {
+      clearScheduledStats();
+      statsJobIdRef.current += 1;
     }
 
     reportSelectionRange(selection);
     setSelectionState((prev) => (sameSelectionState(prev, nextState) ? prev : nextState));
-  }, [editorViewInstance, reportSelectionRange]);
+  }, [clearScheduledStats, editorViewInstance, reportSelectionRange, scheduleSelectionStats]);
 
   const scheduleUpdate = useCallback(
     (pointerClientY?: number | null) => {
@@ -305,8 +463,10 @@ export function useSelectionTracking({
         cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
       }
+      clearScheduledStats();
+      statsJobIdRef.current += 1;
     };
-  }, [editorViewInstance, scheduleUpdate, scrollContainerRef]);
+  }, [clearScheduledStats, editorViewInstance, scheduleUpdate, scrollContainerRef]);
 
   return selectionState;
 }

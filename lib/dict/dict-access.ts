@@ -12,8 +12,7 @@
  *     - lookupBatch()  — many headwords in one IPC, lightweight projection, cached
  *
  * Graceful degradation: consumers should call getHealth() and only enrich when
- * `state === "ready"` (local Electron DB). On web the remote API still answers
- * single-word lookups (ruby), but bulk lookups are capped.
+ * `state === "ready"` (local Electron DB). Remote Genji API access is forbidden.
  *
  * Usage:
  *   import { getDictAccess } from "@/lib/dict/dict-access";
@@ -24,14 +23,13 @@
  */
 import type { DictLookup } from "./dict-types";
 import { LRUCache } from "@/shared/lib/lru-cache";
-import * as GenjiApiBackend from "./providers/genji-api-backend";
 
-export type GenjiHealthState = "ready" | "web-fallback" | "not-installed" | "corrupt" | "unknown";
+export type GenjiHealthState = "ready" | "not-installed" | "corrupt" | "unknown";
 
 export interface GenjiHealth {
   state: GenjiHealthState;
   installedVersion?: string;
-  /** Japanese UI hint; populated for not-installed / corrupt / web-fallback. */
+  /** Japanese UI hint; populated for not-installed / corrupt. */
   message?: string;
 }
 
@@ -67,9 +65,6 @@ const HEALTH_TTL_MS = 5000;
 const LOOKUP_CACHE_SIZE = 8000;
 /** SQLite bind-variable limit is 999; stay comfortably under it per query. */
 const LOCAL_BATCH_CHUNK = 400;
-/** Cap web bulk lookups so analysis can't fan out into hundreds of requests. */
-const REMOTE_MAX_TERMS = 300;
-
 const MISS: DictLookup = Object.freeze({ found: false });
 
 class DictAccess {
@@ -100,8 +95,8 @@ class DictAccess {
     const dict = getElectronDict();
     if (!dict) {
       return {
-        state: "web-fallback",
-        message: "Web版ではオンライン辞典（幻辞API）を使用します。",
+        state: "not-installed",
+        message: "ローカル辞書が利用できません。",
       };
     }
     try {
@@ -170,8 +165,6 @@ class DictAccess {
     const dict = getElectronDict();
     if (dict) {
       await this.lookupLocal(dict, misses, out, normalize);
-    } else {
-      await this.lookupRemote(misses, out, normalize);
     }
     return out;
   }
@@ -213,41 +206,6 @@ class DictAccess {
           out.set(t, MISS);
         }
       }
-    }
-  }
-
-  private async lookupRemote(
-    misses: string[],
-    out: Map<string, DictLookup>,
-    normalize: boolean,
-  ): Promise<void> {
-    const capped = misses.slice(0, REMOTE_MAX_TERMS);
-    if (capped.length < misses.length) {
-      console.warn(
-        `[dict-access] remote lookup capped at ${REMOTE_MAX_TERMS}/${misses.length} terms`,
-      );
-    }
-
-    let map: Map<string, DictLookup>;
-    try {
-      map = await GenjiApiBackend.lookupBatchRemote(capped, normalize);
-    } catch (err) {
-      // Same fail-safe as the local path: a network error must not be cached as
-      // "absent". Leave the terms unresolved so a later request can retry and so
-      // no consumer mistakes an I/O failure for an out-of-dictionary word.
-      console.warn("[dict-access] remote lookupBatch failed:", err);
-      return;
-    }
-
-    for (const t of capped) {
-      const lookup = map.get(t) ?? MISS;
-      this.cache.set(t, lookup);
-      out.set(t, lookup);
-    }
-    // Terms beyond the cap: report as not-found WITHOUT caching, so a later
-    // smaller request can still resolve them.
-    for (const t of misses.slice(REMOTE_MAX_TERMS)) {
-      if (!out.has(t)) out.set(t, MISS);
     }
   }
 }
