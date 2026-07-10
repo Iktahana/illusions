@@ -21,6 +21,7 @@ export type UsageEventName =
   | "save_blocked"
   | "save_all_completed"
   | "autosave_attempted"
+  | "autosave_completed"
   | "autosave_failed"
   | "save_conflict_blocked"
   | "project_create_started"
