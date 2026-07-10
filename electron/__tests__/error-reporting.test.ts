@@ -111,12 +111,16 @@ describe("electron/error-reporting", () => {
       source: "error-boundary",
       sectionName: "エディタ",
       message: "failed to render /Users/test/Novel/第三章.mdi",
-      stack: "at render (C:\\Users\\test\\Novel\\第四章.mdi:10:1)",
+      stack: [
+        "at render (C:\\Users\\test\\Novel\\第四章.mdi:10:1)",
+        "at apply (/Users/test/Repos/illusions/components/editor/MilkdownEditor.tsx:224001:1)",
+      ].join("\n"),
     });
 
     const captured = captureExceptionMock.mock.calls[0]?.[0] as Error;
     expect(captured.message).toContain("[file].mdi");
     expect(captured.message).not.toContain("第三章.mdi");
     expect(captured.stack).toContain("[path]");
+    expect(captured.stack).toContain("components/editor/MilkdownEditor.tsx:224001:1");
   });
 });
