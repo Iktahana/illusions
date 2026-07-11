@@ -126,7 +126,14 @@ function collectDepsRecursive(pkgName, collected) {
 
 // Root external modules that cannot be bundled by esbuild
 // kuromoji: dictionary loading at runtime; better-sqlite3: native addon
-const externalRoots = ["kuromoji", "better-sqlite3", "node-pty"];
+// node-pty: terminal support, but the MAS build gates it out entirely at
+// runtime (electron/ipc/pty-ipc.js), so it's excluded from the MAS bundle
+// too — App Store review treats bundled shell-spawn binaries as a rejection
+// risk even when the code path is dead (docs/release/mac-app-store.md).
+const isMasBuild = process.env.MAS_BUILD === "1";
+const externalRoots = isMasBuild
+  ? ["kuromoji", "better-sqlite3"]
+  : ["kuromoji", "better-sqlite3", "node-pty"];
 
 // Collect all transitive production dependencies
 const allDeps = new Set();
