@@ -25,7 +25,7 @@
     "bundle:electron": "node scripts/bundle-electron.mjs",
     "electron:dev": "node scripts/ensure-credits-stub.mjs && npm run bundle:electron && concurrently \"next dev -p 3020\" \"wait-on http://localhost:3020 && cross-env ELECTRON_DEV=1 electron .\"",
     "electron:build": "npm run type-check && npm run generate:credits && cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron && electron-builder",
-    "electron:build:mas": "npm run type-check && npm run generate:credits && cross-env ELECTRON_BUILD=1 MAS_BUILD=1 next build && npm run bundle:electron && cross-env MAS_BUILD=1 electron-builder --mac mas",
+    "electron:build:mas": "npm run type-check && npm run generate:credits && cross-env ELECTRON_BUILD=1 MAS_BUILD=1 next build && npm run bundle:electron && cross-env MAS_BUILD=1 electron-builder --mac mas --publish never",
     "build:quicklook": "node -e \"if(process.platform==='darwin'){const {execSync}=require('child_process');execSync('bash scripts/build-quicklook.sh',{stdio:'inherit'});}else{console.log('build:quicklook skipped (macOS only)');}\" ",
     "test": "vitest run",
     "test:watch": "vitest",
