@@ -44,7 +44,7 @@ import { useEditorMode } from "@/contexts/EditorModeContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
-import { sanitizeMdiContent } from "@/lib/tab-manager/types";
+import { computeHistoryRestoreTabUpdate } from "@/lib/tab-manager/history-restore";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
@@ -1578,27 +1578,9 @@ export default function EditorPage() {
     currentContent: content,
     onHistoryRestore: (restoredContent: string) => {
       setContent(restoredContent);
-      // Clear conflict state after restoring a snapshot.
-      // Set fileSyncStatus based on whether the restored content matches the last saved content,
-      // so that a restored snapshot that differs from disk is not treated as clean.
       if (activeTabId !== null) {
         const currentTab = tabsRef.current.find((t) => t.id === activeTabId);
-        const editorTab = currentTab && isEditorTab(currentTab) ? currentTab : null;
-        const lastSaved = editorTab ? (editorTab.lastSavedContent ?? "") : "";
-        const fileTypeOpts = editorTab ? { fileType: editorTab.fileType } : undefined;
-        const isClean =
-          sanitizeMdiContent(restoredContent, fileTypeOpts) ===
-          sanitizeMdiContent(lastSaved, fileTypeOpts);
-        updateTab(activeTabId, {
-          fileSyncStatus: isClean ? "clean" : "dirty",
-          // #1845: keep isDirty consistent with fileSyncStatus so the tab ●
-          // shows, close-confirm fires, and auto-save picks up the restore.
-          // Editor remount (incrementEditorKey) sets the value via
-          // defaultValueCtx and never fires markdownUpdated, so isDirty would
-          // otherwise stay false after a restore.
-          isDirty: !isClean,
-          conflictDiskContent: null,
-        });
+        updateTab(activeTabId, computeHistoryRestoreTabUpdate(restoredContent, currentTab));
       }
       incrementEditorKey();
     },
