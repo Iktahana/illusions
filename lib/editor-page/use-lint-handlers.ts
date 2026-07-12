@@ -3,6 +3,7 @@ import { notificationManager } from "@/lib/services/notification-manager";
 import type { EditorView } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting/types";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
+import { dispatchIfEditorViewAlive, isEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 /**
  * Get the exact text a lint issue flagged.
@@ -85,11 +86,14 @@ export function useLintHandlers({
     (issue: LintIssue) => {
       if (!editorViewInstance) return;
       void import("@milkdown/prose/state").then(({ TextSelection }) => {
-        const { state, dispatch } = editorViewInstance;
+        if (!isEditorViewAlive(editorViewInstance)) return;
+        const { state } = editorViewInstance;
         const clampedTo = Math.min(issue.to, state.doc.content.size);
         const clampedFrom = Math.min(issue.from, clampedTo);
-        const selection = TextSelection.create(state.doc, clampedFrom, clampedTo);
-        dispatch(state.tr.setSelection(selection));
+        dispatchIfEditorViewAlive(editorViewInstance, (view) => {
+          const selection = TextSelection.create(view.state.doc, clampedFrom, clampedTo);
+          return view.state.tr.setSelection(selection);
+        });
         centerEditorPosition(editorViewInstance, clampedFrom);
 
         editorViewInstance.focus();
@@ -153,7 +157,7 @@ export function useLintHandlers({
   const handleApplyFix = useCallback(
     (issue: LintIssue & { originalText?: string }) => {
       if (!editorViewInstance || !issue.fix) return;
-      const { state, dispatch } = editorViewInstance;
+      const { state } = editorViewInstance;
       if (issue.to > state.doc.content.size) {
         notificationManager.warning("テキストが変更されたため修正を適用できません");
         return;
@@ -163,8 +167,9 @@ export function useLintHandlers({
         notificationManager.warning("テキストが変更されたため修正を適用できません");
         return;
       }
-      const tr = state.tr.insertText(issue.fix.replacement, issue.from, issue.to);
-      dispatch(tr);
+      dispatchIfEditorViewAlive(editorViewInstance, (view) =>
+        view.state.tr.insertText(issue.fix!.replacement, issue.from, issue.to),
+      );
     },
     [editorViewInstance],
   );

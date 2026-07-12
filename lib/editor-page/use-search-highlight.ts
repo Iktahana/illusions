@@ -3,17 +3,9 @@ import { Decoration, type EditorView } from "@milkdown/prose/view";
 import { TextSelection } from "@milkdown/prose/state";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
 import type { SearchMatch } from "@/lib/editor-page/find-search-matches";
+import { dispatchIfEditorViewAlive, isEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
-/**
- * #1507: After a tab switch the parent's editorView reference may briefly point
- * at a destroyed EditorView (ProseMirror sets `docView` to null on destroy).
- * Dispatching on it routes through torn-down Milkdown plugins and throws
- * "Context editorState not found". This guard is the single chokepoint for that
- * check now that highlight dispatch is centralized here.
- */
-export function isEditorViewAlive(view: EditorView | null): view is EditorView {
-  return view !== null && (view as unknown as { docView: unknown }).docView !== null;
-}
+export { isEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 interface UseSearchHighlightParams {
   editorView: EditorView | null;
@@ -61,16 +53,13 @@ export function useSearchHighlight({
   // TextSelection とスクロールは実行しない（#1857）。
   useEffect(() => {
     if (!isEditorViewAlive(editorView)) return;
-    const { state, dispatch } = editorView;
 
     // 非表示時・検索語空時はハイライトを消す（要求2: 検索窓を閉じた／
     // 検索パネル非表示でハイライト除去）。
     if (!isSearchVisible || !searchTerm || matches.length === 0) {
-      try {
-        dispatch(state.tr.setMeta("searchDecorations", []));
-      } catch {
-        // view が dispatch 途中で破棄された場合のベストエフォート
-      }
+      dispatchIfEditorViewAlive(editorView, (view) =>
+        view.state.tr.setMeta("searchDecorations", []),
+      );
       return;
     }
 
@@ -80,11 +69,9 @@ export function useSearchHighlight({
       }),
     );
 
-    try {
-      dispatch(state.tr.setMeta("searchDecorations", decorations));
-    } catch {
-      // #1507: view が検索中に破棄された — decorations も一緒に消える
-    }
+    dispatchIfEditorViewAlive(editorView, (view) =>
+      view.state.tr.setMeta("searchDecorations", decorations),
+    );
   }, [editorView, matches, currentMatchIndex, searchTerm, isSearchVisible]);
 
   // Effect 2: 明示的ナビゲーション時のみ選択移動＋スクロール（#1857）。
@@ -102,9 +89,9 @@ export function useSearchHighlight({
     if (!current) return;
 
     try {
-      editorView.dispatch(
-        editorView.state.tr.setSelection(
-          TextSelection.create(editorView.state.doc, current.from, current.from),
+      dispatchIfEditorViewAlive(editorView, (view) =>
+        view.state.tr.setSelection(
+          TextSelection.create(view.state.doc, current.from, current.from),
         ),
       );
       centerEditorPosition(editorView, current.from);

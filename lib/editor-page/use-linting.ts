@@ -11,6 +11,7 @@ import {
   type RuleRunnerLike,
 } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import { syncLoadedRulesets, subscribeRulesetChanges } from "@/lib/linting/external-ruleset-loader";
+import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 
 export interface UseLintingResult {
   /** May be `null` until the worker has been spun up after mount. */
@@ -129,6 +130,10 @@ export function useLinting(
     setIsLinting(true);
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
       .then(({ updateLintingSettings }) => {
+        if (!isEditorViewAlive(editorViewInstance)) {
+          setIsLinting(false);
+          return;
+        }
         const nlpClient = ruleRunner.hasMorphologicalRules() ? getNlpClient() : null;
 
         updateLintingSettings(

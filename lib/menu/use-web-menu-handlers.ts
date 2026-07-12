@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import type { EditorView } from "@milkdown/prose/view";
+import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
 
 interface UseWebMenuHandlersProps {
@@ -151,9 +152,13 @@ export function useWebMenuHandlers({
               .readText()
               .then((text) => {
                 if (!text) return;
-                const { state, dispatch } = editorView;
-                const tr = state.tr.insertText(text, state.selection.from, state.selection.to);
-                dispatch(tr);
+                dispatchIfEditorViewAlive(editorView, (view) =>
+                  view.state.tr.insertText(
+                    text,
+                    view.state.selection.from,
+                    view.state.selection.to,
+                  ),
+                );
                 editorView.focus();
               })
               .catch((err: unknown) => {

@@ -1,5 +1,6 @@
 import { Plugin, PluginKey } from "@milkdown/prose/state";
 import type { Node } from "@milkdown/prose/model";
+import { dispatchIfEditorViewAlive } from "../../../shared/lib/editor-view-safety";
 
 const HEADING_ID_FIXER_META_COMPOSING = "headingIdFixerComposing";
 const HEADING_ID_FIXER_META_FORCE_RECONCILE = "headingIdFixerForceReconcile";
@@ -44,8 +45,8 @@ export function createHeadingIdFixerPlugin() {
 
       const handleCompositionEnd = () => {
         composing = false;
-        editorView.dispatch(
-          editorView.state.tr.setMeta(HEADING_ID_FIXER_META_FORCE_RECONCILE, true),
+        dispatchIfEditorViewAlive(editorView, (view) =>
+          view.state.tr.setMeta(HEADING_ID_FIXER_META_FORCE_RECONCILE, true),
         );
       };
 

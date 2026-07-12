@@ -5,6 +5,7 @@ import { shouldEnablePosHighlight } from "./power-policy";
 import { getWindowActivitySnapshot, subscribeWindowActivity } from "./window-activity";
 import type { WindowActivityState } from "./window-activity";
 import type { EditorView } from "@milkdown/prose/view";
+import { isEditorViewAlive } from "./use-search-highlight";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -66,7 +67,7 @@ export function usePosHighlightActivation(params: UsePosHighlightActivationParam
       // 動的 import で plugin 本体（kuromoji 含む）を初期バンドルから外す
       import("@/packages/milkdown-plugin-japanese-novel/pos-highlight")
         .then(({ updatePosHighlightSettings }) => {
-          if (disposed) return;
+          if (disposed || !isEditorViewAlive(view)) return;
           updatePosHighlightSettings(view, {
             enabled: shouldEnablePosHighlight(activity, { posHighlightEnabled, powerSaveMode }),
             colors: posHighlightColors,

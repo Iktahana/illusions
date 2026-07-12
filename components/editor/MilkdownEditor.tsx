@@ -58,6 +58,8 @@ import {
   useScrollSettings,
 } from "@/contexts/EditorSettingsContext";
 import { usePosHighlightActivation } from "@/lib/editor-page/use-pos-highlight-activation";
+import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
+import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 interface MilkdownEditorProps {
   initialContent: string;
@@ -463,6 +465,7 @@ export default function MilkdownEditor({
 
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
       .then(({ updateLintingSettings }) => {
+        if (!isEditorViewAlive(editorViewInstance)) return;
         updateLintingSettings(
           editorViewInstance,
           {
@@ -766,10 +769,10 @@ export default function MilkdownEditor({
           navigator.clipboard
             .readText()
             .then((text) => {
-              const { state, dispatch } = editorViewInstance;
-              const { from, to } = state.selection;
-              const transaction = state.tr.insertText(text, from, to);
-              dispatch(transaction);
+              dispatchIfEditorViewAlive(editorViewInstance, (view) => {
+                const { from, to } = view.state.selection;
+                return view.state.tr.insertText(text, from, to);
+              });
             })
             .catch((err) => {
               console.error("Failed to paste:", err);
@@ -780,10 +783,10 @@ export default function MilkdownEditor({
             .readText()
             .then((text) => {
               // Strip formatting by using plain text
-              const { state, dispatch } = editorViewInstance;
-              const { from, to } = state.selection;
-              const transaction = state.tr.insertText(text, from, to);
-              dispatch(transaction);
+              dispatchIfEditorViewAlive(editorViewInstance, (view) => {
+                const { from, to } = view.state.selection;
+                return view.state.tr.insertText(text, from, to);
+              });
             })
             .catch((err) => {
               console.error("Failed to paste plain text:", err);
@@ -798,9 +801,10 @@ export default function MilkdownEditor({
           break;
         }
         case "select-all": {
-          const { state: st, dispatch: dp } = editorViewInstance;
-          const allSelection = new AllSelection(st.doc);
-          dp(st.tr.setSelection(allSelection));
+          dispatchIfEditorViewAlive(editorViewInstance, (view) => {
+            const allSelection = new AllSelection(view.state.doc);
+            return view.state.tr.setSelection(allSelection);
+          });
           break;
         }
         case "ruby":
