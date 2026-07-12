@@ -90,16 +90,6 @@ async function findBuild(buildNumber, { retries = 20, delayMs = 30000 } = {}) {
   throw new Error(`Build ${buildNumber} did not become VALID within timeout`);
 }
 
-async function ensureExportCompliance(buildId) {
-  await asc(`/builds/${buildId}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      data: { type: "builds", id: buildId, attributes: { usesNonExemptEncryption: false } },
-    }),
-  });
-  console.log("Export compliance confirmed (exempt encryption only).");
-}
-
 async function findOrGetInternalGroup() {
   // `filter[isInternalGroup]` isn't a supported query param on this
   // endpoint (confirmed via a 400 PARAMETER_ERROR.ILLEGAL response) — fetch
@@ -124,7 +114,11 @@ async function addBuildToGroup(groupId, buildId) {
 }
 
 const build = await findBuild(buildNumber);
-await ensureExportCompliance(build.id);
+// Export compliance is declared once via ITSAppUsesNonExemptEncryption in
+// the Info.plist (package.json's mac.extendInfo) — App Store Connect reads
+// it from the binary automatically, and re-confirming the same value via
+// PATCH /builds/{id} 409s with "You cannot update when the value is already
+// set", so there's nothing to do here.
 const group = await findOrGetInternalGroup();
 await addBuildToGroup(group.id, build.id);
 console.log(`\n✅ Build ${buildNumber} is now available via TestFlight to internal testers.`);
