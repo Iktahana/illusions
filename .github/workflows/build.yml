@@ -19,7 +19,12 @@ on:
   workflow_dispatch:
     inputs:
       run_mas_build:
-        description: "MAS向けpkgをビルドしてApp Store Connectへアップロードする"
+        description: "MAS向けpkgをビルドする（署名済み.pkgをartifactとして出力。ストアへは一切アップロードしない）"
+        required: false
+        default: false
+        type: boolean
+      run_mas_publish:
+        description: "ビルド済みのMAS pkgをApp Store Connect/TestFlightへアップロードする（run_mas_buildと併用時のみ有効）"
         required: false
         default: false
         type: boolean
@@ -346,12 +351,13 @@ jobs:
   build-mas:
     name: Build (Mac App Store)
     needs: [detect-changes, compute-version]
-    # beta への push で自動実行し、内部TestFlightへ配信する。workflow_dispatch でも手動起動可能。
-    # タグpush（main向け安定版）ではまだ走らせない。
-    # Build+sign runs in parallel with the test matrix (same as the other
-    # platform build jobs) — only the publish-mas job below (upload to App
-    # Store Connect/TestFlight) is gated on tests passing, so a slow/failing
-    # test run no longer blocks the ~4 minutes of build+sign work too.
+    # Build-only: produces a signed .pkg artifact, nothing more. Never
+    # uploads anywhere — see publish-mas below, which only runs on an
+    # explicit, separate workflow_dispatch request. Auto-runs on beta pushes
+    # (same as the other platform build jobs) purely to keep a fresh signed
+    # artifact available; tag pushes (main/stable) don't trigger it yet.
+    # Runs in parallel with the test matrix, same as the other platform
+    # build jobs — only publish-mas is gated on tests passing.
     if: |
       always() &&
       needs.compute-version.result == 'success' &&
@@ -462,12 +468,14 @@ jobs:
   publish-mas:
     name: Publish (Mac App Store / TestFlight)
     needs: [build-mas, test-windows, test-macos]
-    # Only this small upload+TestFlight step waits on the cross-platform
-    # test matrix — the build+sign work above already ran in parallel with
-    # it. `always()` lets us inspect build-mas's result even though it's
-    # itself conditional (would otherwise be treated as skipped).
+    # Publishing is never automatic — build-mas only ever produces a signed
+    # .pkg artifact, regardless of trigger (including beta pushes). This job
+    # only runs when explicitly requested via workflow_dispatch's
+    # run_mas_publish input, on top of the test matrix passing.
     if: |
       always() &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_mas_publish == true &&
       needs.build-mas.result == 'success' &&
       needs.test-windows.result == 'success' &&
       needs.test-macos.result == 'success'
