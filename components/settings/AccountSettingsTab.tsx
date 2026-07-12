@@ -108,6 +108,14 @@ export default function AccountSettingsTab() {
           ログアウト
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => openExternal("https://my.illusions.app/delete-account")}
+        className="text-xs text-foreground-tertiary underline-offset-2 hover:text-foreground-secondary hover:underline"
+      >
+        アカウントを削除
+      </button>
     </div>
   );
 }

@@ -345,10 +345,21 @@ jobs:
 
   build-mas:
     name: Build (Mac App Store)
-    # 初期移行中は手動入力が明示されたときだけ実行し、タグpushでは走らせない。
+    needs: [detect-changes, compute-version, test-windows, test-macos]
+    # beta への push で自動実行し、内部TestFlightへ配信する。workflow_dispatch でも手動起動可能。
+    # タグpush（main向け安定版）ではまだ走らせない。
+    # Also gated on the cross-platform test matrix succeeding, since this job
+    # uploads directly to App Store Connect/TestFlight — it's an independent
+    # publish point that isn't downstream of the `release` job.
     if: |
-      github.event_name == 'workflow_dispatch' &&
-      inputs.run_mas_build == true
+      always() &&
+      needs.compute-version.result == 'success' &&
+      needs.test-windows.result == 'success' &&
+      needs.test-macos.result == 'success' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.run_mas_build == true) ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/beta' && needs.detect-changes.outputs.desktop_changed == 'true')
+      )
     runs-on: macos-latest
     environment: Apple
     env:
@@ -428,6 +439,14 @@ jobs:
           printf '%s' "$ASC_API_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
           chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 
+      - name: Apply computed version
+        # CFBundleVersion must be plain dot-separated integers, so this uses
+        # the clean `base` output (no beta.<timestamp> suffix) — same
+        # ephemeral, uncommitted bump every other channel does via
+        # compute-version, so each MAS upload gets a fresh version
+        # automatically instead of colliding with the previous one.
+        run: npm version ${{ needs.compute-version.outputs.base }} --no-git-tag-version --allow-same-version
+
       - name: Download local fonts
         run: npm run download:fonts
 
@@ -435,9 +454,18 @@ jobs:
         run: npm run build:quicklook
 
       - name: Build MAS package
+        # CFBundleVersion (the App Store Connect "build number") must be
+        # unique on every upload, but compute-version's clean `base` output
+        # (used above for CFBundleShortVersionString) only advances when a
+        # stable git tag is cut — which doesn't happen on every beta push or
+        # manual re-run, causing duplicate-version upload rejections. Set
+        # CFBundleVersion independently to the numeric, always-unique
+        # run_id+run_attempt so every build gets a fresh one regardless of
+        # tag state.
         run: MAS_BUILD=1 npm run electron:build:mas
         env:
           DEBUG: electron-builder
+          MAS_EXTRA_BUILDER_ARGS: --config.mas.bundleVersion=${{ github.run_id }}${{ github.run_attempt }}
 
       - name: Upload MAS package artifact
         uses: actions/upload-artifact@v7
@@ -459,6 +487,14 @@ jobs:
             --type macos \
             --apiKey "$ASC_KEY_ID" \
             --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Enable build for internal TestFlight testers
+        # Apple takes a few minutes to finish processing an uploaded build
+        # before it's visible via the API, hence the polling/retry loop
+        # inside this script. Pass the same unique CFBundleVersion used for
+        # the build above (not the marketing version — multiple builds can
+        # share that, which would match the wrong one).
+        run: node scripts/asc-testflight-enable.mjs ${{ github.run_id }}${{ github.run_attempt }}
 
   # ---------------------------------------------------------------------------
   # Windows — shared build step, then separate NSIS / MSIX packaging
@@ -927,6 +963,64 @@ jobs:
           path: dist-electron/**
 
   # ---------------------------------------------------------------------------
+  # Cross-platform unit tests — run in parallel with the platform builds above
+  # (same push-only gating as the "full build" steps in those jobs). Linux is
+  # already covered by the "Test & Coverage" job in quality.yml, so only
+  # Windows/macOS runners are needed here. Nothing downstream of these jobs
+  # waits on them except the actual publish steps (release, build-mas), so a
+  # test failure never slows down compilation/packaging — it only blocks
+  # shipping.
+  # ---------------------------------------------------------------------------
+
+  test-windows:
+    name: Test (Windows)
+    needs: detect-changes
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  test-macos:
+    name: Test (macOS)
+    needs: detect-changes
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  # ---------------------------------------------------------------------------
   # Publish & Release
   # ---------------------------------------------------------------------------
 
@@ -944,6 +1038,8 @@ jobs:
         package-windows-nsis,
         package-windows-msix,
         build-linux,
+        test-windows,
+        test-macos,
       ]
     runs-on: ubuntu-latest
 
