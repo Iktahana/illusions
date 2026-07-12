@@ -12,19 +12,16 @@ on:
     paths-ignore:
       - "store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
+      - ".github/workflows/store-publish.yml"
   pull_request:
     paths-ignore:
       - "store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
+      - ".github/workflows/store-publish.yml"
   workflow_dispatch:
     inputs:
       run_mas_build:
-        description: "MAS向けpkgをビルドする（署名済み.pkgをartifactとして出力。ストアへは一切アップロードしない）"
-        required: false
-        default: false
-        type: boolean
-      run_mas_publish:
-        description: "ビルド済みのMAS pkgをApp Store Connect/TestFlightへアップロードする（run_mas_buildと併用時のみ有効）"
+        description: "MAS向けpkgをビルドする（署名済み.pkgをartifactとして出力。ストアへのアップロードは store-publish.yml が別途担当）"
         required: false
         default: false
         type: boolean
@@ -351,13 +348,15 @@ jobs:
   build-mas:
     name: Build (Mac App Store)
     needs: [detect-changes, compute-version]
-    # Build-only: produces a signed .pkg artifact, nothing more. Never
-    # uploads anywhere — see publish-mas below, which only runs on an
-    # explicit, separate workflow_dispatch request. Auto-runs on beta pushes
+    # Build-only: produces a signed .pkg artifact, nothing more. Publishing
+    # (App Store Connect/TestFlight upload) lives entirely in
+    # store-publish.yml's appstore-testflight job, triggered separately and
+    # explicitly — this job never uploads anywhere. Auto-runs on beta pushes
     # (same as the other platform build jobs) purely to keep a fresh signed
     # artifact available; tag pushes (main/stable) don't trigger it yet.
-    # Runs in parallel with the test matrix, same as the other platform
-    # build jobs — only publish-mas is gated on tests passing.
+    # Runs in parallel with the test matrix, same as every other platform
+    # build job — nothing here is gated on tests, since it has no external
+    # side effects to guard.
     if: |
       always() &&
       needs.compute-version.result == 'success' &&
@@ -464,84 +463,6 @@ jobs:
         with:
           name: illusions-mas-pkg
           path: dist-electron/**/*.pkg
-
-  publish-mas:
-    name: Publish (Mac App Store / TestFlight)
-    needs: [build-mas, test-windows, test-macos]
-    # Publishing is never automatic — build-mas only ever produces a signed
-    # .pkg artifact, regardless of trigger (including beta pushes). This job
-    # only runs when explicitly requested via workflow_dispatch's
-    # run_mas_publish input, on top of the test matrix passing.
-    if: |
-      always() &&
-      github.event_name == 'workflow_dispatch' &&
-      inputs.run_mas_publish == true &&
-      needs.build-mas.result == 'success' &&
-      needs.test-windows.result == 'success' &&
-      needs.test-macos.result == 'success'
-    runs-on: macos-latest
-    environment: Apple
-    env:
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
-      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
-      - name: Download MAS package artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: illusions-mas-pkg
-          path: dist-electron
-
-      - name: Prepare App Store Connect API key
-        shell: bash
-        run: |
-          missing=()
-          [ -z "$ASC_KEY_ID" ] && missing+=("ASC_KEY_ID")
-          [ -z "$ASC_ISSUER_ID" ] && missing+=("ASC_ISSUER_ID")
-          [ -z "$ASC_API_KEY" ] && missing+=("ASC_API_KEY")
-          [ -z "$ASC_APP_ID" ] && missing+=("ASC_APP_ID")
-          if [ ${#missing[@]} -ne 0 ]; then
-            echo "::error::Missing ASC credentials: ${missing[*]}"
-            exit 1
-          fi
-
-          # altool はこの標準パスから App Store Connect API キーを探す。
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          printf '%s' "$ASC_API_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-
-      - name: Upload to App Store Connect
-        shell: bash
-        run: |
-          PKG_FILE=$(find dist-electron -name "*.pkg" -type f | head -n 1)
-          if [ -z "$PKG_FILE" ]; then
-            echo "::error::MAS pkg artifact was not found"
-            exit 1
-          fi
-          echo "Uploading $PKG_FILE to App Store Connect app $ASC_APP_ID"
-          xcrun altool --upload-app \
-            -f "$PKG_FILE" \
-            --type macos \
-            --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID"
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-
-      - name: Enable build for internal TestFlight testers
-        # Apple takes a few minutes to finish processing an uploaded build
-        # before it's visible via the API, hence the polling/retry loop
-        # inside this script. Pass the same unique CFBundleVersion used for
-        # the build above (not the marketing version — multiple builds can
-        # share that, which would match the wrong one).
-        run: node scripts/asc-testflight-enable.mjs ${{ github.run_id }}${{ github.run_attempt }}
 
   # ---------------------------------------------------------------------------
   # Windows — shared build step, then separate NSIS / MSIX packaging
@@ -1013,10 +934,12 @@ jobs:
   # Cross-platform unit tests — run in parallel with the platform builds above
   # (same push-only gating as the "full build" steps in those jobs). Linux is
   # already covered by the "Test & Coverage" job in quality.yml, so only
-  # Windows/macOS runners are needed here. Nothing downstream of these jobs
-  # waits on them except the actual publish steps (release, publish-mas), so
-  # a test failure never slows down compilation/packaging — it only blocks
-  # shipping.
+  # Windows/macOS runners are needed here. Nothing in this file waits on them
+  # except the `release` job (GitHub Release) — App Store/Microsoft Store
+  # publishing lives entirely in store-publish.yml, which pulls signed
+  # artifacts from a completed build.yml run rather than depending on jobs
+  # here directly. Either way, a test failure never slows down
+  # compilation/packaging — it only blocks shipping.
   # ---------------------------------------------------------------------------
 
   test-windows:

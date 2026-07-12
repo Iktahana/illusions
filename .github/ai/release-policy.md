@@ -1,6 +1,6 @@
 # Illusions Release Policy
 
-Version: 1.0.0
+Version: 1.1.0
 Status: Active canonical policy
 
 ## Canonical Topology
@@ -9,12 +9,13 @@ Status: Active canonical policy
 
 - `dev`: integration branch for all regular development work.
 - `beta`: preview channel fed from `dev` using the release-beta workflow.
-- `main`: production branch promoted from `beta` by scheduled workflow.
+- `main`: production branch promoted from `beta` manually.
 
-## Weekly Stable Promotion
+## Stable Promotion
 
 - Stable promotion is `beta -> main`.
-- Promotion cadence: weekly Friday workflow.
+- Manual process — the automated weekly Friday workflow (`weekly-release.yml`) was removed
+  2026-07-12. A human creates and merges the `beta -> main` PR when ready.
 
 ## Tooling Alignment
 

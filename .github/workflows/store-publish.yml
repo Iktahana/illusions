@@ -1,0 +1,231 @@
+name: Store Publish
+
+# Publishing to any store is entirely separate from building — build.yml only
+# ever produces signed installer artifacts, never uploads them anywhere. This
+# file owns every "ship it to a store" concern: Microsoft Store (stable +
+# beta flight) and Mac App Store (TestFlight). Submitting a MAS build for
+# App Store review itself stays a manual App Store Connect step — that's not
+# automated here.
+
+on:
+  workflow_run:
+    workflows: ["Desktop Build and Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which publish job to run manually"
+        required: true
+        type: choice
+        options:
+          - msstore-flight
+          - msstore-stable
+          - appstore-testflight
+      release_tag:
+        description: "GitHub Release tag (msstore-flight/msstore-stable — defaults to latest matching release if omitted)"
+        required: false
+        type: string
+      build_run_id:
+        description: "Desktop Build and Release run ID to pull the signed MAS .pkg from (appstore-testflight — defaults to latest successful build-mas run if omitted)"
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run — log actions without mutating store state (Microsoft Store jobs only)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: read
+  models: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Microsoft Store — beta flight
+  # ---------------------------------------------------------------------------
+
+  resolve-msstore-flight-tag:
+    name: Resolve beta release tag
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'beta' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'msstore-flight')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases \
+            --jq '[.[] | select(.draft == false and .prerelease == true and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-beta\\.")))] | sort_by(.created_at) | last | .tag_name')
+          if [ -z "$RELEASE_TAG" ] || [ "$RELEASE_TAG" = "null" ]; then
+            echo "::error::No beta prerelease found"
+            exit 1
+          fi
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Found beta release tag: ${RELEASE_TAG}"
+
+  msstore-flight:
+    name: Publish (Microsoft Store Flight)
+    needs: resolve-msstore-flight-tag
+    concurrency:
+      group: "ms-store-flight-dispatch"
+      cancel-in-progress: false
+    uses: ./.github/workflows/sync-ms-store-listing.yml
+    with:
+      mode: flight-submission
+      release_tag: ${{ needs.resolve-msstore-flight-tag.outputs.tag }}
+      dry_run: ${{ inputs.dry_run || false }}
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Microsoft Store — stable
+  # ---------------------------------------------------------------------------
+
+  resolve-msstore-stable-tag:
+    name: Resolve stable release tag
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'msstore-stable')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Resolve tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases \
+            --jq '[.[] | select(.draft == false and .prerelease == false)] | sort_by(.created_at) | last | .tag_name')
+          if [ -z "$RELEASE_TAG" ] || [ "$RELEASE_TAG" = "null" ]; then
+            echo "::error::No stable release found"
+            exit 1
+          fi
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Found release tag: ${RELEASE_TAG}"
+
+  msstore-stable:
+    name: Publish (Microsoft Store Stable)
+    needs: resolve-msstore-stable-tag
+    concurrency:
+      group: "ms-store-submission"
+      cancel-in-progress: false
+    uses: ./.github/workflows/sync-ms-store-listing.yml
+    with:
+      mode: full-submission
+      release_tag: ${{ needs.resolve-msstore-stable-tag.outputs.tag }}
+      dry_run: ${{ inputs.dry_run || false }}
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
+  # Mac App Store — TestFlight (internal testing only; App Store review
+  # submission itself is a manual App Store Connect step, not automated)
+  # ---------------------------------------------------------------------------
+
+  appstore-testflight:
+    name: Publish (Mac App Store / TestFlight)
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'appstore-testflight'
+    runs-on: macos-latest
+    environment: Apple
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
+      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Resolve build run ID and attempt
+        id: resolve-run
+        run: |
+          if [ -n "${{ inputs.build_run_id }}" ]; then
+            RUN_ID="${{ inputs.build_run_id }}"
+          else
+            RUN_ID=$(gh run list --repo "${{ github.repository }}" \
+              --workflow "Desktop Build and Release" \
+              --status success \
+              --json databaseId,workflowName \
+              --jq '[.[] | select(.workflowName == "Desktop Build and Release")][0].databaseId')
+          fi
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "::error::No successful Desktop Build and Release run found"
+            exit 1
+          fi
+          # build-mas sets --config.mas.bundleVersion=<run_id><run_attempt> —
+          # need the exact attempt number of the resolved run to reconstruct
+          # the same CFBundleVersion for the TestFlight lookup below.
+          RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+          echo "run_attempt=${RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "Using build run ${RUN_ID}, attempt ${RUN_ATTEMPT}"
+
+      - name: Download MAS package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: illusions-mas-pkg
+          path: dist-electron
+          run-id: ${{ steps.resolve-run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare App Store Connect API key
+        shell: bash
+        run: |
+          missing=()
+          [ -z "$ASC_KEY_ID" ] && missing+=("ASC_KEY_ID")
+          [ -z "$ASC_ISSUER_ID" ] && missing+=("ASC_ISSUER_ID")
+          [ -z "$ASC_API_KEY" ] && missing+=("ASC_API_KEY")
+          [ -z "$ASC_APP_ID" ] && missing+=("ASC_APP_ID")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing ASC credentials: ${missing[*]}"
+            exit 1
+          fi
+
+          # altool はこの標準パスから App Store Connect API キーを探す。
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$ASC_API_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Upload to App Store Connect
+        shell: bash
+        run: |
+          PKG_FILE=$(find dist-electron -name "*.pkg" -type f | head -n 1)
+          if [ -z "$PKG_FILE" ]; then
+            echo "::error::MAS pkg artifact was not found"
+            exit 1
+          fi
+          echo "Uploading $PKG_FILE to App Store Connect app $ASC_APP_ID"
+          xcrun altool --upload-app \
+            -f "$PKG_FILE" \
+            --type macos \
+            --apiKey "$ASC_KEY_ID" \
+            --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Enable build for internal TestFlight testers
+        # Apple takes a few minutes to finish processing an uploaded build
+        # before it's visible via the API, hence the polling/retry loop
+        # inside this script. build-mas set --config.mas.bundleVersion to
+        # <run_id><run_attempt> of the build run — reconstruct the same
+        # value from the resolved build run instead of parsing it back out
+        # of the .pkg.
+        run: node scripts/asc-testflight-enable.mjs "${{ steps.resolve-run.outputs.run_id }}${{ steps.resolve-run.outputs.run_attempt }}"
