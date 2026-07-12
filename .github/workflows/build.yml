@@ -345,12 +345,17 @@ jobs:
 
   build-mas:
     name: Build (Mac App Store)
-    needs: [detect-changes, compute-version]
+    needs: [detect-changes, compute-version, test-windows, test-macos]
     # beta への push で自動実行し、内部TestFlightへ配信する。workflow_dispatch でも手動起動可能。
     # タグpush（main向け安定版）ではまだ走らせない。
+    # Also gated on the cross-platform test matrix succeeding, since this job
+    # uploads directly to App Store Connect/TestFlight — it's an independent
+    # publish point that isn't downstream of the `release` job.
     if: |
       always() &&
       needs.compute-version.result == 'success' &&
+      needs.test-windows.result == 'success' &&
+      needs.test-macos.result == 'success' &&
       (
         (github.event_name == 'workflow_dispatch' && inputs.run_mas_build == true) ||
         (github.event_name == 'push' && github.ref == 'refs/heads/beta' && needs.detect-changes.outputs.desktop_changed == 'true')
@@ -486,8 +491,10 @@ jobs:
       - name: Enable build for internal TestFlight testers
         # Apple takes a few minutes to finish processing an uploaded build
         # before it's visible via the API, hence the polling/retry loop
-        # inside this script.
-        run: node scripts/asc-testflight-enable.mjs ${{ needs.compute-version.outputs.base }}
+        # inside this script. Pass the same unique CFBundleVersion used for
+        # the build above (not the marketing version — multiple builds can
+        # share that, which would match the wrong one).
+        run: node scripts/asc-testflight-enable.mjs ${{ github.run_id }}${{ github.run_attempt }}
 
   # ---------------------------------------------------------------------------
   # Windows — shared build step, then separate NSIS / MSIX packaging
@@ -956,6 +963,64 @@ jobs:
           path: dist-electron/**
 
   # ---------------------------------------------------------------------------
+  # Cross-platform unit tests — run in parallel with the platform builds above
+  # (same push-only gating as the "full build" steps in those jobs). Linux is
+  # already covered by the "Test & Coverage" job in quality.yml, so only
+  # Windows/macOS runners are needed here. Nothing downstream of these jobs
+  # waits on them except the actual publish steps (release, build-mas), so a
+  # test failure never slows down compilation/packaging — it only blocks
+  # shipping.
+  # ---------------------------------------------------------------------------
+
+  test-windows:
+    name: Test (Windows)
+    needs: detect-changes
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  test-macos:
+    name: Test (macOS)
+    needs: detect-changes
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  # ---------------------------------------------------------------------------
   # Publish & Release
   # ---------------------------------------------------------------------------
 
@@ -973,6 +1038,8 @@ jobs:
         package-windows-nsis,
         package-windows-msix,
         build-linux,
+        test-windows,
+        test-macos,
       ]
     runs-on: ubuntu-latest
 
