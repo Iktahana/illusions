@@ -176,7 +176,9 @@ describe("RulesetsManager.readModule / uninstall (isolated HOME)", () => {
   it("reads a complete install, verifies integrity, and rejects tamper/traversal", async () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "illusions-rm-"));
     const prev = process.env.HOME;
+    const prevUserProfile = process.env.USERPROFILE;
     process.env.HOME = home;
+    process.env.USERPROFILE = home;
     try {
       const mgr = new RulesetsManager();
       const id = "com.example.thirdparty";
@@ -205,13 +207,17 @@ describe("RulesetsManager.readModule / uninstall (isolated HOME)", () => {
       fs.rmSync(home, { recursive: true, force: true });
       if (prev === undefined) delete process.env.HOME;
       else process.env.HOME = prev;
+      if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = prevUserProfile;
     }
   });
 
   it("uninstalls a third-party ruleset but refuses official ones", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "illusions-rm-"));
     const prev = process.env.HOME;
+    const prevUserProfile = process.env.USERPROFILE;
     process.env.HOME = home;
+    process.env.USERPROFILE = home;
     try {
       const mgr = new RulesetsManager();
       const tp = "com.example.thirdparty";
@@ -233,6 +239,8 @@ describe("RulesetsManager.readModule / uninstall (isolated HOME)", () => {
       fs.rmSync(home, { recursive: true, force: true });
       if (prev === undefined) delete process.env.HOME;
       else process.env.HOME = prev;
+      if (prevUserProfile === undefined) delete process.env.USERPROFILE;
+      else process.env.USERPROFILE = prevUserProfile;
     }
   });
 });

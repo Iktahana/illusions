@@ -25,7 +25,14 @@ vi.mock("electron", () => ({
  * editor_buffer, recent_files, and recent_projects tables.
  * Each map entry corresponds to one row by primary key.
  */
-type FakeRow = { id?: string; path?: string; data: string; updated_at?: number };
+type FakeRow = {
+  id?: string;
+  path?: string;
+  root_path?: string;
+  name?: string;
+  data: string;
+  updated_at?: number;
+};
 type TableName = "app_state" | "editor_buffer" | "recent_files" | "recent_projects";
 
 function createFakeBetterSqlite3(tables: Partial<Record<TableName, FakeRow[]>> = {}) {
@@ -106,6 +113,20 @@ function createFakeBetterSqlite3(tables: Partial<Record<TableName, FakeRow[]>> =
         } else if (/DELETE FROM recent_projects WHERE id/.test(sql)) {
           const id = args[0] as string;
           store.recent_projects = store.recent_projects.filter((r) => r.id !== id);
+        } else if (/DELETE FROM recent_projects WHERE root_path/.test(sql)) {
+          const [rootPath, id] = args as [string, string];
+          store.recent_projects = store.recent_projects.filter(
+            (r) => r.root_path !== rootPath && r.id !== id,
+          );
+        } else if (/INSERT INTO recent_projects/.test(sql)) {
+          const [id, root_path, name, data, updated_at] = args as [
+            string,
+            string,
+            string,
+            string,
+            number,
+          ];
+          store.recent_projects.push({ id, root_path, name, data, updated_at });
         }
       }),
       get: vi.fn((..._args: unknown[]): unknown => {
@@ -114,6 +135,9 @@ function createFakeBetterSqlite3(tables: Partial<Record<TableName, FakeRow[]>> =
         }
         if (/SELECT data FROM editor_buffer/.test(sql)) {
           return store.editor_buffer[0] ?? undefined;
+        }
+        if (/SELECT COUNT\(\*\) as count FROM recent_projects/.test(sql)) {
+          return { count: store.recent_projects.length };
         }
         return undefined;
       }),
@@ -156,6 +180,19 @@ function createManagerWithFakeDb(fakeDb: ReturnType<typeof createFakeBetterSqlit
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (manager as any).db = fakeDb;
   return manager;
+}
+
+function withPlatform<T>(platform: NodeJS.Platform, fn: () => T): T {
+  const original = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", {
+    configurable: true,
+    value: platform,
+  });
+  try {
+    return fn();
+  } finally {
+    if (original) Object.defineProperty(process, "platform", original);
+  }
 }
 
 // -----------------------------------------------------------------------
@@ -419,6 +456,107 @@ describe("ElectronStorageManager — corrupt JSON recovery", () => {
       );
 
       warnSpy.mockRestore();
+    });
+  });
+
+  describe("addRecentProject", () => {
+    it("deduplicates Windows drive-letter root paths case-insensitively on win32", () => {
+      const fakeDb = createFakeBetterSqlite3({
+        recent_projects: [
+          {
+            id: "old-project",
+            root_path: "C:\\Users\\Me\\Novel",
+            name: "Novel",
+            data: JSON.stringify({
+              id: "old-project",
+              rootPath: "C:\\Users\\Me\\Novel",
+              name: "Novel",
+            }),
+            updated_at: 1,
+          },
+        ],
+      });
+      const manager = createManagerWithFakeDb(fakeDb);
+
+      withPlatform("win32", () => {
+        manager.addRecentProject({
+          id: "new-project",
+          rootPath: "c:\\users\\me\\novel\\",
+          name: "Novel renamed",
+        });
+      });
+
+      const projects = manager.getRecentProjects();
+      expect(projects).toHaveLength(1);
+      expect(projects[0]).toMatchObject({
+        id: "new-project",
+        rootPath: "c:\\users\\me\\novel\\",
+        name: "Novel renamed",
+      });
+    });
+
+    it("deduplicates Windows UNC roots case-insensitively on win32", () => {
+      const fakeDb = createFakeBetterSqlite3({
+        recent_projects: [
+          {
+            id: "old-unc",
+            root_path: "\\\\SERVER\\Share\\Novel",
+            name: "Novel",
+            data: JSON.stringify({
+              id: "old-unc",
+              rootPath: "\\\\SERVER\\Share\\Novel",
+              name: "Novel",
+            }),
+            updated_at: 1,
+          },
+        ],
+      });
+      const manager = createManagerWithFakeDb(fakeDb);
+
+      withPlatform("win32", () => {
+        manager.addRecentProject({
+          id: "new-unc",
+          rootPath: "\\\\server\\share\\novel",
+          name: "Novel",
+        });
+      });
+
+      const projects = manager.getRecentProjects();
+      expect(projects).toHaveLength(1);
+      expect(projects[0].id).toBe("new-unc");
+    });
+
+    it("deduplicates macOS NFC/NFD variants without changing case sensitivity", () => {
+      const nfc = "ガ";
+      const nfd = "ガ";
+      const fakeDb = createFakeBetterSqlite3({
+        recent_projects: [
+          {
+            id: "old-jp",
+            root_path: `/Users/me/${nfd}`,
+            name: "Novel",
+            data: JSON.stringify({
+              id: "old-jp",
+              rootPath: `/Users/me/${nfd}`,
+              name: "Novel",
+            }),
+            updated_at: 1,
+          },
+        ],
+      });
+      const manager = createManagerWithFakeDb(fakeDb);
+
+      withPlatform("darwin", () => {
+        manager.addRecentProject({
+          id: "new-jp",
+          rootPath: `/Users/me/${nfc}/`,
+          name: "Novel",
+        });
+      });
+
+      const projects = manager.getRecentProjects();
+      expect(projects).toHaveLength(1);
+      expect(projects[0].id).toBe("new-jp");
     });
   });
 });

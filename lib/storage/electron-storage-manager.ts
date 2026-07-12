@@ -36,6 +36,12 @@ try {
   // 環境によっては better-sqlite3 が存在しない
 }
 
+function normalizeRecentProjectRootPath(rootPath: string): string {
+  const normalized = rootPath.replace(/\\/g, "/").replace(/\/+$/, "").normalize("NFC");
+  const isWindowsPath = /^[a-zA-Z]:\//.test(normalized) || normalized.startsWith("//");
+  return process.platform === "win32" && isWindowsPath ? normalized.toLowerCase() : normalized;
+}
+
 /**
  * トランザクション内で fn を実行するヘルパー。
  *
@@ -389,6 +395,27 @@ export class ElectronStorageManager {
     const db = this.ensureInitialized();
 
     runInTransaction(db, () => {
+      const targetRoot = normalizeRecentProjectRootPath(project.rootPath);
+      const existingRows = db
+        .prepare("SELECT id, root_path, data FROM recent_projects")
+        .all() as Array<{ id: string; root_path?: string; data?: string }>;
+      const deleteByIdStmt = db.prepare("DELETE FROM recent_projects WHERE id = ?");
+
+      for (const row of existingRows) {
+        let existingRoot = row.root_path;
+        if (!existingRoot && row.data) {
+          try {
+            const parsed = JSON.parse(row.data) as { rootPath?: unknown };
+            existingRoot = typeof parsed.rootPath === "string" ? parsed.rootPath : undefined;
+          } catch {
+            // Corrupt rows are handled by getRecentProjects(); ignore them here.
+          }
+        }
+        if (existingRoot && normalizeRecentProjectRootPath(existingRoot) === targetRoot) {
+          deleteByIdStmt.run(row.id);
+        }
+      }
+
       // Remove existing entries for this root path OR this id to prevent PRIMARY KEY collision
       // when a duplicated project directory shares the same projectId with a different path.
       const deleteStmt = db.prepare("DELETE FROM recent_projects WHERE root_path = ? OR id = ?");
