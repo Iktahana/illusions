@@ -345,13 +345,16 @@ jobs:
 
   build-mas:
     name: Build (Mac App Store)
-    needs: compute-version
-    # 初期移行中は手動入力が明示されたときだけ実行し、タグpushでは走らせない。
+    needs: [detect-changes, compute-version]
+    # beta への push で自動実行し、内部TestFlightへ配信する。workflow_dispatch でも手動起動可能。
+    # タグpush（main向け安定版）ではまだ走らせない。
     if: |
       always() &&
-      github.event_name == 'workflow_dispatch' &&
-      inputs.run_mas_build == true &&
-      needs.compute-version.result == 'success'
+      needs.compute-version.result == 'success' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.run_mas_build == true) ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/beta' && needs.detect-changes.outputs.desktop_changed == 'true')
+      )
     runs-on: macos-latest
     environment: Apple
     env:
