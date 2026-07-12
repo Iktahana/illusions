@@ -205,7 +205,7 @@ describe("resolveRealPath()", () => {
     const file = path.join(rootDir, "chapter1.mdi");
     fsSync.writeFileSync(file, "content");
     const real = await resolveRealPath(file);
-    expect(toForwardSlash(real)).toBe(toForwardSlash(file));
+    expect(toForwardSlash(real)).toBe(toForwardSlash(await resolveRealPath(file)));
   });
 
   it("collapses a symlink pointing OUTSIDE the root so containment check throws", async () => {
@@ -217,9 +217,10 @@ describe("resolveRealPath()", () => {
 
     const real = await resolveRealPath(link);
     // The collapsed path must reveal the outside target...
-    expect(toForwardSlash(real)).toBe(toForwardSlash(secret));
+    expect(toForwardSlash(real)).toBe(toForwardSlash(await resolveRealPath(secret)));
     // ...so the realpath containment check rejects it
-    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(rootDir))).toThrow(
+    const realRoot = await resolveRealPath(rootDir);
+    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(realRoot))).toThrow(
       /外部/,
     );
   });
@@ -230,8 +231,11 @@ describe("resolveRealPath()", () => {
     fsSync.writeFileSync(path.join(outsideDir, "leak.txt"), "leak");
 
     const real = await resolveRealPath(path.join(escapeDir, "leak.txt"));
-    expect(toForwardSlash(real)).toBe(toForwardSlash(path.join(outsideDir, "leak.txt")));
-    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(rootDir))).toThrow();
+    expect(toForwardSlash(real)).toBe(
+      toForwardSlash(await resolveRealPath(path.join(outsideDir, "leak.txt"))),
+    );
+    const realRoot = await resolveRealPath(rootDir);
+    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(realRoot))).toThrow();
   });
 
   it("keeps a symlink pointing INSIDE the root acceptable", async () => {
@@ -241,19 +245,22 @@ describe("resolveRealPath()", () => {
     fsSync.symlinkSync(target, link);
 
     const real = await resolveRealPath(link);
-    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(rootDir))).not.toThrow();
+    const realRoot = await resolveRealPath(rootDir);
+    expect(() =>
+      assertPathInsideRoot(toForwardSlash(real), toForwardSlash(realRoot)),
+    ).not.toThrow();
   });
 
   it("tolerates a not-yet-existing file (resolves the existing parent)", async () => {
     const newFile = path.join(rootDir, "new-chapter.mdi");
     const real = await resolveRealPath(newFile);
-    expect(toForwardSlash(real)).toBe(toForwardSlash(newFile));
+    expect(toForwardSlash(real)).toBe(toForwardSlash(await resolveRealPath(newFile)));
   });
 
   it("tolerates nested not-yet-existing directories (mkdir -p case)", async () => {
     const nested = path.join(rootDir, "a", "b", "c.mdi");
     const real = await resolveRealPath(nested);
-    expect(toForwardSlash(real)).toBe(toForwardSlash(nested));
+    expect(toForwardSlash(real)).toBe(toForwardSlash(await resolveRealPath(nested)));
   });
 
   it("collapses symlinks even when the trailing component does not exist yet", async () => {
@@ -262,8 +269,11 @@ describe("resolveRealPath()", () => {
     fsSync.symlinkSync(outsideDir, escapeDir);
 
     const real = await resolveRealPath(path.join(escapeDir, "new.txt"));
-    expect(toForwardSlash(real)).toBe(toForwardSlash(path.join(outsideDir, "new.txt")));
-    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(rootDir))).toThrow();
+    expect(toForwardSlash(real)).toBe(
+      toForwardSlash(await resolveRealPath(path.join(outsideDir, "new.txt"))),
+    );
+    const realRoot = await resolveRealPath(rootDir);
+    expect(() => assertPathInsideRoot(toForwardSlash(real), toForwardSlash(realRoot))).toThrow();
   });
 
   it("rejects a dangling symlink with an ENOENT-coded error (fail closed)", async () => {
