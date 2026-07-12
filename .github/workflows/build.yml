@@ -471,6 +471,12 @@ jobs:
             --apiKey "$ASC_KEY_ID" \
             --apiIssuer "$ASC_ISSUER_ID"
 
+      - name: Enable build for internal TestFlight testers
+        # Apple takes a few minutes to finish processing an uploaded build
+        # before it's visible via the API, hence the polling/retry loop
+        # inside this script.
+        run: node scripts/asc-testflight-enable.mjs ${{ needs.compute-version.outputs.base }}
+
   # ---------------------------------------------------------------------------
   # Windows — shared build step, then separate NSIS / MSIX packaging
   # ---------------------------------------------------------------------------
