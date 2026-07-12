@@ -162,22 +162,39 @@ export class HistoryService {
           }
         }
 
+        let snapshotWritten = false;
+
         // Write the snapshot file
         await this.store.writeSnapshotFile(sourcePath, filename, content);
+        snapshotWritten = true;
 
-        lockedIndex.snapshots.unshift(entry);
+        try {
+          lockedIndex.snapshots.unshift(entry);
 
-        // Prune according to policy
-        const toDelete = getPruneSet(lockedIndex);
-        if (toDelete.length > 0) {
-          const deleteIds = new Set(toDelete.map((s) => s.id));
-          for (const pruned of toDelete) {
-            await this.store.deleteSnapshotFile(sourcePath, pruned.filename);
+          // Prune according to policy
+          const toDelete = getPruneSet(lockedIndex);
+          if (toDelete.length > 0) {
+            const deleteIds = new Set(toDelete.map((s) => s.id));
+            for (const pruned of toDelete) {
+              await this.store.deleteSnapshotFile(sourcePath, pruned.filename);
+            }
+            lockedIndex.snapshots = lockedIndex.snapshots.filter((s) => !deleteIds.has(s.id));
           }
-          lockedIndex.snapshots = lockedIndex.snapshots.filter((s) => !deleteIds.has(s.id));
-        }
 
-        await this.store.saveIndex(lockedIndex);
+          await this.store.saveIndex(lockedIndex);
+        } catch (error) {
+          if (snapshotWritten) {
+            try {
+              await this.store.deleteSnapshotFile(sourcePath, filename);
+            } catch (rollbackError) {
+              console.error(
+                "Failed to roll back orphan snapshot file / 孤立スナップショットのロールバックに失敗しました:",
+                rollbackError,
+              );
+            }
+          }
+          throw error;
+        }
         return true;
       });
 
@@ -258,6 +275,18 @@ export class HistoryService {
         if (!entry.displayName) {
           entry.displayName = getSnapshotDisplayName(entry);
         }
+        try {
+          entry.isMissing = !(await this.store.snapshotFileExists(
+            entry.sourcePath,
+            entry.filename,
+          ));
+        } catch (error) {
+          console.warn(
+            "Failed to check snapshot file availability / スナップショットファイルの存在確認に失敗しました:",
+            error,
+          );
+          delete entry.isMissing;
+        }
       }
 
       // Ensure sorted by timestamp descending
@@ -310,10 +339,23 @@ export class HistoryService {
         return {
           success: false,
           error: `Snapshot not found: ${snapshotId}`,
+          reason: "snapshot-not-found",
         };
       }
 
-      const content = await this.store.readSnapshotFile(entry.sourcePath, entry.filename);
+      let content: string;
+      try {
+        content = await this.store.readSnapshotFile(entry.sourcePath, entry.filename);
+      } catch (error) {
+        if (this.isMissingSnapshotFileError(error)) {
+          return {
+            success: false,
+            error: `Snapshot file missing: ${entry.filename}`,
+            reason: "snapshot-file-missing",
+          };
+        }
+        throw error;
+      }
 
       // Verify checksum
       const actualChecksum = await calculateChecksum(content);
@@ -324,6 +366,7 @@ export class HistoryService {
             `Checksum mismatch for snapshot "${entry.filename}". ` +
             `Expected: ${entry.checksum}, got: ${actualChecksum}. ` +
             "The snapshot file may be corrupted.",
+          reason: "checksum-mismatch",
         };
       }
 
@@ -332,8 +375,18 @@ export class HistoryService {
       return {
         success: false,
         error: `Failed to restore snapshot: ${error instanceof Error ? error.message : String(error)}`,
+        reason: "read-error",
       };
     }
+  }
+
+  private isMissingSnapshotFileError(error: unknown): boolean {
+    const err = error as { code?: string; name?: string; message?: string } | undefined;
+    return (
+      err?.code === "ENOENT" ||
+      err?.name === "NotFoundError" ||
+      err?.message?.includes("File not found") === true
+    );
   }
 
   // -----------------------------------------------------------------------

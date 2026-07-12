@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Pin, RotateCcw, Loader2, Bookmark, GitCompare, MoreVertical } from "lucide-react";
+import { Pin, RotateCcw, Loader2, Bookmark, GitCompare, MoreVertical, FileX } from "lucide-react";
 import clsx from "clsx";
 
 import type { SnapshotEntry } from "@/lib/services/history-service";
@@ -34,6 +34,7 @@ export default function SnapshotItem({
 }: SnapshotItemProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isMissing = snapshot.isMissing === true;
 
   // Close menu on outside click
   useEffect(() => {
@@ -50,22 +51,27 @@ export default function SnapshotItem({
   return (
     <div
       role="button"
-      tabIndex={0}
+      tabIndex={isMissing ? -1 : 0}
+      aria-disabled={isMissing}
       onClick={() => {
-        if (!isLoadingDiff) onCompare(snapshot);
+        if (!isLoadingDiff && !isMissing) onCompare(snapshot);
       }}
       onKeyDown={(e) => {
         if (
           (e.key === "Enter" || e.key === " ") &&
           !isLoadingDiff &&
+          !isMissing &&
           e.target === e.currentTarget
         ) {
           e.preventDefault();
           onCompare(snapshot);
         }
       }}
-      title="クリックで差分を表示"
-      className="bg-background-secondary rounded-lg p-3 border border-border cursor-pointer hover:border-accent/50 transition-colors"
+      title={isMissing ? "履歴ファイルが見つかりません" : "クリックで差分を表示"}
+      className={clsx(
+        "bg-background-secondary rounded-lg p-3 border border-border transition-colors",
+        isMissing ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:border-accent/50",
+      )}
     >
       {/* Row 1: Time + type badge + char count */}
       <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -91,6 +97,12 @@ export default function SnapshotItem({
       {/* Milestone label */}
       {snapshot.label && (
         <p className="text-xs font-medium text-foreground-secondary mb-1">{snapshot.label}</p>
+      )}
+      {isMissing && (
+        <p className="text-[11px] text-warning mb-1 flex items-center gap-1">
+          <FileX className="w-3 h-3" />
+          履歴ファイルなし
+        </p>
       )}
 
       {/* Row 2: Diff indicator + actions */}
@@ -136,7 +148,7 @@ export default function SnapshotItem({
                     setMenuOpen(false);
                     onRestore(snapshot);
                   }}
-                  disabled={isRestoring}
+                  disabled={isRestoring || isMissing}
                   className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
                 >
                   {isRestoring ? (
@@ -152,7 +164,7 @@ export default function SnapshotItem({
                     setMenuOpen(false);
                     onCompare(snapshot);
                   }}
-                  disabled={isLoadingDiff}
+                  disabled={isLoadingDiff || isMissing}
                   className="flex items-center gap-2 w-full px-3 py-1.5 text-[11px] font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
                 >
                   {isLoadingDiff ? (
