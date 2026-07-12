@@ -168,4 +168,10 @@ describe("#1466 — effective POS highlight follows window activity", () => {
     await mountHook(makeParams({ view: null }));
     expect(updatePosHighlightSettings).not.toHaveBeenCalled();
   });
+
+  it("does nothing when the view has already been destroyed", async () => {
+    const destroyedView = { docView: null } as unknown as EditorView;
+    await mountHook(makeParams({ view: destroyedView }));
+    expect(updatePosHighlightSettings).not.toHaveBeenCalled();
+  });
 });
