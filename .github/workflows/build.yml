@@ -345,10 +345,13 @@ jobs:
 
   build-mas:
     name: Build (Mac App Store)
+    needs: compute-version
     # 初期移行中は手動入力が明示されたときだけ実行し、タグpushでは走らせない。
     if: |
+      always() &&
       github.event_name == 'workflow_dispatch' &&
-      inputs.run_mas_build == true
+      inputs.run_mas_build == true &&
+      needs.compute-version.result == 'success'
     runs-on: macos-latest
     environment: Apple
     env:
@@ -427,6 +430,14 @@ jobs:
           mkdir -p "$HOME/.appstoreconnect/private_keys"
           printf '%s' "$ASC_API_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
           chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Apply computed version
+        # CFBundleVersion must be plain dot-separated integers, so this uses
+        # the clean `base` output (no beta.<timestamp> suffix) — same
+        # ephemeral, uncommitted bump every other channel does via
+        # compute-version, so each MAS upload gets a fresh version
+        # automatically instead of colliding with the previous one.
+        run: npm version ${{ needs.compute-version.outputs.base }} --no-git-tag-version --allow-same-version
 
       - name: Download local fonts
         run: npm run download:fonts
