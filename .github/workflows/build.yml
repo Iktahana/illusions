@@ -449,9 +449,18 @@ jobs:
         run: npm run build:quicklook
 
       - name: Build MAS package
+        # CFBundleVersion (the App Store Connect "build number") must be
+        # unique on every upload, but compute-version's clean `base` output
+        # (used above for CFBundleShortVersionString) only advances when a
+        # stable git tag is cut — which doesn't happen on every beta push or
+        # manual re-run, causing duplicate-version upload rejections. Set
+        # CFBundleVersion independently to the numeric, always-unique
+        # run_id+run_attempt so every build gets a fresh one regardless of
+        # tag state.
         run: MAS_BUILD=1 npm run electron:build:mas
         env:
           DEBUG: electron-builder
+          MAS_EXTRA_BUILDER_ARGS: --config.mas.bundleVersion=${{ github.run_id }}${{ github.run_attempt }}
 
       - name: Upload MAS package artifact
         uses: actions/upload-artifact@v7
