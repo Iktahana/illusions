@@ -3,19 +3,22 @@
  * Makes an already-uploaded build available to internal TestFlight testers.
  *
  * Requires env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_API_KEY (base64 .p8), ASC_APP_ID.
- * Usage: node scripts/asc-testflight-enable.mjs <version>  (e.g. 1.3.3)
+ * Usage: node scripts/asc-testflight-enable.mjs <CFBundleVersion>
+ *   (the unique build number passed to --config.mas.bundleVersion, not the
+ *   marketing version — multiple builds can share the same marketing
+ *   version, so matching on that would pick up a stale build)
  */
 import crypto from "crypto";
 
 const { ASC_KEY_ID, ASC_ISSUER_ID, ASC_API_KEY, ASC_APP_ID } = process.env;
-const version = process.argv[2];
+const buildNumber = process.argv[2];
 
 if (!ASC_KEY_ID || !ASC_ISSUER_ID || !ASC_API_KEY || !ASC_APP_ID) {
   console.error("Missing ASC_KEY_ID / ASC_ISSUER_ID / ASC_API_KEY / ASC_APP_ID");
   process.exit(1);
 }
-if (!version) {
-  console.error("Usage: node scripts/asc-testflight-enable.mjs <version>");
+if (!buildNumber) {
+  console.error("Usage: node scripts/asc-testflight-enable.mjs <CFBundleVersion>");
   process.exit(1);
 }
 
@@ -62,12 +65,15 @@ async function asc(path, options = {}) {
   return body;
 }
 
-async function findBuild(version, { retries = 20, delayMs = 30000 } = {}) {
+async function findBuild(buildNumber, { retries = 20, delayMs = 30000 } = {}) {
   for (let attempt = 1; attempt <= retries; attempt++) {
-    const res = await asc(
-      `/builds?filter[app]=${ASC_APP_ID}&filter[version]=${encodeURIComponent(version)}&sort=-uploadedDate&limit=5`,
-    );
-    const build = res.data?.[0];
+    // Fetch recent builds and match on the exact CFBundleVersion rather than
+    // relying on `filter[version]` — several builds can share the same
+    // marketing (CFBundleShortVersionString) value, and it's unclear from
+    // testing whether that filter matches on that or CFBundleVersion, so
+    // matching client-side on the unique number is the reliable option.
+    const res = await asc(`/builds?filter[app]=${ASC_APP_ID}&sort=-uploadedDate&limit=10`);
+    const build = res.data?.find((b) => b.attributes.version === buildNumber);
     if (build) {
       console.log(`Found build ${build.id} (state: ${build.attributes.processingState})`);
       if (build.attributes.processingState === "VALID") {
@@ -75,11 +81,13 @@ async function findBuild(version, { retries = 20, delayMs = 30000 } = {}) {
       }
       console.log(`  still processing (${build.attributes.processingState}), waiting...`);
     } else {
-      console.log(`Build ${version} not visible yet, waiting... (attempt ${attempt}/${retries})`);
+      console.log(
+        `Build with CFBundleVersion ${buildNumber} not visible yet, waiting... (attempt ${attempt}/${retries})`,
+      );
     }
     await new Promise((r) => setTimeout(r, delayMs));
   }
-  throw new Error(`Build ${version} did not become VALID within timeout`);
+  throw new Error(`Build ${buildNumber} did not become VALID within timeout`);
 }
 
 async function ensureExportCompliance(buildId) {
@@ -93,8 +101,11 @@ async function ensureExportCompliance(buildId) {
 }
 
 async function findOrGetInternalGroup() {
-  const res = await asc(`/apps/${ASC_APP_ID}/betaGroups?filter[isInternalGroup]=true`);
-  const group = res.data?.[0];
+  // `filter[isInternalGroup]` isn't a supported query param on this
+  // endpoint (confirmed via a 400 PARAMETER_ERROR.ILLEGAL response) — fetch
+  // all groups for the app and filter client-side instead.
+  const res = await asc(`/apps/${ASC_APP_ID}/betaGroups`);
+  const group = res.data?.find((g) => g.attributes.isInternalGroup === true);
   if (!group) {
     throw new Error(
       "No internal beta group found for this app. Create one in App Store Connect → TestFlight → Internal Testing first (this is a one-time manual step Apple requires).",
@@ -112,8 +123,8 @@ async function addBuildToGroup(groupId, buildId) {
   console.log("Build added to internal TestFlight group.");
 }
 
-const build = await findBuild(version);
+const build = await findBuild(buildNumber);
 await ensureExportCompliance(build.id);
 const group = await findOrGetInternalGroup();
 await addBuildToGroup(group.id, build.id);
-console.log(`\n✅ Build ${version} is now available via TestFlight to internal testers.`);
+console.log(`\n✅ Build ${buildNumber} is now available via TestFlight to internal testers.`);
