@@ -29,6 +29,8 @@ const HISTORY_DIR_NAME = "history";
 
 /** Name of the history index file */
 const HISTORY_INDEX_FILENAME = "index.json";
+const HISTORY_INDEX_PATH = ".illusions/history/index.json";
+const HISTORY_INDEX_BACKUP_PATH = ".illusions/history/index.json.bak";
 
 /** Name of the bookmarks file */
 export const BOOKMARKS_FILENAME = ".history_bookmarks.json";
@@ -65,11 +67,14 @@ export class HistoryStore {
   async loadIndex(): Promise<HistoryIndex> {
     let content: string;
     try {
-      const historyDir = await this.getHistoryDirectory();
-      const indexHandle = await historyDir.getFileHandle(HISTORY_INDEX_FILENAME);
-      content = await indexHandle.read();
+      content = await getProjectFileService().readFile(HISTORY_INDEX_PATH);
     } catch {
-      // Index file doesn't exist (e.g. ENOENT on first run); return defaults
+      try {
+        const backupText = await getProjectFileService().readFile(HISTORY_INDEX_BACKUP_PATH);
+        return JSON.parse(backupText) as HistoryIndex;
+      } catch {
+        // Index file doesn't exist (e.g. ENOENT on first run); return defaults
+      }
       return createDefaultHistoryIndex();
     }
 
@@ -79,6 +84,12 @@ export class HistoryStore {
     try {
       parsed = JSON.parse(content) as HistoryIndex;
     } catch (err) {
+      try {
+        const backupText = await getProjectFileService().readFile(HISTORY_INDEX_BACKUP_PATH);
+        return JSON.parse(backupText) as HistoryIndex;
+      } catch {
+        // No usable last-known-good backup; fall through to existing corrupt-index repair.
+      }
       console.warn(
         "[HistoryStore] index.json が破損しています。バックアップ成功時のみデフォルト値で再生成します。",
         err,
@@ -121,9 +132,36 @@ export class HistoryStore {
    * 履歴インデックスを .illusions/history/index.json に書き込む。
    */
   async saveIndex(index: HistoryIndex): Promise<void> {
-    const historyDir = await this.ensureHistoryDirectory();
-    const indexHandle = await historyDir.getFileHandle(HISTORY_INDEX_FILENAME, { create: true });
-    await indexHandle.write(JSON.stringify(index, null, 2));
+    await this.ensureHistoryDirectory();
+    const vfs = getProjectFileService();
+    let backupJson: string | null = null;
+    try {
+      const currentText = await vfs.readFile(HISTORY_INDEX_PATH);
+      backupJson = JSON.stringify(JSON.parse(currentText) as HistoryIndex, null, 2);
+    } catch {
+      try {
+        const backupText = await vfs.readFile(HISTORY_INDEX_BACKUP_PATH);
+        backupJson = JSON.stringify(JSON.parse(backupText) as HistoryIndex, null, 2);
+      } catch {
+        backupJson = null;
+      }
+    }
+
+    const tempPath = `${HISTORY_INDEX_PATH}.tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    try {
+      if (backupJson !== null) {
+        await vfs.writeFile(HISTORY_INDEX_BACKUP_PATH, backupJson);
+      }
+      await vfs.writeFile(tempPath, JSON.stringify(index, null, 2));
+      await vfs.rename(tempPath, HISTORY_INDEX_PATH);
+    } catch (error) {
+      try {
+        await vfs.deleteFile(tempPath);
+      } catch {
+        // Best-effort cleanup only.
+      }
+      throw error;
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -159,6 +197,23 @@ export class HistoryStore {
   }
 
   /**
+   * Check whether a snapshot file exists without reading its content.
+   * スナップショットファイルが存在するかを内容を読まずに確認する。
+   */
+  async snapshotFileExists(_sourcePath: string, filename: string): Promise<boolean> {
+    try {
+      const historyDir = await this.getHistoryDirectory();
+      await historyDir.getFileHandle(filename);
+      return true;
+    } catch (error) {
+      if (this.isMissingFileError(error)) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Delete a snapshot file.
    * スナップショットファイルを削除する。
    *
@@ -169,9 +224,14 @@ export class HistoryStore {
     try {
       const historyDir = await this.getHistoryDirectory();
       await historyDir.removeEntry(filename);
-    } catch {
-      // File may already be deleted; log and continue
-      console.warn(`Failed to delete snapshot file: ${filename}`);
+    } catch (error) {
+      const code = (error as { code?: string; name?: string } | undefined)?.code;
+      const name = (error as { code?: string; name?: string } | undefined)?.name;
+      if (code === "ENOENT" || name === "NotFoundError") {
+        return;
+      }
+      console.warn(`Failed to delete snapshot file: ${filename}`, error);
+      throw error;
     }
   }
 
@@ -314,5 +374,14 @@ export class HistoryStore {
     const rootDir = await vfs.getDirectoryHandle("");
     const illusionsDir = await rootDir.getDirectoryHandle(".illusions", { create: true });
     return illusionsDir.getDirectoryHandle(HISTORY_DIR_NAME, { create: true });
+  }
+
+  private isMissingFileError(error: unknown): boolean {
+    const err = error as { code?: string; name?: string; message?: string } | undefined;
+    return (
+      err?.code === "ENOENT" ||
+      err?.name === "NotFoundError" ||
+      err?.message?.includes("File not found") === true
+    );
   }
 }

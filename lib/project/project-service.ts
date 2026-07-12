@@ -33,6 +33,9 @@ interface HistoryIndex {
   retentionDays: number;
 }
 
+const PROJECT_JSON_PATH = ".illusions/project.json";
+const PROJECT_JSON_BACKUP_PATH = ".illusions/project.json.bak";
+
 /**
  * Result of project structure validation.
  * プロジェクト構造の検証結果。
@@ -295,13 +298,11 @@ export class ProjectService {
     await mainFileHandle.write(content);
 
     // Update project.json lastModified
-    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
-    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
     const updatedMetadata: ProjectConfig = {
       ...project.metadata,
       lastModified: Date.now(),
     };
-    await projectJsonHandle.write(JSON.stringify(updatedMetadata, null, 2));
+    await this.persistProjectMetadata(project, updatedMetadata);
 
     // Update workspace.json via merge writer (preserves openTabs/dockviewLayout
     // written by tab persistence — see workspace-persistence.ts).
@@ -320,10 +321,44 @@ export class ProjectService {
    * @param project - The project whose metadata should be persisted
    */
   async saveProjectMetadata(project: ProjectMode): Promise<void> {
+    await this.persistProjectMetadata(project, project.metadata);
+  }
+
+  private async persistProjectMetadata(
+    project: ProjectMode,
+    metadata: ProjectConfig,
+  ): Promise<void> {
     const rootDirHandle = await this.getVFSDirectoryHandle(project);
-    const illusionsDir = await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
-    const projectJsonHandle = await illusionsDir.getFileHandle("project.json", { create: true });
-    await projectJsonHandle.write(JSON.stringify(project.metadata, null, 2));
+    await rootDirHandle.getDirectoryHandle(".illusions", { create: true });
+
+    const nextJson = JSON.stringify(metadata, null, 2);
+    const lastKnownGoodJson = await this.readExistingProjectMetadataJson();
+    const tempPath = `.illusions/project.json.tmp-${Date.now()}-${crypto.randomUUID()}`;
+
+    try {
+      await this.vfs.writeFile(PROJECT_JSON_BACKUP_PATH, lastKnownGoodJson ?? nextJson);
+      await this.vfs.writeFile(tempPath, nextJson);
+      await this.vfs.rename(tempPath, PROJECT_JSON_PATH);
+    } catch (error) {
+      try {
+        await this.vfs.deleteFile(tempPath);
+      } catch {
+        // Best-effort cleanup; preserve the original persistence failure.
+      }
+      throw error;
+    }
+  }
+
+  private async readExistingProjectMetadataJson(): Promise<string | null> {
+    for (const path of [PROJECT_JSON_PATH, PROJECT_JSON_BACKUP_PATH]) {
+      try {
+        const text = await this.vfs.readFile(path);
+        return JSON.stringify(JSON.parse(text) as ProjectConfig, null, 2);
+      } catch {
+        // Missing/corrupt source is handled by falling back to the next candidate.
+      }
+    }
+    return null;
   }
 
   /**

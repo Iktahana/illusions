@@ -12,10 +12,13 @@
 
 const path = require("path");
 const fs = require("fs");
+const fsp = require("fs/promises");
 const https = require("https");
 const zlib = require("zlib");
 const crypto = require("crypto");
+const { pipeline } = require("stream/promises");
 const { app } = require("electron");
+const { withTransientIoRetry } = require("./lib/transient-io-retry");
 
 const PROVIDER_ID = "genji";
 const GITHUB_OWNER = "illusions-lab";
@@ -865,7 +868,7 @@ class DictManager {
       await this._decompressGzip(tempPath, finalPath + ".decompressing");
 
       // Clean up temp file
-      fs.unlinkSync(tempPath);
+      await withTransientIoRetry(() => fsp.unlink(tempPath));
 
       // Close existing DB connection before replacing file
       if (this._db) {
@@ -876,7 +879,7 @@ class DictManager {
       }
 
       // Atomically replace the database file
-      fs.renameSync(finalPath + ".decompressing", finalPath);
+      await withTransientIoRetry(() => fsp.rename(finalPath + ".decompressing", finalPath));
 
       // Save version
       if (this._latestVersion) {
@@ -903,7 +906,7 @@ class DictManager {
         this._getDbPath() + ".decompressing",
       ]) {
         try {
-          if (fs.existsSync(p)) fs.unlinkSync(p);
+          await withTransientIoRetry(() => fsp.unlink(p));
         } catch {}
       }
       return { success: false, error: String(err?.message ?? err) };
@@ -967,7 +970,6 @@ class DictManager {
             let lastReportedPct = 0;
             const hash = crypto.createHash("sha256");
 
-            const fileStream = fs.createWriteStream(destPath);
             res.on("data", (chunk) => {
               hash.update(chunk);
               receivedBytes += chunk.length;
@@ -979,10 +981,11 @@ class DictManager {
                 }
               }
             });
-            res.pipe(fileStream);
-            fileStream.on("close", () => resolve(hash.digest("hex")));
-            fileStream.on("error", reject);
-            res.on("error", reject);
+
+            const fileStream = fs.createWriteStream(destPath);
+            pipeline(res, fileStream)
+              .then(() => resolve(hash.digest("hex")))
+              .catch(reject);
           })
           .on("error", reject);
       };
@@ -995,19 +998,12 @@ class DictManager {
    * Decompress a .gz file to the given destination path.
    * @private
    */
-  _decompressGzip(srcPath, destPath) {
-    return new Promise((resolve, reject) => {
-      const src = fs.createReadStream(srcPath);
-      const dest = fs.createWriteStream(destPath);
-      const gunzip = zlib.createGunzip();
-
-      src.on("error", reject);
-      gunzip.on("error", reject);
-      dest.on("error", reject);
-      dest.on("close", resolve);
-
-      src.pipe(gunzip).pipe(dest);
-    });
+  async _decompressGzip(srcPath, destPath) {
+    await pipeline(
+      fs.createReadStream(srcPath),
+      zlib.createGunzip(),
+      fs.createWriteStream(destPath),
+    );
   }
 }
 
