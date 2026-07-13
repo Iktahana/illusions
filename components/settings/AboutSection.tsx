@@ -8,6 +8,7 @@ import clsx from "clsx";
 import SettingsField from "@/components/settings/primitives/SettingsField";
 import SettingsToggle from "@/components/settings/primitives/SettingsToggle";
 import { useUpdateSettingsContext } from "@/contexts/EditorSettingsContext";
+import { getAppRuntimeInfo, type AppRuntimeInfo } from "@/lib/utils/runtime-env";
 
 const LICENSE_TEXT = process.env.NEXT_PUBLIC_LICENSE_TEXT || "";
 const TERMS_TEXT = process.env.NEXT_PUBLIC_TERMS_TEXT || "";
@@ -37,7 +38,10 @@ export default function AboutSection(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<AboutTab>("terms");
   const [expandedCredits, setExpandedCredits] = useState<Set<string>>(new Set());
   const [creditsData, setCreditsData] = useState<CreditEntry[]>([]);
-  const [isElectron, setIsElectron] = useState(false);
+  const [runtimeInfo, setRuntimeInfo] = useState<AppRuntimeInfo>({
+    distributionProvider: "unknown",
+    releaseChannel: "unknown",
+  });
 
   const { allowBetaUpdates, onAllowBetaUpdatesChange } = useUpdateSettingsContext();
 
@@ -49,10 +53,17 @@ export default function AboutSection(): React.ReactElement {
       });
   }, []);
 
-  // beta opt-in トグルは auto-updater を持つデスクトップ版でのみ表示する
+  // beta opt-in トグルは直售版の auto-updater でのみ表示する。
+  // Store / App Store 系の flight は配信プラットフォーム側の tester group で管理する。
   useEffect(() => {
-    setIsElectron(Boolean(window.electronAPI?.isElectron));
+    setRuntimeInfo(getAppRuntimeInfo());
   }, []);
+
+  const showDirectBetaToggle = runtimeInfo.distributionProvider === "direct";
+  const showStoreManagedUpdates =
+    runtimeInfo.distributionProvider === "microsoft-store" ||
+    runtimeInfo.distributionProvider === "app-store";
+  const isFlightBuild = runtimeInfo.releaseChannel === "beta";
 
   // Group credits by license type
   const creditsByLicense = creditsData.reduce<Record<string, CreditEntry[]>>((acc, entry) => {
@@ -94,8 +105,8 @@ export default function AboutSection(): React.ReactElement {
         </p>
       </div>
 
-      {/* Beta update opt-in (desktop only) */}
-      {isElectron && (
+      {/* Beta update opt-in (direct desktop only) */}
+      {showDirectBetaToggle && (
         <div className="rounded-lg border border-border bg-background-secondary p-4">
           <SettingsField
             label="ベータ版アップデートを受け取る"
@@ -109,6 +120,17 @@ export default function AboutSection(): React.ReactElement {
               onChange={onAllowBetaUpdatesChange}
             />
           </SettingsField>
+        </div>
+      )}
+
+      {showStoreManagedUpdates && (
+        <div className="rounded-lg border border-border bg-background-secondary p-4">
+          <p className="text-sm font-medium text-foreground">
+            {isFlightBuild ? "ベータ版（Flight）" : "ストア版"}
+          </p>
+          <p className="mt-1 text-xs text-foreground-tertiary">
+            このストア版は配信プラットフォーム経由で更新されます。ベータ版は招待されたテスターにのみ配信されます。
+          </p>
         </div>
       )}
 
@@ -147,7 +169,7 @@ export default function AboutSection(): React.ReactElement {
               : "border-transparent text-foreground-secondary hover:text-foreground",
           )}
         >
-          利用規約
+          利用規約・プライバシー
         </button>
         <button
           onClick={() => setActiveTab("license")}

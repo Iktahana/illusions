@@ -14,6 +14,10 @@ import { LRUCache } from "@/shared/lib/lru-cache";
 import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
 import { getPosColor, DEFAULT_POS_COLORS } from "./pos-colors";
 import type { PosColorConfig } from "./types";
+import {
+  dispatchIfEditorViewAlive,
+  isEditorViewAlive,
+} from "../../../shared/lib/editor-view-safety";
 
 export const posHighlightKey = new PluginKey("posHighlight");
 
@@ -123,6 +127,7 @@ export function createPosHighlightPlugin(
         const version = ++processingVersion;
 
         debounceTimer = setTimeout(async () => {
+          if (!isEditorViewAlive(view)) return;
           const state = posHighlightKey.getState(view.state);
           if (!state?.enabled) return;
 
@@ -153,6 +158,7 @@ export function createPosHighlightPlugin(
           }
 
           if (version !== processingVersion) return;
+          if (!isEditorViewAlive(view)) return;
 
           // キャッシュ済みトークンからすべての段落のデコレーションを構築
           // （ビューポート外でもキャッシュがあれば着色を維持）
@@ -194,8 +200,9 @@ export function createPosHighlightPlugin(
             allDecorations.length > 0
               ? DecorationSet.create(view.state.doc, allDecorations)
               : DecorationSet.empty;
-          const tr = view.state.tr.setMeta(posHighlightKey, { decorations });
-          view.dispatch(tr);
+          dispatchIfEditorViewAlive(view, (aliveView) =>
+            aliveView.state.tr.setMeta(posHighlightKey, { decorations }),
+          );
         }, debounceMs);
       }
 

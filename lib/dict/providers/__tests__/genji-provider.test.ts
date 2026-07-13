@@ -1,18 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { DictEntry } from "../../dict-types";
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-const mockQueryByEntry = vi.fn<(term: string, limit: number) => Promise<DictEntry[]>>();
-const mockQueryByReading = vi.fn<(reading: string, limit: number) => Promise<DictEntry[]>>();
-
-vi.mock("../genji-api-backend", () => ({
-  queryByEntry: (...args: [string, number]) => mockQueryByEntry(...args),
-  queryByReading: (...args: [string, number]) => mockQueryByReading(...args),
-}));
-
 const SAMPLE_ENTRY: DictEntry = {
   id: "abc-123",
   entry: "雪",
@@ -70,8 +58,6 @@ function setupWebEnv() {
 describe("GenjiProvider", () => {
   beforeEach(() => {
     vi.resetModules();
-    mockQueryByEntry.mockReset();
-    mockQueryByReading.mockReset();
   });
 
   afterEach(() => {
@@ -88,10 +74,10 @@ describe("GenjiProvider", () => {
   }
 
   describe("isAvailable", () => {
-    it("returns true in web environment", async () => {
+    it("returns false in web environment", async () => {
       setupWebEnv();
       const provider = await createProvider();
-      expect(await provider.isAvailable()).toBe(true);
+      expect(await provider.isAvailable()).toBe(false);
     });
 
     it("returns true in Electron environment", async () => {
@@ -102,15 +88,13 @@ describe("GenjiProvider", () => {
   });
 
   describe("query — web environment", () => {
-    it("uses remote backend", async () => {
+    it("returns no results without calling a remote backend", async () => {
       setupWebEnv();
-      mockQueryByEntry.mockResolvedValue([SAMPLE_ENTRY]);
 
       const provider = await createProvider();
       const results = await provider.query("雪");
 
-      expect(mockQueryByEntry).toHaveBeenCalledWith("雪", 20);
-      expect(results).toEqual([SAMPLE_ENTRY]);
+      expect(results).toEqual([]);
     });
   });
 
@@ -122,65 +106,56 @@ describe("GenjiProvider", () => {
       const results = await provider.query("雪");
 
       expect(results).toEqual([SAMPLE_LOCAL_ENTRY]);
-      expect(mockQueryByEntry).not.toHaveBeenCalled();
     });
   });
 
   describe("query — Electron without installed dict", () => {
-    it("falls back to remote backend", async () => {
+    it("returns no results", async () => {
       setupElectronEnv(false);
-      mockQueryByEntry.mockResolvedValue([SAMPLE_ENTRY]);
 
       const provider = await createProvider();
       const results = await provider.query("雪");
 
-      expect(mockQueryByEntry).toHaveBeenCalledWith("雪", 20);
-      expect(results).toEqual([SAMPLE_ENTRY]);
+      expect(results).toEqual([]);
     });
   });
 
   describe("query — Electron local returns empty", () => {
     it("treats the installed local dict as authoritative and does NOT hit the network", async () => {
       // A zero-hit lookup in the installed local dict means "no such entry";
-      // it must not fall through to the (often unreachable) remote API.
+      // it must not fall through to any network backend.
       setupElectronEnv(true, []);
-      mockQueryByEntry.mockResolvedValue([SAMPLE_ENTRY]);
 
       const provider = await createProvider();
       const results = await provider.query("雪");
 
-      expect(mockQueryByEntry).not.toHaveBeenCalled();
       expect(results).toEqual([]);
     });
   });
 
   describe("query — Electron local throws", () => {
-    it("falls back to remote on local error", async () => {
+    it("returns no results and does not call a remote backend", async () => {
       setupElectronEnv(true);
       // Override query to throw
       (
         window as Window & { electronAPI?: { dict?: { query: ReturnType<typeof vi.fn> } } }
       ).electronAPI!.dict!.query.mockRejectedValue(new Error("IPC failed"));
-      mockQueryByEntry.mockResolvedValue([SAMPLE_ENTRY]);
 
       const provider = await createProvider();
       const results = await provider.query("雪");
 
-      expect(mockQueryByEntry).toHaveBeenCalled();
-      expect(results).toEqual([SAMPLE_ENTRY]);
+      expect(results).toEqual([]);
     });
   });
 
   describe("queryByReading — web environment", () => {
-    it("uses remote backend", async () => {
+    it("returns no results without calling a remote backend", async () => {
       setupWebEnv();
-      mockQueryByReading.mockResolvedValue([SAMPLE_ENTRY]);
 
       const provider = await createProvider();
       const results = await provider.queryByReading("ゆき");
 
-      expect(mockQueryByReading).toHaveBeenCalledWith("ゆき", 20);
-      expect(results).toEqual([SAMPLE_ENTRY]);
+      expect(results).toEqual([]);
     });
   });
 });

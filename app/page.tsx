@@ -37,14 +37,14 @@ import { notificationManager } from "@/lib/services/notification-manager";
 import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { getAppRuntimeInfo, isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
-import { sanitizeMdiContent } from "@/lib/tab-manager/types";
+import { computeHistoryRestoreTabUpdate } from "@/lib/tab-manager/history-restore";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
@@ -72,11 +72,6 @@ import { useErrorReportingConsentToast } from "@/lib/error-reporting/use-error-r
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
-
-// Selections larger than this are never treated as a single-word dictionary
-// lookup. Caps the synchronous textBetween() cost on段落/全選択 and avoids
-// pointless Genji lookups while dragging across大量のテキスト (#1639).
-const SELECTED_WORD_MAX_CHARS = 30;
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
 // but resets on page refresh (module re-evaluated).
@@ -212,6 +207,8 @@ export default function EditorPage() {
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
+  const isTerminalAvailable =
+    isElectron && getAppRuntimeInfo().distributionProvider !== "app-store";
 
   // Rule metas of every installed external ruleset (all lint rules now live in
   // external rulesets). The inspector's correction-mode dropdown derives its
@@ -546,7 +543,6 @@ export default function EditorPage() {
   const [selectedCharCount, setSelectedCharCount] = useState(0);
   const [selectedManuscriptCells, setSelectedManuscriptCells] = useState(0);
   const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
-  const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [searchSelectionRange, setSearchSelectionRange] = useState<SearchRange | null>(null);
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
@@ -736,11 +732,11 @@ export default function EditorPage() {
       const items = [
         { label: "新規ファイル", action: "new-file" },
         { label: "ファイルを開く…", action: "open-file" },
-        ...(isElectron ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
+        ...(isTerminalAvailable ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
       ];
       void showTabBarMenu(e, items);
     },
-    [showTabBarMenu, isElectron],
+    [showTabBarMenu, isTerminalAvailable],
   );
 
   const handleTabBarMenuAction = useCallback(
@@ -1301,6 +1297,7 @@ export default function EditorPage() {
 
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
       .then(({ updateLintingSettings }) => {
+        if (!isEditorViewAlive(editorViewInstance)) return;
         updateLintingSettings(editorViewInstance, { ignoredCorrections }, "ignored-correction");
       })
       .catch((err) => {
@@ -1314,6 +1311,7 @@ export default function EditorPage() {
 
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
       .then(({ updateLintingSettings }) => {
+        if (!isEditorViewAlive(editorViewInstance)) return;
         updateLintingSettings(editorViewInstance, { knownTerms }, "known-terms-change");
       })
       .catch((err) => {
@@ -1584,27 +1582,9 @@ export default function EditorPage() {
     currentContent: content,
     onHistoryRestore: (restoredContent: string) => {
       setContent(restoredContent);
-      // Clear conflict state after restoring a snapshot.
-      // Set fileSyncStatus based on whether the restored content matches the last saved content,
-      // so that a restored snapshot that differs from disk is not treated as clean.
       if (activeTabId !== null) {
         const currentTab = tabsRef.current.find((t) => t.id === activeTabId);
-        const editorTab = currentTab && isEditorTab(currentTab) ? currentTab : null;
-        const lastSaved = editorTab ? (editorTab.lastSavedContent ?? "") : "";
-        const fileTypeOpts = editorTab ? { fileType: editorTab.fileType } : undefined;
-        const isClean =
-          sanitizeMdiContent(restoredContent, fileTypeOpts) ===
-          sanitizeMdiContent(lastSaved, fileTypeOpts);
-        updateTab(activeTabId, {
-          fileSyncStatus: isClean ? "clean" : "dirty",
-          // #1845: keep isDirty consistent with fileSyncStatus so the tab ●
-          // shows, close-confirm fires, and auto-save picks up the restore.
-          // Editor remount (incrementEditorKey) sets the value via
-          // defaultValueCtx and never fires markdownUpdated, so isDirty would
-          // otherwise stay false after a restore.
-          isDirty: !isClean,
-          conflictDiskContent: null,
-        });
+        updateTab(activeTabId, computeHistoryRestoreTabUpdate(restoredContent, currentTab));
       }
       incrementEditorKey();
     },
@@ -1631,7 +1611,6 @@ export default function EditorPage() {
     },
     switchToCorrectionsTrigger,
     previousDayStats,
-    selectedWord,
   } as const;
 
   return (
@@ -1716,7 +1695,7 @@ export default function EditorPage() {
           bottomView,
           setTopView,
           setBottomView,
-          handleNewTerminalTab,
+          handleNewTerminalTab: isTerminalAvailable ? handleNewTerminalTab : undefined,
         }}
         mainArea={{
           tabs,
@@ -1740,19 +1719,6 @@ export default function EditorPage() {
             setSelectedCharCount(count);
             setSelectedManuscriptCells(cells);
             setSelectedManuscriptPages(pages);
-            // 選択語を幻辞ルックアップ用に保持する。
-            // 大きな選択（段落・全選択）では textBetween が O(n) で重く、語の辞書引きにも
-            // 不向きなので閾値を超えたら早期に null。実際の辞書引きの debounce は
-            // useGenjiWordInfo 側で行う（選択ドラッグ中の連続 IPC を抑制）。
-            if (count > 0 && count <= SELECTED_WORD_MAX_CHARS && editorViewRef.current) {
-              const { selection, doc } = editorViewRef.current.state;
-              const text = doc.textBetween(selection.from, selection.to, "").trim();
-              // 単語単位（空白区切り）の先頭語、または選択全体（日本語は空白なし）
-              const word = text.split(/\s+/)[0] ?? null;
-              setSelectedWord(word || null);
-            } else {
-              setSelectedWord(null);
-            }
           },
           onSelectionRangeChange: (range: SearchRange | null) => {
             setSearchSelectionRange(range);

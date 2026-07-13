@@ -9,7 +9,7 @@ import * as esbuild from "esbuild";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import fs from "fs";
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -47,6 +47,7 @@ await esbuild.build({
   ],
   define: {
     "process.env.APTABASE_APP_KEY": JSON.stringify(process.env.APTABASE_APP_KEY || ""),
+    "process.env.APTABASE_HOST": JSON.stringify(process.env.APTABASE_HOST || ""),
     "process.env.ERROR_REPORT_DSN": JSON.stringify(process.env.ERROR_REPORT_DSN || ""),
   },
   format: "cjs",
@@ -125,7 +126,14 @@ function collectDepsRecursive(pkgName, collected) {
 
 // Root external modules that cannot be bundled by esbuild
 // kuromoji: dictionary loading at runtime; better-sqlite3: native addon
-const externalRoots = ["kuromoji", "better-sqlite3", "node-pty"];
+// node-pty: terminal support, but the MAS build gates it out entirely at
+// runtime (electron/ipc/pty-ipc.js), so it's excluded from the MAS bundle
+// too — App Store review treats bundled shell-spawn binaries as a rejection
+// risk even when the code path is dead (docs/release/mac-app-store.md).
+const isMasBuild = process.env.MAS_BUILD === "1";
+const externalRoots = isMasBuild
+  ? ["kuromoji", "better-sqlite3"]
+  : ["kuromoji", "better-sqlite3", "node-pty"];
 
 // Collect all transitive production dependencies
 const allDeps = new Set();
@@ -175,6 +183,53 @@ function resolvePackageDir(dep) {
   return null;
 }
 
+function getElectronVersion() {
+  const electronPkgPath = join(projectRoot, "node_modules", "electron", "package.json");
+  const electronPkg = JSON.parse(fs.readFileSync(electronPkgPath, "utf-8"));
+  return electronPkg.version;
+}
+
+function rebuildBetterSqliteForArch(arch) {
+  const electronVersion = getElectronVersion();
+  execSync(
+    `npx electron-rebuild --force --only better-sqlite3 --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
+    { cwd: projectRoot, stdio: "inherit" },
+  );
+}
+
+function getMachOArchs(filePath) {
+  if (process.platform !== "darwin" || !fs.existsSync(filePath)) return [];
+
+  try {
+    return execFileSync("lipo", ["-archs", filePath], { encoding: "utf-8" })
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function expectedMachOArch(arch) {
+  return arch === "x64" ? "x86_64" : arch;
+}
+
+function ensureHostBetterSqliteArch(arch) {
+  if (arch !== process.arch || process.platform !== "darwin") return;
+
+  const bsqlDir = resolvePackageDir("better-sqlite3");
+  if (!bsqlDir) return;
+
+  const nativeAddonPath = join(bsqlDir, "build", "Release", "better_sqlite3.node");
+  const archs = getMachOArchs(nativeAddonPath);
+  const expectedArch = expectedMachOArch(arch);
+  if (archs.includes(expectedArch)) return;
+
+  const foundArchs = archs.length > 0 ? archs.join(", ") : "missing";
+  console.log(`  ⚙️  Rebuilding better-sqlite3 for ${arch}; native addon arch is ${foundArchs}`);
+  rebuildBetterSqliteForArch(arch);
+}
+
 // When cross-compiling for a different architecture, swap native binaries
 // so the packaged app contains the correct arch-specific modules.
 async function prepareNativeModulesForArch(arch) {
@@ -183,21 +238,17 @@ async function prepareNativeModulesForArch(arch) {
   // --- better-sqlite3: download correct prebuild for target arch ---
   const bsqlDir = resolvePackageDir("better-sqlite3");
   if (bsqlDir) {
-    const electronPkgPath = join(projectRoot, "node_modules", "electron", "package.json");
-    const electronPkg = JSON.parse(fs.readFileSync(electronPkgPath, "utf-8"));
+    const electronVersion = getElectronVersion();
     console.log(`  📥 Downloading better-sqlite3 prebuild for win32-${arch}...`);
     try {
       execSync(
-        `npx prebuild-install --arch ${arch} --platform win32 --runtime electron --target ${electronPkg.version}`,
+        `npx prebuild-install --arch ${arch} --platform win32 --runtime electron --target ${electronVersion}`,
         { cwd: bsqlDir, stdio: "inherit" },
       );
       console.log(`  ✅ better-sqlite3 prebuild ready for ${arch}`);
     } catch {
       console.log(`  ⚙️  No better-sqlite3 prebuild for ${arch}; rebuilding from source...`);
-      execSync(
-        `npx electron-rebuild --force --only better-sqlite3 --arch ${arch} --version ${electronPkg.version} --module-dir ${projectRoot} --build-from-source`,
-        { cwd: projectRoot, stdio: "inherit" },
-      );
+      rebuildBetterSqliteForArch(arch);
       console.log(`  ✅ better-sqlite3 rebuilt from source for ${arch}`);
     }
   }
@@ -216,6 +267,7 @@ async function prepareNativeModulesForArch(arch) {
 }
 
 await prepareNativeModulesForArch(targetArch);
+ensureHostBetterSqliteArch(targetArch);
 
 for (const dep of runtimeDeps) {
   const src = resolvePackageDir(dep);

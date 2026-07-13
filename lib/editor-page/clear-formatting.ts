@@ -1,5 +1,6 @@
 import { liftTarget } from "@milkdown/prose/transform";
 import type { EditorView } from "@milkdown/prose/view";
+import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 /**
  * 選択範囲を標準本文（段落・装飾なし）に戻す。
@@ -60,6 +61,6 @@ export function clearFormatting(view: EditorView): void {
     }
   });
 
-  view.dispatch(tr.scrollIntoView());
+  dispatchIfEditorViewAlive(view, () => tr.scrollIntoView());
   view.focus();
 }

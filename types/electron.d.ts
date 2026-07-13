@@ -11,12 +11,14 @@ import type { VFSWatchEvent } from "@/lib/vfs/types";
 import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 import type { DictEntry, DictDownloadStatus, DictLookup } from "@/lib/dict/dict-types";
 import type { PdfGenerationOptions } from "@/lib/export/types";
+import type { AppRuntimeInfo } from "@/lib/utils/runtime-env";
 
 export {};
 
 declare global {
   interface ElectronAPI {
     isElectron: boolean;
+    appRuntime?: AppRuntimeInfo;
     openFile: () => Promise<{ path: string; content: string } | null>;
     saveFile: (
       filePath: string | null,

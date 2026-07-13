@@ -44,7 +44,9 @@ function trimTrailingSlashes(p) {
  * @returns {string}
  */
 function normalizeForCompare(p) {
-  return trimTrailingSlashes(normalizeSeparators(p)).normalize("NFC");
+  const normalized = trimTrailingSlashes(normalizeSeparators(p)).normalize("NFC");
+  const isWindowsPath = /^[a-zA-Z]:\//.test(normalized) || normalized.startsWith("//");
+  return process.platform === "win32" && isWindowsPath ? normalized.toLowerCase() : normalized;
 }
 
 /**
@@ -53,9 +55,11 @@ function normalizeForCompare(p) {
  * @param {string} p
  * @returns {string}
  */
-function toForwardSlash(p) {
-  let resolved = path.resolve(p).replace(/\\/g, "/");
-  // Strip Windows extended-path prefixes like //?/ or //./  without changing drive/UNC semantics
+function toForwardSlash(p, pathImpl = path) {
+  let resolved = pathImpl.resolve(p).replace(/\\/g, "/");
+  // Strip Windows extended-path prefixes without changing drive/UNC semantics.
+  // //?/UNC/server/share must become //server/share, not UNC/server/share.
+  resolved = resolved.replace(/^\/\/\?\/UNC\//i, "//");
   resolved = resolved.replace(/^\/\/[?.]\//, "");
   return resolved;
 }
@@ -72,7 +76,12 @@ function assertPathInsideRoot(resolvedPath, rootPath) {
   if (resolvedPath.includes("\\")) {
     throw new Error("パス正規化エラー: バックスラッシュが残っています");
   }
-  if (resolvedPath !== rootPath && !resolvedPath.startsWith(rootPath + "/")) {
+  const resolvedForCompare = normalizeForCompare(resolvedPath);
+  const rootForCompare = normalizeForCompare(rootPath);
+  if (
+    resolvedForCompare !== rootForCompare &&
+    !resolvedForCompare.startsWith(rootForCompare + "/")
+  ) {
     throw new Error("プロジェクトディレクトリの外部へのアクセスは許可されていません");
   }
 }

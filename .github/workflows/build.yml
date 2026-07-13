@@ -12,10 +12,19 @@ on:
     paths-ignore:
       - "store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
+      - ".github/workflows/store-publish.yml"
   pull_request:
     paths-ignore:
       - "store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
+      - ".github/workflows/store-publish.yml"
+  workflow_dispatch:
+    inputs:
+      run_mas_build:
+        description: "MAS向けpkgをビルドする（署名済み.pkgをartifactとして出力。ストアへのアップロードは store-publish.yml が別途担当）"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -125,14 +134,21 @@ jobs:
           case "$BRANCH_NAME" in
             main)
               FULL_VERSION="${BASE_VERSION}"
+              MSIX_REVISION=0
               ;;
             beta)
               BETA_DATE=$(date -u +%Y%m%d)
               BETA_TIME=$(date -u +%H%M%S)
               FULL_VERSION="${BASE_VERSION}-beta.${BETA_DATE}.$((10#$BETA_TIME))"
+              MSIX_REVISION=0
               ;;
-            alpha|dev)
+            alpha)
               FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
+              MSIX_REVISION=0
+              ;;
+            dev)
+              FULL_VERSION="${BASE_VERSION}-${BRANCH_NAME}"
+              MSIX_REVISION=0
               ;;
             *)
               echo "::error::Unexpected branch '${BRANCH_NAME}' — only main/alpha/beta/dev are allowed"
@@ -140,15 +156,16 @@ jobs:
               ;;
           esac
 
-          # MSIX requires exactly four numeric parts; electron-builder handles this
-          # but we compute it here for logging
-          MSIX_VERSION="${BASE_VERSION}.0"
+          # Microsoft Store package acceptance requires an AppX manifest
+          # revision of 0. Flight/channel identity must come from Partner
+          # Center flights and artifact names, not the package version.
+          MSIX_VERSION="${BASE_VERSION}.${MSIX_REVISION}"
 
           echo "base=${BASE_VERSION}" >> "$GITHUB_OUTPUT"
           echo "full=${FULL_VERSION}" >> "$GITHUB_OUTPUT"
           echo "msix=${MSIX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "branch=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
-          echo "Version: base=${BASE_VERSION} | full=${FULL_VERSION} | MSIX=${MSIX_VERSION} | Branch=${BRANCH_NAME} | Latest tag patch=${LATEST_PATCH:-none}"
+          echo "Version: base=${BASE_VERSION} | full=${FULL_VERSION} | MSIX=${MSIX_VERSION} | Branch=${BRANCH_NAME} | MSIX revision=${MSIX_REVISION} | Latest tag patch=${LATEST_PATCH:-none}"
 
       - name: Validate version format
         run: |
@@ -247,6 +264,7 @@ jobs:
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
+      APTABASE_HOST: ${{ secrets.APTABASE_HOST }}
       ERROR_REPORT_DSN: ${{ secrets.ERROR_REPORT_DSN }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -327,6 +345,125 @@ jobs:
           name: illusions-macos-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
           path: dist-electron/**
 
+  build-mas:
+    name: Build (Mac App Store)
+    needs: [detect-changes, compute-version]
+    # Build-only: produces a signed .pkg artifact, nothing more. Publishing
+    # (App Store Connect/TestFlight upload) lives entirely in
+    # store-publish.yml's appstore-testflight job, triggered separately and
+    # explicitly — this job never uploads anywhere. Auto-runs on beta pushes
+    # (same as the other platform build jobs) purely to keep a fresh signed
+    # artifact available; tag pushes (main/stable) don't trigger it yet.
+    # Runs in parallel with the test matrix, same as every other platform
+    # build job — nothing here is gated on tests, since it has no external
+    # side effects to guard.
+    if: |
+      always() &&
+      needs.compute-version.result == 'success' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.run_mas_build == true) ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/beta' && needs.detect-changes.outputs.desktop_changed == 'true')
+      )
+    runs-on: macos-latest
+    environment: Apple
+    env:
+      CSC_LINK: ${{ secrets.MAS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAS_CSC_KEY_PASSWORD }}
+      CSC_INSTALLER_LINK: ${{ secrets.CSC_INSTALLER_LINK }}
+      CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.CSC_INSTALLER_KEY_PASSWORD }}
+      MAS_PROVISIONING_PROFILE: ${{ secrets.MAS_PROVISIONING_PROFILE }}
+      APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
+      APTABASE_HOST: ${{ secrets.APTABASE_HOST }}
+      ERROR_REPORT_DSN: ${{ secrets.ERROR_REPORT_DSN }}
+      ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+      ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Restore Electron caches
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.ELECTRON_CACHE }}
+            ${{ env.ELECTRON_BUILDER_CACHE }}
+          key: electron-${{ runner.os }}-mas-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-${{ runner.os }}-mas-
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            npm install && break
+            if [ $i -lt 3 ]; then
+              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "::error::npm install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+      - name: Prepare MAS signing credentials
+        shell: bash
+        run: |
+          missing=()
+          [ -z "$CSC_LINK" ] && missing+=("MAS_CSC_LINK")
+          [ -z "$CSC_KEY_PASSWORD" ] && missing+=("MAS_CSC_KEY_PASSWORD")
+          [ -z "$CSC_INSTALLER_LINK" ] && missing+=("CSC_INSTALLER_LINK")
+          [ -z "$CSC_INSTALLER_KEY_PASSWORD" ] && missing+=("CSC_INSTALLER_KEY_PASSWORD")
+          [ -z "$MAS_PROVISIONING_PROFILE" ] && missing+=("MAS_PROVISIONING_PROFILE")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing MAS credentials: ${missing[*]}"
+            exit 1
+          fi
+
+          # electron-builder は build.mas.provisioningProfile のパスをそのまま読む。
+          printf '%s' "$MAS_PROVISIONING_PROFILE" | base64 --decode > build/illusions.provisionprofile
+
+      - name: Apply computed version
+        # CFBundleVersion must be plain dot-separated integers, so this uses
+        # the clean `base` output (no beta.<timestamp> suffix) — same
+        # ephemeral, uncommitted bump every other channel does via
+        # compute-version, so each MAS upload gets a fresh version
+        # automatically instead of colliding with the previous one.
+        run: npm version ${{ needs.compute-version.outputs.base }} --no-git-tag-version --allow-same-version
+
+      - name: Download local fonts
+        run: npm run download:fonts
+
+      - name: Build Quick Look plugin
+        run: npm run build:quicklook
+
+      - name: Build MAS package
+        # CFBundleVersion (the App Store Connect "build number") must be
+        # unique on every upload, but compute-version's clean `base` output
+        # (used above for CFBundleShortVersionString) only advances when a
+        # stable git tag is cut — which doesn't happen on every beta push or
+        # manual re-run, causing duplicate-version upload rejections. Set
+        # CFBundleVersion independently to the numeric, always-unique
+        # run_id+run_attempt so every build gets a fresh one regardless of
+        # tag state.
+        run: MAS_BUILD=1 npm run electron:build:mas
+        env:
+          DEBUG: electron-builder
+          MAS_EXTRA_BUILDER_ARGS: --config.mas.bundleVersion=${{ github.run_id }}${{ github.run_attempt }}
+
+      - name: Upload MAS package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: illusions-mas-pkg
+          path: dist-electron/**/*.pkg
+
   # ---------------------------------------------------------------------------
   # Windows — shared build step, then separate NSIS / MSIX packaging
   # ---------------------------------------------------------------------------
@@ -341,6 +478,7 @@ jobs:
     runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
     env:
       APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
+      APTABASE_HOST: ${{ secrets.APTABASE_HOST }}
       ERROR_REPORT_DSN: ${{ secrets.ERROR_REPORT_DSN }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -439,6 +577,7 @@ jobs:
         arch: [x64, arm64]
     env:
       APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
+      APTABASE_HOST: ${{ secrets.APTABASE_HOST }}
       ERROR_REPORT_DSN: ${{ secrets.ERROR_REPORT_DSN }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -565,6 +704,7 @@ jobs:
       version: ${{ needs.compute-version.outputs.full }}
     env:
       APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
+      APTABASE_HOST: ${{ secrets.APTABASE_HOST }}
       ERROR_REPORT_DSN: ${{ secrets.ERROR_REPORT_DSN }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -609,7 +749,7 @@ jobs:
 
       - name: Update package.json version for MSIX build
         if: github.event_name != 'pull_request'
-        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.base }}';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+        run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.base }}';p.build={...(p.build||{}),buildVersion:'${{ needs.compute-version.outputs.msix }}'};require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
       - name: Download build output
         if: github.event_name != 'pull_request'
@@ -659,6 +799,33 @@ jobs:
         if: github.event_name != 'pull_request'
         run: npx electron-builder --win appx --${{ matrix.arch }} --publish never
 
+      - name: Normalize MSIX artifact names
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $fullVersion = "${{ needs.compute-version.outputs.full }}"
+          $arch = "${{ matrix.arch }}"
+          $targetName = "illusions-$fullVersion-$arch.appx"
+          $targetPath = Join-Path "dist-electron" $targetName
+
+          $appxFiles = Get-ChildItem "dist-electron\*.appx"
+          if ($appxFiles.Count -ne 1) {
+            Write-Error "Expected exactly one .appx for $arch, found $($appxFiles.Count)"
+            $appxFiles | ForEach-Object { Write-Host "  - $($_.FullName)" }
+            exit 1
+          }
+
+          $appx = $appxFiles[0]
+          $blockmapPath = "$($appx.FullName).blockmap"
+
+          Rename-Item -Path $appx.FullName -NewName $targetName -Force
+
+          if (Test-Path $blockmapPath) {
+            Rename-Item -Path $blockmapPath -NewName "$targetName.blockmap" -Force
+          }
+
+          Write-Host "Renamed MSIX artifact to $targetPath"
+
       - name: Upload MSIX artifacts
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
@@ -682,6 +849,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
+      APTABASE_HOST: ${{ secrets.APTABASE_HOST }}
       ERROR_REPORT_DSN: ${{ secrets.ERROR_REPORT_DSN }}
       ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
       ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
@@ -763,6 +931,72 @@ jobs:
           path: dist-electron/**
 
   # ---------------------------------------------------------------------------
+  # Cross-platform unit tests — run in parallel with the platform builds above
+  # (same push-only gating as the "full build" steps in those jobs). Linux is
+  # already covered by the "Test & Coverage" job in quality.yml, so only
+  # Windows/macOS runners are needed here. Nothing in this file waits on them
+  # except the `release` job (GitHub Release) — App Store/Microsoft Store
+  # publishing lives entirely in store-publish.yml, which pulls signed
+  # artifacts from a completed build.yml run rather than depending on jobs
+  # here directly. Either way, a test failure never slows down
+  # compilation/packaging — it only blocks shipping.
+  # ---------------------------------------------------------------------------
+
+  test-windows:
+    name: Test (Windows)
+    needs: detect-changes
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate credits
+        run: npm run generate:credits
+
+      - name: Run unit tests
+        run: npm test
+
+  test-macos:
+    name: Test (macOS)
+    needs: detect-changes
+    if: |
+      github.event_name != 'pull_request' &&
+      needs.detect-changes.outputs.desktop_changed == 'true'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate credits
+        run: npm run generate:credits
+
+      - name: Run unit tests
+        run: npm test
+
+  # ---------------------------------------------------------------------------
   # Publish & Release
   # ---------------------------------------------------------------------------
 
@@ -780,6 +1014,8 @@ jobs:
         package-windows-nsis,
         package-windows-msix,
         build-linux,
+        test-windows,
+        test-macos,
       ]
     runs-on: ubuntu-latest
 

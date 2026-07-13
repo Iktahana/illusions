@@ -23,6 +23,7 @@ import type { LintIssue } from "@/lib/linting";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import { useTypographySettings, useSpeechSettings } from "@/contexts/EditorSettingsContext";
 import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
+import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 interface EditorProps {
   initialContent?: string;
@@ -203,7 +204,9 @@ export default function NovelEditor({
     cancelSpeechScroll();
     const view = editorViewRef.current;
     if (!view) return;
-    view.dispatch(view.state.tr.setMeta("speechDecorations", []));
+    dispatchIfEditorViewAlive(view, (aliveView) =>
+      aliveView.state.tr.setMeta("speechDecorations", []),
+    );
   }, []);
 
   const startSpeechFromPos = useCallback(
@@ -235,7 +238,9 @@ export default function NovelEditor({
             const to = (m.positions[chunk.highlightEnd - 1] ?? from) + 1;
             if (from == null) return;
             const deco = Decoration.inline(from, to, { class: "speech-reading" });
-            v.dispatch(v.state.tr.setMeta("speechDecorations", [deco]));
+            dispatchIfEditorViewAlive(v, (aliveView) =>
+              aliveView.state.tr.setMeta("speechDecorations", [deco]),
+            );
             // Auto-scroll to keep the highlighted word in view
             const container = scrollContainerRef.current;
             if (container) {

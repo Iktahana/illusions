@@ -18,10 +18,12 @@ tags:
 
 ## 読み始める場所
 
-- [MDI ドキュメント](MDI/README.md)
-  `.mdi` フォーマット、構文仕様、実装上の扱いを追いたい場合の入口です。
+- [MDI ドキュメント](https://github.com/illusions-lab/MDI)
+  `.mdi` フォーマット、構文仕様、実装上の扱いは専用リポジトリで管理しています。
 - [アーキテクチャ](architecture/)
   ストレージ、VFS、タブ管理、エクスポートなど、主要サブシステムの設計文書です。
+- [リポジトリ構造](architecture/repository-structure.md)
+  1.3.0 以降のディレクトリ責務、feature slice、root 整理方針です。
 - [開発ガイド](guides/)
   lint ルール、Milkdown 拡張、ショートカット、テーマなどの実務ガイドです。
 - [セットアップ](setup/)
@@ -30,13 +32,6 @@ tags:
   外部規格や補助資料の置き場です。
 
 ## 主要ドキュメント
-
-### MDI
-
-- [MDI 概要](MDI/README.md)
-- [MDI 構文仕様](MDI/spec.md)
-- [MDI 実装ノート](MDI/implementation.md)
-- [MDI ロードマップ](MDI/roadmap.md)
 
 ### アーキテクチャ
 
@@ -58,6 +53,7 @@ tags:
 - [NLP バックエンド](architecture/nlp-backend-architecture.md)
 - [通知システム](architecture/notification-system.md)
 - [校正・AI 校正システム](architecture/correction-ai-system.ja.md)
+- [リポジトリ構造](architecture/repository-structure.md)
 
 ### ガイド
 
@@ -83,5 +79,6 @@ tags:
 
 ## 補足
 
-- 旧来のルート `MDI.md` は互換性のために残し、正式な入口は `docs/MDI/` に移しました。
+- MDI フォーマットのドキュメントは [illusions-lab/MDI](https://github.com/illusions-lab/MDI) に移管しました。このリポジトリでは維持しません。
 - 歴史的な検証メモや単発レポートは [archive/](archive/) に置きます。
+- 一時的な作業計画は repository に置かず、OS の temp directory に置きます。

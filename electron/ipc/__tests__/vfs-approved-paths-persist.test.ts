@@ -17,9 +17,10 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 
-/** @type {{ loadApprovals, saveApprovals, clearApprovalsCache }} */
+/** @type {{ loadApprovals, loadApprovalEntries, saveApprovals, clearApprovalsCache }} */
 const {
   loadApprovals,
+  loadApprovalEntries,
   saveApprovals,
   clearApprovalsCache,
 } = require("../../../electron/lib/vfs-approvals.js");
@@ -69,6 +70,25 @@ describe("saveApprovals()", () => {
     expect(data.approvals[0].projectId).toBe("proj_001");
     expect(data.approvals[0].path).toBe("/Users/alice/novel1");
     expect(typeof data.approvals[0].approvedAt).toBe("string");
+  });
+
+  it("persists optional security-scoped bookmarks by path", async () => {
+    const paths = new Set(["/Users/alice/novel1", "/Users/alice/novel2"]);
+    const bookmarks = new Map([["/Users/alice/novel2", "bookmark-base64"]]);
+
+    await saveApprovals(tmpFile, "proj_001", paths, bookmarks);
+
+    const raw = fsSync.readFileSync(tmpFile, "utf-8");
+    const data = JSON.parse(raw);
+    const entryWithoutBookmark = data.approvals.find(
+      (a: { path: string }) => a.path === "/Users/alice/novel1",
+    );
+    const entryWithBookmark = data.approvals.find(
+      (a: { path: string }) => a.path === "/Users/alice/novel2",
+    );
+
+    expect(entryWithoutBookmark.bookmark).toBeUndefined();
+    expect(entryWithBookmark.bookmark).toBe("bookmark-base64");
   });
 
   it("replaces only the given projectId, keeping other projects intact", async () => {
@@ -157,6 +177,71 @@ describe("loadApprovals()", () => {
 
     const restored = await loadApprovals(tmpFile, "proj_restart");
     expect(restored.has("/Users/carol/myProject")).toBe(true);
+  });
+
+  it("loads old approval entries that do not have bookmark fields", async () => {
+    const data = {
+      version: 1,
+      approvals: [
+        {
+          projectId: "proj_old",
+          path: "/Users/alice/oldProject",
+          approvedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    };
+    fsSync.writeFileSync(tmpFile, JSON.stringify(data));
+    clearApprovalsCache();
+
+    const result = await loadApprovals(tmpFile, "proj_old");
+    expect(result.has("/Users/alice/oldProject")).toBe(true);
+  });
+});
+
+describe("loadApprovalEntries()", () => {
+  it("round-trips path approvals with optional bookmark metadata", async () => {
+    await saveApprovals(
+      tmpFile,
+      "proj_bookmark",
+      new Set(["/Users/alice/bookmarked"]),
+      new Map([["/Users/alice/bookmarked", "bookmark-base64"]]),
+    );
+    clearApprovalsCache();
+
+    const entries = await loadApprovalEntries(tmpFile, "proj_bookmark");
+    expect(entries).toHaveLength(1);
+    expect(entries[0].path).toBe("/Users/alice/bookmarked");
+    expect(entries[0].bookmark).toBe("bookmark-base64");
+  });
+
+  it("keeps approvals when bookmark is missing or malformed", async () => {
+    const data = {
+      version: 1,
+      approvals: [
+        {
+          projectId: "proj_compat",
+          path: "/Users/alice/noBookmark",
+          approvedAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          projectId: "proj_compat",
+          path: "/Users/alice/badBookmark",
+          approvedAt: "2026-01-01T00:00:00.000Z",
+          bookmark: 123,
+        },
+      ],
+    };
+    fsSync.writeFileSync(tmpFile, JSON.stringify(data));
+    clearApprovalsCache();
+
+    const entries = await loadApprovalEntries(tmpFile, "proj_compat");
+    expect(entries.map((entry: { path: string }) => entry.path).sort()).toEqual([
+      "/Users/alice/badBookmark",
+      "/Users/alice/noBookmark",
+    ]);
+    expect(entries.every((entry: { bookmark?: string }) => entry.bookmark === undefined)).toBe(
+      true,
+    );
   });
 });
 

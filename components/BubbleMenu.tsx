@@ -77,10 +77,18 @@ export default function BubbleMenu({
       Math.max(bounds.top, Math.min(bounds.bottom - menuHeight, y));
 
     if (isVertical) {
+      // Vertical Japanese text reads right-to-left, so anchoring the menu to
+      // the selection's left edge would cover text the reader hasn't reached
+      // yet. Anchor to the right edge (already-read side) instead.
+      // Prefer rangeRect (the actual rendered selection's bounding box) over
+      // the caret rects at from/to, which can sit slightly inside the real
+      // highlight and cause the menu to overlap the selected text.
       const endCoords = selectionState.endCoords ?? startCoords;
-      const selLeft = Math.min(startCoords.left, endCoords.left);
+      const selRight = selectionState.rangeRect
+        ? selectionState.rangeRect.right
+        : Math.max(startCoords.right, endCoords.right);
       setPosition({
-        left: clampX(selLeft - menuWidth - gap),
+        left: clampX(selRight + gap),
         top: clampY(startCoords.top),
       });
       return;
@@ -96,6 +104,7 @@ export default function BubbleMenu({
     scrollContainerRef,
     selectionState.endCoords,
     selectionState.hasSelection,
+    selectionState.rangeRect,
     selectionState.startCoords,
   ]);
 

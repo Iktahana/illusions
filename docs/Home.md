@@ -15,15 +15,10 @@ illusions の実装・設計・仕様を整理したドキュメントです。
 
 ## 読み始める場所
 
-- [[MDI/README|MDI ドキュメント]]
+- [MDI ドキュメント](https://github.com/illusions-lab/MDI)
 - [[README|GitHub 向けドキュメント一覧]]
 
 ## 主要ドキュメント
-
-### MDI
-
-- [[MDI/README|MDI 概要]]
-- [[MDI/spec|MDI 構文仕様]]
 
 ### アーキテクチャ
 
@@ -42,6 +37,7 @@ illusions の実装・設計・仕様を整理したドキュメントです。
 - [[architecture/readability-scoring|可読性スコアリング]]
 - [[architecture/text-statistics|テキスト統計]]
 - [[architecture/documentation-gap-map|文書化ギャップマップ]]
+- [[architecture/repository-structure|リポジトリ構造]]
 
 ### ガイド
 
@@ -56,3 +52,4 @@ illusions の実装・設計・仕様を整理したドキュメントです。
 ## 管理
 
 - [[architecture/documentation-gap-map|文書化ギャップマップ]]
+- [[architecture/repository-structure|リポジトリ構造]]

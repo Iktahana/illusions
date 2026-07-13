@@ -9,8 +9,6 @@
  *
  * External rulesets (downloaded from the marketplace) are loaded here
  * alongside legacy rules via LOAD_RULESET / UNLOAD_RULESET messages.
- *
- * See plan: docs/superpowers/plans/2026-05-05-lint-worker-parallelization.md
  */
 
 import { RuleRunner } from "@/lib/linting/rule-runner";

@@ -62,7 +62,7 @@ illusions は、日本語で小説を書くためのエディタです。
 技術文書、仕様、開発ガイドは [`docs/`](docs/README.md) にまとめています。
 
 - [ドキュメント入口](docs/README.md)
-- [MDI ドキュメント](docs/MDI/README.md)
+- [MDI ドキュメント](https://github.com/illusions-lab/MDI)
 
 ## 開発者向け
 

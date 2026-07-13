@@ -108,6 +108,4 @@ export interface InspectorProps {
   switchToCorrectionsTrigger?: number;
   /** Previous day's stats for comparison display */
   previousDayStats?: PreviousDayStats | null;
-  /** 選択中の語（統計タブで幻辞情報を表示するために渡す） */
-  selectedWord?: string | null;
 }

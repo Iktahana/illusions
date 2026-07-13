@@ -58,9 +58,10 @@ const { DICT_CHANNELS, POWER_CHANNELS, RULESETS_CHANNELS } = require("./lib/ipc-
 // privileged scheme として登録するため）。App Key はビルド時に esbuild の define で
 // 埋め込まれる（scripts/bundle-electron.mjs）。未設定（OSSビルド等）の場合は計測を無効化する。
 const APTABASE_APP_KEY = process.env.APTABASE_APP_KEY || "";
+const APTABASE_HOST = process.env.APTABASE_HOST || "";
 if (APTABASE_APP_KEY) {
   const { initialize: initializeAnalytics } = require("@aptabase/electron/main");
-  initializeAnalytics(APTABASE_APP_KEY);
+  initializeAnalytics(APTABASE_APP_KEY, APTABASE_HOST ? { host: APTABASE_HOST } : undefined);
 }
 
 const HEARTBEAT_INTERVAL_MS = 10 * 60 * 1000;
@@ -216,7 +217,7 @@ app.whenReady().then(async () => {
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
-            `connect-src 'self' https://my.illusions.app https://api.dict.illusions.app https://bug-report.api.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com${extraAiConnectSrc} ws://localhost:*`,
+            `connect-src 'self' https://my.illusions.app https://bug-report.api.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com${extraAiConnectSrc} ws://localhost:*`,
             "worker-src 'self' blob:",
             "object-src blob:",
             "frame-src blob:",

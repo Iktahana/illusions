@@ -123,10 +123,11 @@ export function useAutoSave(params: UseAutoSaveParams): void {
         // #1579) and re-checks the conflicted transition right before
         // writing (#1562 b).
         const activity = getWindowActivitySnapshot();
+        const activityLabel =
+          activity.isWindowFocused && activity.isDocumentVisible ? "foreground" : "background";
         trackUsageEvent("autosave_attempted", {
           target_kind: getTelemetryTargetKind(tab.file),
-          activity:
-            activity.isWindowFocused && activity.isDocumentVisible ? "foreground" : "background",
+          activity: activityLabel,
         });
         void (async () => {
           const outcome = await executeTabSave({
@@ -140,7 +141,12 @@ export function useAutoSave(params: UseAutoSaveParams): void {
             isAutoSave: true,
             isMounted: () => mountedRef.current,
           });
-          if (outcome.status === "failed") {
+          if (outcome.status === "saved") {
+            trackUsageEvent("autosave_completed", {
+              target_kind: getTelemetryTargetKind(tab.file),
+              activity: activityLabel,
+            });
+          } else if (outcome.status === "failed") {
             trackUsageEvent("autosave_failed", {
               target_kind: getTelemetryTargetKind(tab.file),
               reason: classifySaveOutcome(outcome),

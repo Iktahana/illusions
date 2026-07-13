@@ -8,6 +8,7 @@ import { createPosHighlightPlugin, posHighlightKey } from "./decoration-plugin";
 import { DEFAULT_POS_COLORS } from "./pos-colors";
 import type { EditorView } from "@milkdown/prose/view";
 import type { PosColorConfig, PosHighlightSettings } from "./types";
+import { dispatchIfEditorViewAlive } from "../../../shared/lib/editor-view-safety";
 
 // 型定義と定数をエクスポート
 export type { PosColorConfig, PosHighlightSettings, Token } from "./types";
@@ -56,6 +57,7 @@ export function updatePosHighlightSettings(
   view: EditorView,
   settings: Partial<PosHighlightSettings>,
 ) {
-  const tr = view.state.tr.setMeta(posHighlightKey, settings);
-  view.dispatch(tr);
+  dispatchIfEditorViewAlive(view, (aliveView) =>
+    aliveView.state.tr.setMeta(posHighlightKey, settings),
+  );
 }
