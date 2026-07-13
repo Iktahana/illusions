@@ -4,6 +4,7 @@ import { useCallback, useEffect } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import type { EditorView } from "@milkdown/prose/view";
+import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 interface UseEditorLifecycleParams {
   flushTabState: () => Promise<void>;
@@ -115,10 +116,10 @@ export function useEditorLifecycle({
   const insertTextAtSelectionOrAppend = useCallback(
     (text: string) => {
       if (editorViewInstance) {
-        const { state, dispatch } = editorViewInstance;
-        const { from, to } = state.selection;
-        const tr = state.tr.insertText(text, from, to);
-        dispatch(tr);
+        dispatchIfEditorViewAlive(editorViewInstance, (view) => {
+          const { from, to } = view.state.selection;
+          return view.state.tr.insertText(text, from, to);
+        });
       } else {
         const currentContent = contentRef.current;
         const newContent = currentContent ? `${currentContent}\n\n${text}` : text;

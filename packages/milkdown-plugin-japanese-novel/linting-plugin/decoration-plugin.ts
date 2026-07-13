@@ -32,6 +32,10 @@ import type {
 } from "./types";
 import { isSilentCancelError } from "./worker/protocol";
 import type { DictSnapshotPayload } from "./worker/protocol";
+import {
+  dispatchIfEditorViewAlive,
+  isEditorViewAlive,
+} from "../../../shared/lib/editor-view-safety";
 
 export const lintingKey = new PluginKey<LintingPluginState>("linting");
 
@@ -310,6 +314,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
         immediateRebuild = false;
 
         debounceTimer = setTimeout(async () => {
+          if (!isEditorViewAlive(view)) return;
           const state = lintingKey.getState(view.state);
           if (!state?.enabled || !currentRuleRunner) return;
 
@@ -520,6 +525,7 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
           }
 
           if (version !== processingVersion) return;
+          if (!isEditorViewAlive(view)) return;
 
           // Build decorations from all paragraphs that have cached results
           const allDecorations: Decoration[] = [];
@@ -583,8 +589,10 @@ export function createLintingPlugin(options: LintingPluginOptions): Plugin<Linti
             allDecorations.length > 0
               ? DecorationSet.create(view.state.doc, allDecorations)
               : DecorationSet.empty;
-          const tr = view.state.tr.setMeta(lintingKey, { decorations });
-          view.dispatch(tr);
+          const didDispatch = dispatchIfEditorViewAlive(view, (aliveView) =>
+            aliveView.state.tr.setMeta(lintingKey, { decorations }),
+          );
+          if (!didDispatch) return;
 
           // Diagnostics for #1964: a packaged lint pass that re-lints paragraphs
           // yet yields nothing is the exact symptom. Logging only this case keeps

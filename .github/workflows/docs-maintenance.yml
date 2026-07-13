@@ -2,20 +2,17 @@ name: Docs Maintenance
 
 on:
   schedule:
-    # Daily at 02:00 UTC — check for code changes that need docs/ updates
-    - cron: "0 2 * * *"
-    # Daily at 02:30 UTC — check for code changes that need README update
-    - cron: "30 2 * * *"
-    # Weekly on Wednesday at 03:00 UTC — full docs audit
-    - cron: "0 3 * * 3"
+    # Weekly on Wednesday at 02:00 UTC — docs updater, README updater, and full
+    # audit all run together (consolidated from separate daily/weekly crons).
+    - cron: "0 2 * * 3"
   workflow_dispatch:
     inputs:
       task:
         description: "Which task to run manually"
         type: choice
         options:
-          - daily-docs-updater
-          - daily-readme-updater
+          - weekly-docs-updater
+          - weekly-readme-updater
           - weekly-docs-auditor
 
 permissions:
@@ -24,12 +21,12 @@ permissions:
 
 jobs:
   # ──────────────────────────────────────────────
-  # Daily: create a Copilot issue when code changes need docs updates
+  # Weekly: create a Copilot issue when code changes need docs updates
   # ──────────────────────────────────────────────
-  daily-docs-updater:
+  weekly-docs-updater:
     if: |
-      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * *') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'daily-docs-updater')
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'weekly-docs-updater')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dev
@@ -38,13 +35,13 @@ jobs:
           ref: dev
           fetch-depth: 0
 
-      - name: Collect code-only commits from last 24h
+      - name: Collect code-only commits from the last week
         id: changes
         run: |
-          # Commits in the last 24 hours that touch code paths (exclude docs: prefix)
+          # Commits in the last week that touch code paths (exclude docs: prefix)
           COMMITS=$(git log \
             --oneline \
-            --since="24 hours ago" \
+            --since="7 days ago" \
             --format="%h %s" \
             -- \
             '*.ts' '*.tsx' '*.js' '*.mjs' \
@@ -54,7 +51,7 @@ jobs:
             || true)
 
           if [ -z "$COMMITS" ]; then
-            echo "No code changes in the last 24h, skipping."
+            echo "No code changes in the last week, skipping."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -62,7 +59,7 @@ jobs:
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
           # Diff stat for changed code files
-          BASE_COMMIT=$(git rev-list -1 --before="24 hours ago" HEAD || true)
+          BASE_COMMIT=$(git rev-list -1 --before="7 days ago" HEAD || true)
           if [ -n "$BASE_COMMIT" ]; then
             DIFF_STAT=$(git diff --stat "$BASE_COMMIT" HEAD \
               -- \
@@ -71,7 +68,7 @@ jobs:
               'contexts/**' 'packages/**' \
               2>/dev/null || echo "Diff not available")
           else
-            DIFF_STAT="Diff not available (no commits older than 24h)"
+            DIFF_STAT="Diff not available (no commits older than 7 days)"
           fi
 
           {
@@ -108,7 +105,7 @@ jobs:
             --jq '.[].number' | while read -r num; do
             gh issue close "$num" \
               --repo "${{ github.repository }}" \
-              --comment "Superseded by a newer daily docs check." || true
+              --comment "Superseded by a newer weekly docs check." || true
           done
 
       - name: Create issue for Copilot
@@ -125,7 +122,7 @@ jobs:
 
           Recent code commits may require updates to `docs/`. Review the changes below and update any affected documentation.
 
-          ## Recent Code Commits (last 24h)
+          ## Recent Code Commits (the last week)
 
           ```
           ${{ steps.changes.outputs.commits }}
@@ -153,12 +150,12 @@ jobs:
           )"
 
   # ──────────────────────────────────────────────
-  # Daily: create a Copilot issue when code changes need README update
+  # Weekly: create a Copilot issue when code changes need README update
   # ──────────────────────────────────────────────
-  daily-readme-updater:
+  weekly-readme-updater:
     if: |
-      (github.event_name == 'schedule' && github.event.schedule == '30 2 * * *') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'daily-readme-updater')
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'weekly-readme-updater')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout dev
@@ -167,13 +164,13 @@ jobs:
           ref: dev
           fetch-depth: 0
 
-      - name: Collect code-only commits from last 24h
+      - name: Collect code-only commits from the last week
         id: changes
         run: |
-          # Commits in the last 24 hours that touch user-facing code (exclude docs:/README commits)
+          # Commits in the last week that touch user-facing code (exclude docs:/README commits)
           COMMITS=$(git log \
             --oneline \
-            --since="24 hours ago" \
+            --since="7 days ago" \
             --format="%h %s" \
             -- \
             '*.ts' '*.tsx' '*.js' '*.mjs' \
@@ -184,14 +181,14 @@ jobs:
             || true)
 
           if [ -z "$COMMITS" ]; then
-            echo "No code changes in the last 24h, skipping."
+            echo "No code changes in the last week, skipping."
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
-          BASE_COMMIT=$(git rev-list -1 --before="24 hours ago" HEAD || true)
+          BASE_COMMIT=$(git rev-list -1 --before="7 days ago" HEAD || true)
           if [ -n "$BASE_COMMIT" ]; then
             DIFF_STAT=$(git diff --stat "$BASE_COMMIT" HEAD \
               -- \
@@ -200,7 +197,7 @@ jobs:
               'contexts/**' 'packages/**' 'package.json' \
               2>/dev/null || echo "Diff not available")
           else
-            DIFF_STAT="Diff not available (no commits older than 24h)"
+            DIFF_STAT="Diff not available (no commits older than 7 days)"
           fi
 
           {
@@ -237,7 +234,7 @@ jobs:
             --jq '.[].number' | while read -r num; do
             gh issue close "$num" \
               --repo "${{ github.repository }}" \
-              --comment "Superseded by a newer daily README check." || true
+              --comment "Superseded by a newer weekly README check." || true
           done
 
       - name: Create issue for Copilot
@@ -254,7 +251,7 @@ jobs:
 
           Update `README.md` to reflect the latest code changes merged to `dev`.
 
-          ## Recent Code Commits (last 24h)
+          ## Recent Code Commits (the last week)
 
           ```
           ${{ steps.changes.outputs.commits }}
@@ -285,7 +282,7 @@ jobs:
   # ──────────────────────────────────────────────
   weekly-docs-auditor:
     if: |
-      (github.event_name == 'schedule' && github.event.schedule == '0 3 * * 3') ||
+      github.event_name == 'schedule' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.task == 'weekly-docs-auditor')
     runs-on: ubuntu-latest
     steps:

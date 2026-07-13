@@ -36,6 +36,7 @@ import {
 import { ProjectSearchWorkerClient } from "@/lib/editor-page/project-search-worker-client";
 import { addSearchHistoryEntry, loadSearchHistory } from "@/lib/editor-page/search-history";
 import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
+import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 type SearchScope = "project" | "current" | "folder";
 const EMPTY_PROJECT_BUFFERS: ReadonlyMap<string, string> = new Map();
@@ -273,11 +274,11 @@ export default function SearchResults({
       const [step] = createReplacementSteps([match], replaceTerm, searchOptions);
       if (!step) return;
 
-      const { state, dispatch } = editorView;
-      const tr = step.text
-        ? state.tr.replaceWith(step.from, step.to, state.schema.text(step.text))
-        : state.tr.delete(step.from, step.to);
-      dispatch(tr);
+      dispatchIfEditorViewAlive(editorView, (view) =>
+        step.text
+          ? view.state.tr.replaceWith(step.from, step.to, view.state.schema.text(step.text))
+          : view.state.tr.delete(step.from, step.to),
+      );
     },
     [editorView, replaceTerm, searchOptions],
   );
@@ -287,14 +288,15 @@ export default function SearchResults({
     const steps = createReplacementSteps(matches, replaceTerm, searchOptions);
     if (steps.length === 0) return;
 
-    const { state, dispatch } = editorView;
-    let tr = state.tr;
-    for (const step of steps) {
-      tr = step.text
-        ? tr.replaceWith(step.from, step.to, state.schema.text(step.text))
-        : tr.delete(step.from, step.to);
-    }
-    dispatch(tr);
+    dispatchIfEditorViewAlive(editorView, (view) => {
+      let tr = view.state.tr;
+      for (const step of steps) {
+        tr = step.text
+          ? tr.replaceWith(step.from, step.to, view.state.schema.text(step.text))
+          : tr.delete(step.from, step.to);
+      }
+      return tr;
+    });
     setConfirmReplaceAll(false);
   }, [editorView, matches, replaceTerm, searchOptions]);
 

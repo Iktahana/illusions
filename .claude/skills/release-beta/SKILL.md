@@ -4,8 +4,8 @@ description: >
   illusions プロジェクト専用ベータ発行スキル。dev ブランチを beta ブランチへマージし、
   ベータ版（プレリリース）を発行する。「ベータを出して」「beta 発行して」「dev を beta に
   マージして」「release-beta」「新しいベータ版を出して」など、ベータ発行を意図する発言で
-  積極的に使用する。安定版への昇格 (beta → main) は毎週金曜の自動ワークフローが担当するため、
-  このスキルは扱わない。
+  積極的に使用する。安定版への昇格 (beta → main) は手動プロセス（自動ワークフローは廃止済み）
+  のため、このスキルは扱わない。
 ---
 
 # release-beta
@@ -19,8 +19,9 @@ beta ブランチへ push すると `build.yml` が **自動で** `vX.Y.Z-beta.Y
 > `-beta` の前の `X.Y.Z` は「次に main へ昇格される安定版番号」と一致する（安定版タグから
 > +1 して算出され、beta タグは算出対象から除外される）。
 >
-> **昇格は扱わない**: `beta → main` の安定版昇格は `.github/workflows/weekly-release.yml`
-> （毎週金曜 09:00 JST、または workflow_dispatch 手動）が自動 PR で行う。
+> **昇格は扱わない**: `beta → main` の安定版昇格は手動プロセス。自動化していた
+> `weekly-release.yml` は廃止済み（2026-07-12）— 昇格したい場合はユーザーが手動で
+> `beta` → `main` の PR を作成・マージする。
 
 ---
 
@@ -97,7 +98,7 @@ gh release list --limit 5
 
 - **タグもバージョン番号も手動で作らない。** build.yml が beta 版番号を自動算出・タグ付けする
   （メモリ `project_release_workflow_versioning` 準拠）。
-- **このスキルは beta → main 昇格を行わない。** 安定版リリースは金曜の Weekly Beta Promotion
-  ワークフロー（または workflow_dispatch 手動起動）に委ねる。
+- **このスキルは beta → main 昇格を行わない。** 安定版リリースは手動プロセス
+  （自動ワークフローは廃止済み）——昇格が必要な場合はユーザーが別途手動で対応する。
 - **beta ブランチ以外には触れない。** dev → beta の発行だけを扱う。
 - **package.json の `version` フィールドとは無関係。** バージョンは git タグ + build.yml で管理する。

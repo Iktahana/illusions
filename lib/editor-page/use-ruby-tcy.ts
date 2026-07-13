@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { Fragment } from "@milkdown/prose/model";
 import type { EditorView } from "@milkdown/prose/view";
+import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 interface UseRubyTcyOptions {
   editorViewRef: MutableRefObject<EditorView | null>;
@@ -43,12 +44,13 @@ export function useRubyTcy({
       if (!view) return;
       const sel = rubySelectionRef.current;
       if (!sel) return;
-      const { state, dispatch } = view;
+      const { state } = view;
       const rubyNodeType = state.schema.nodes.ruby;
       if (!rubyNodeType) {
         // Fallback: insert as plain text if ruby node type is not available
-        const tr = state.tr.insertText(rubyMarkup, sel.from, sel.to);
-        dispatch(tr);
+        dispatchIfEditorViewAlive(view, (aliveView) =>
+          aliveView.state.tr.insertText(rubyMarkup, sel.from, sel.to),
+        );
         rubySelectionRef.current = null;
         return;
       }
@@ -68,8 +70,9 @@ export function useRubyTcy({
         nodes.push(state.schema.text(rubyMarkup.slice(lastIndex)));
       }
       const fragment = Fragment.from(nodes);
-      const tr = state.tr.replaceWith(sel.from, sel.to, fragment);
-      dispatch(tr);
+      dispatchIfEditorViewAlive(view, (aliveView) =>
+        aliveView.state.tr.replaceWith(sel.from, sel.to, fragment),
+      );
       rubySelectionRef.current = null;
     },
     // editorViewRef is a stable ref object; including it here satisfies the React Compiler
@@ -80,7 +83,7 @@ export function useRubyTcy({
   const handleToggleTcy = useCallback(() => {
     const view = editorViewRef.current;
     if (!view) return;
-    const { state, dispatch } = view;
+    const { state } = view;
     const { from, to } = state.selection;
     if (from === to) return;
     const text = state.doc.textBetween(from, to);
@@ -88,11 +91,13 @@ export function useRubyTcy({
     // Toggle: if already wrapped in ^...^, unwrap; otherwise wrap
     if (text.startsWith("^") && text.endsWith("^") && text.length >= 2) {
       const unwrapped = text.slice(1, -1);
-      const tr = state.tr.insertText(unwrapped, from, to);
-      dispatch(tr);
+      dispatchIfEditorViewAlive(view, (aliveView) =>
+        aliveView.state.tr.insertText(unwrapped, from, to),
+      );
     } else {
-      const tr = state.tr.insertText(`^${text}^`, from, to);
-      dispatch(tr);
+      dispatchIfEditorViewAlive(view, (aliveView) =>
+        aliveView.state.tr.insertText(`^${text}^`, from, to),
+      );
     }
     // editorViewRef is a stable ref object; including it here satisfies the React Compiler
   }, [editorViewRef]);

@@ -12,14 +12,16 @@ on:
     paths-ignore:
       - "store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
+      - ".github/workflows/store-publish.yml"
   pull_request:
     paths-ignore:
       - "store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
+      - ".github/workflows/store-publish.yml"
   workflow_dispatch:
     inputs:
       run_mas_build:
-        description: "MAS向けpkgをビルドしてApp Store Connectへアップロードする"
+        description: "MAS向けpkgをビルドする（署名済み.pkgをartifactとして出力。ストアへのアップロードは store-publish.yml が別途担当）"
         required: false
         default: false
         type: boolean
@@ -345,17 +347,19 @@ jobs:
 
   build-mas:
     name: Build (Mac App Store)
-    needs: [detect-changes, compute-version, test-windows, test-macos]
-    # beta への push で自動実行し、内部TestFlightへ配信する。workflow_dispatch でも手動起動可能。
-    # タグpush（main向け安定版）ではまだ走らせない。
-    # Also gated on the cross-platform test matrix succeeding, since this job
-    # uploads directly to App Store Connect/TestFlight — it's an independent
-    # publish point that isn't downstream of the `release` job.
+    needs: [detect-changes, compute-version]
+    # Build-only: produces a signed .pkg artifact, nothing more. Publishing
+    # (App Store Connect/TestFlight upload) lives entirely in
+    # store-publish.yml's appstore-testflight job, triggered separately and
+    # explicitly — this job never uploads anywhere. Auto-runs on beta pushes
+    # (same as the other platform build jobs) purely to keep a fresh signed
+    # artifact available; tag pushes (main/stable) don't trigger it yet.
+    # Runs in parallel with the test matrix, same as every other platform
+    # build job — nothing here is gated on tests, since it has no external
+    # side effects to guard.
     if: |
       always() &&
       needs.compute-version.result == 'success' &&
-      needs.test-windows.result == 'success' &&
-      needs.test-macos.result == 'success' &&
       (
         (github.event_name == 'workflow_dispatch' && inputs.run_mas_build == true) ||
         (github.event_name == 'push' && github.ref == 'refs/heads/beta' && needs.detect-changes.outputs.desktop_changed == 'true')
@@ -368,10 +372,6 @@ jobs:
       CSC_INSTALLER_LINK: ${{ secrets.CSC_INSTALLER_LINK }}
       CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.CSC_INSTALLER_KEY_PASSWORD }}
       MAS_PROVISIONING_PROFILE: ${{ secrets.MAS_PROVISIONING_PROFILE }}
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
-      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
       APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       APTABASE_HOST: ${{ secrets.APTABASE_HOST }}
       ERROR_REPORT_DSN: ${{ secrets.ERROR_REPORT_DSN }}
@@ -413,7 +413,7 @@ jobs:
             fi
           done
 
-      - name: Prepare MAS credentials
+      - name: Prepare MAS signing credentials
         shell: bash
         run: |
           missing=()
@@ -422,10 +422,6 @@ jobs:
           [ -z "$CSC_INSTALLER_LINK" ] && missing+=("CSC_INSTALLER_LINK")
           [ -z "$CSC_INSTALLER_KEY_PASSWORD" ] && missing+=("CSC_INSTALLER_KEY_PASSWORD")
           [ -z "$MAS_PROVISIONING_PROFILE" ] && missing+=("MAS_PROVISIONING_PROFILE")
-          [ -z "$ASC_KEY_ID" ] && missing+=("ASC_KEY_ID")
-          [ -z "$ASC_ISSUER_ID" ] && missing+=("ASC_ISSUER_ID")
-          [ -z "$ASC_API_KEY" ] && missing+=("ASC_API_KEY")
-          [ -z "$ASC_APP_ID" ] && missing+=("ASC_APP_ID")
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::Missing MAS credentials: ${missing[*]}"
             exit 1
@@ -433,11 +429,6 @@ jobs:
 
           # electron-builder は build.mas.provisioningProfile のパスをそのまま読む。
           printf '%s' "$MAS_PROVISIONING_PROFILE" | base64 --decode > build/illusions.provisionprofile
-
-          # altool はこの標準パスから App Store Connect API キーを探す。
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          printf '%s' "$ASC_API_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
-          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 
       - name: Apply computed version
         # CFBundleVersion must be plain dot-separated integers, so this uses
@@ -472,29 +463,6 @@ jobs:
         with:
           name: illusions-mas-pkg
           path: dist-electron/**/*.pkg
-
-      - name: Upload to App Store Connect
-        shell: bash
-        run: |
-          PKG_FILE=$(find dist-electron -name "*.pkg" -type f | head -n 1)
-          if [ -z "$PKG_FILE" ]; then
-            echo "::error::MAS pkg artifact was not found"
-            exit 1
-          fi
-          echo "Uploading $PKG_FILE to App Store Connect app $ASC_APP_ID"
-          xcrun altool --upload-app \
-            -f "$PKG_FILE" \
-            --type macos \
-            --apiKey "$ASC_KEY_ID" \
-            --apiIssuer "$ASC_ISSUER_ID"
-
-      - name: Enable build for internal TestFlight testers
-        # Apple takes a few minutes to finish processing an uploaded build
-        # before it's visible via the API, hence the polling/retry loop
-        # inside this script. Pass the same unique CFBundleVersion used for
-        # the build above (not the marketing version — multiple builds can
-        # share that, which would match the wrong one).
-        run: node scripts/asc-testflight-enable.mjs ${{ github.run_id }}${{ github.run_attempt }}
 
   # ---------------------------------------------------------------------------
   # Windows — shared build step, then separate NSIS / MSIX packaging
@@ -966,10 +934,12 @@ jobs:
   # Cross-platform unit tests — run in parallel with the platform builds above
   # (same push-only gating as the "full build" steps in those jobs). Linux is
   # already covered by the "Test & Coverage" job in quality.yml, so only
-  # Windows/macOS runners are needed here. Nothing downstream of these jobs
-  # waits on them except the actual publish steps (release, build-mas), so a
-  # test failure never slows down compilation/packaging — it only blocks
-  # shipping.
+  # Windows/macOS runners are needed here. Nothing in this file waits on them
+  # except the `release` job (GitHub Release) — App Store/Microsoft Store
+  # publishing lives entirely in store-publish.yml, which pulls signed
+  # artifacts from a completed build.yml run rather than depending on jobs
+  # here directly. Either way, a test failure never slows down
+  # compilation/packaging — it only blocks shipping.
   # ---------------------------------------------------------------------------
 
   test-windows:

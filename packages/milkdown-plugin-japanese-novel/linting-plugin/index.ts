@@ -11,6 +11,7 @@ import type { IgnoredCorrection } from "@/lib/project/project-types";
 import type { ConfigChangeReason } from "@/lib/linting/correction-config";
 import type { LintingSettingsUpdate, RuleRunnerLike } from "./types";
 import { createLintingPlugin, lintingKey } from "./decoration-plugin";
+import { dispatchIfEditorViewAlive } from "../../../shared/lib/editor-view-safety";
 
 // Export the plugin key for external use
 export { lintingKey } from "./decoration-plugin";
@@ -81,13 +82,5 @@ export function updateLintingSettings(
   if (reason !== undefined) {
     meta.changeReason = reason;
   }
-  try {
-    const tr = view.state.tr.setMeta(lintingKey, meta);
-    view.dispatch(tr);
-  } catch (err: unknown) {
-    // Milkdown throws "Context ... not found" when the editor is destroyed or not yet initialized.
-    // Only suppress that specific error; let unexpected failures propagate.
-    const msg = err instanceof Error ? err.message : "";
-    if (!msg.includes("not found")) throw err;
-  }
+  dispatchIfEditorViewAlive(view, (aliveView) => aliveView.state.tr.setMeta(lintingKey, meta));
 }

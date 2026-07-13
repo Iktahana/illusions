@@ -37,14 +37,14 @@ import { notificationManager } from "@/lib/services/notification-manager";
 import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { getAppRuntimeInfo, isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
-import { sanitizeMdiContent } from "@/lib/tab-manager/types";
+import { computeHistoryRestoreTabUpdate } from "@/lib/tab-manager/history-restore";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
@@ -207,6 +207,8 @@ export default function EditorPage() {
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
+  const isTerminalAvailable =
+    isElectron && getAppRuntimeInfo().distributionProvider !== "app-store";
 
   // Rule metas of every installed external ruleset (all lint rules now live in
   // external rulesets). The inspector's correction-mode dropdown derives its
@@ -730,11 +732,11 @@ export default function EditorPage() {
       const items = [
         { label: "新規ファイル", action: "new-file" },
         { label: "ファイルを開く…", action: "open-file" },
-        ...(isElectron ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
+        ...(isTerminalAvailable ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
       ];
       void showTabBarMenu(e, items);
     },
-    [showTabBarMenu, isElectron],
+    [showTabBarMenu, isTerminalAvailable],
   );
 
   const handleTabBarMenuAction = useCallback(
@@ -1295,6 +1297,7 @@ export default function EditorPage() {
 
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
       .then(({ updateLintingSettings }) => {
+        if (!isEditorViewAlive(editorViewInstance)) return;
         updateLintingSettings(editorViewInstance, { ignoredCorrections }, "ignored-correction");
       })
       .catch((err) => {
@@ -1308,6 +1311,7 @@ export default function EditorPage() {
 
     import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
       .then(({ updateLintingSettings }) => {
+        if (!isEditorViewAlive(editorViewInstance)) return;
         updateLintingSettings(editorViewInstance, { knownTerms }, "known-terms-change");
       })
       .catch((err) => {
@@ -1578,27 +1582,9 @@ export default function EditorPage() {
     currentContent: content,
     onHistoryRestore: (restoredContent: string) => {
       setContent(restoredContent);
-      // Clear conflict state after restoring a snapshot.
-      // Set fileSyncStatus based on whether the restored content matches the last saved content,
-      // so that a restored snapshot that differs from disk is not treated as clean.
       if (activeTabId !== null) {
         const currentTab = tabsRef.current.find((t) => t.id === activeTabId);
-        const editorTab = currentTab && isEditorTab(currentTab) ? currentTab : null;
-        const lastSaved = editorTab ? (editorTab.lastSavedContent ?? "") : "";
-        const fileTypeOpts = editorTab ? { fileType: editorTab.fileType } : undefined;
-        const isClean =
-          sanitizeMdiContent(restoredContent, fileTypeOpts) ===
-          sanitizeMdiContent(lastSaved, fileTypeOpts);
-        updateTab(activeTabId, {
-          fileSyncStatus: isClean ? "clean" : "dirty",
-          // #1845: keep isDirty consistent with fileSyncStatus so the tab ●
-          // shows, close-confirm fires, and auto-save picks up the restore.
-          // Editor remount (incrementEditorKey) sets the value via
-          // defaultValueCtx and never fires markdownUpdated, so isDirty would
-          // otherwise stay false after a restore.
-          isDirty: !isClean,
-          conflictDiskContent: null,
-        });
+        updateTab(activeTabId, computeHistoryRestoreTabUpdate(restoredContent, currentTab));
       }
       incrementEditorKey();
     },
@@ -1709,7 +1695,7 @@ export default function EditorPage() {
           bottomView,
           setTopView,
           setBottomView,
-          handleNewTerminalTab,
+          handleNewTerminalTab: isTerminalAvailable ? handleNewTerminalTab : undefined,
         }}
         mainArea={{
           tabs,

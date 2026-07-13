@@ -151,7 +151,7 @@ interface EditorLayoutProps {
     bottomView: ActivityBarView;
     setTopView: (view: ActivityBarView) => void;
     setBottomView: (view: ActivityBarView) => void;
-    handleNewTerminalTab: () => void;
+    handleNewTerminalTab?: () => void;
   };
   mainArea: {
     tabs: TabState[];
