@@ -37,7 +37,7 @@ import { notificationManager } from "@/lib/services/notification-manager";
 import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
 import { useGlobalShortcuts } from "@/lib/hooks/use-global-shortcuts";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { getAppRuntimeInfo, isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { useEditorMode } from "@/contexts/EditorModeContext";
@@ -207,6 +207,8 @@ export default function EditorPage() {
   } = settingsHandlers;
 
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
+  const isTerminalAvailable =
+    isElectron && getAppRuntimeInfo().distributionProvider !== "app-store";
 
   // Rule metas of every installed external ruleset (all lint rules now live in
   // external rulesets). The inspector's correction-mode dropdown derives its
@@ -730,11 +732,11 @@ export default function EditorPage() {
       const items = [
         { label: "新規ファイル", action: "new-file" },
         { label: "ファイルを開く…", action: "open-file" },
-        ...(isElectron ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
+        ...(isTerminalAvailable ? [{ label: "新規ターミナル", action: "new-terminal" }] : []),
       ];
       void showTabBarMenu(e, items);
     },
-    [showTabBarMenu, isElectron],
+    [showTabBarMenu, isTerminalAvailable],
   );
 
   const handleTabBarMenuAction = useCallback(
@@ -1693,7 +1695,7 @@ export default function EditorPage() {
           bottomView,
           setTopView,
           setBottomView,
-          handleNewTerminalTab,
+          handleNewTerminalTab: isTerminalAvailable ? handleNewTerminalTab : undefined,
         }}
         mainArea={{
           tabs,
