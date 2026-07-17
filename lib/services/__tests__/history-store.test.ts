@@ -34,6 +34,19 @@ const fileStore = new Map<string, string>();
  * simulates a getFileHandle/backup failure for specific file names (Codex F-07).
  */
 let getFileHandleHook: ((fileName: string, options?: { create?: boolean }) => void) | null = null;
+let removeEntryHook: ((entryName: string) => void) | null = null;
+const mockVfsWriteFile = vi.fn(async (path: string, content: string): Promise<void> => {
+  fileStore.set(path, content);
+});
+const mockVfsRename = vi.fn(async (oldPath: string, newPath: string): Promise<void> => {
+  const content = fileStore.get(oldPath);
+  if (content === undefined) throw new Error(`File not found: ${oldPath}`);
+  fileStore.set(newPath, content);
+  fileStore.delete(oldPath);
+});
+const mockVfsDeleteFile = vi.fn(async (path: string): Promise<void> => {
+  fileStore.delete(path);
+});
 
 function createMockFileHandle(name: string, dirPath: string): VFSFileHandle {
   const fullPath = dirPath ? `${dirPath}/${name}` : name;
@@ -75,6 +88,7 @@ function createMockDirectoryHandle(name: string, path: string): VFSDirectoryHand
       },
     ),
     removeEntry: vi.fn(async (entryName: string): Promise<void> => {
+      removeEntryHook?.(entryName);
       const fullPath = path ? `${path}/${entryName}` : entryName;
       fileStore.delete(fullPath);
     }),
@@ -87,6 +101,14 @@ function createMockDirectoryHandle(name: string, path: string): VFSDirectoryHand
 vi.mock("@/lib/services/project-file-service", () => ({
   getProjectFileService: () => ({
     getDirectoryHandle: vi.fn(async () => createMockDirectoryHandle("", "")),
+    readFile: vi.fn(async (path: string) => {
+      const content = fileStore.get(path);
+      if (content === undefined) throw new Error(`File not found: ${path}`);
+      return content;
+    }),
+    writeFile: mockVfsWriteFile,
+    rename: mockVfsRename,
+    deleteFile: mockVfsDeleteFile,
   }),
 }));
 
@@ -116,6 +138,10 @@ describe("HistoryStore", () => {
   beforeEach(() => {
     fileStore.clear();
     getFileHandleHook = null;
+    removeEntryHook = null;
+    mockVfsWriteFile.mockClear();
+    mockVfsRename.mockClear();
+    mockVfsDeleteFile.mockClear();
     store = new HistoryStore();
     vi.unstubAllGlobals();
   });
@@ -157,6 +183,40 @@ describe("HistoryStore", () => {
       const result = await store.loadIndex();
       expect(result.snapshots).toHaveLength(1);
       expect(result.snapshots[0].id).toBe("a");
+    });
+
+    it("loads the last-known-good backup when index.json is corrupt (#2145)", async () => {
+      const backup = makeIndex({
+        snapshots: [
+          {
+            id: "backup-entry",
+            timestamp: 1000,
+            filename: "backup.history",
+            sourcePath: "a.mdi",
+            displayName: "a.mdi",
+            type: "manual",
+            characterCount: 6,
+            fileSize: 6,
+            checksum: "abc",
+          },
+        ],
+      });
+      fileStore.set(".illusions/history/index.json", "{bad json");
+      fileStore.set(".illusions/history/index.json.bak", JSON.stringify(backup));
+
+      const result = await store.loadIndex();
+
+      expect(result.snapshots).toHaveLength(1);
+      expect(result.snapshots[0].id).toBe("backup-entry");
+    });
+
+    it("loads the last-known-good backup when index.json is missing (#2145)", async () => {
+      const backup = makeIndex({ maxSnapshots: 12 });
+      fileStore.set(".illusions/history/index.json.bak", JSON.stringify(backup));
+
+      const result = await store.loadIndex();
+
+      expect(result.maxSnapshots).toBe(12);
     });
 
     // Issue #1844 / T-3: corrupt index.json must self-heal (backup → regenerate)
@@ -249,6 +309,37 @@ describe("HistoryStore", () => {
       expect(fileStore.has(key)).toBe(true);
       const parsed = JSON.parse(fileStore.get(key)!) as HistoryIndex;
       expect(parsed.maxSnapshots).toBe(100);
+      expect(mockVfsRename).toHaveBeenCalledWith(
+        expect.stringMatching(/^\.illusions\/history\/index\.json\.tmp-/),
+        ".illusions/history/index.json",
+      );
+    });
+
+    it("keeps a last-known-good backup and replaces index via temp rename (#2145)", async () => {
+      const existing = makeIndex({ maxSnapshots: 77 });
+      fileStore.set(".illusions/history/index.json", JSON.stringify(existing));
+      const next = makeIndex({ maxSnapshots: 88 });
+
+      await store.saveIndex(next);
+
+      const backup = JSON.parse(
+        fileStore.get(".illusions/history/index.json.bak")!,
+      ) as HistoryIndex;
+      const primary = JSON.parse(fileStore.get(".illusions/history/index.json")!) as HistoryIndex;
+      expect(backup.maxSnapshots).toBe(77);
+      expect(primary.maxSnapshots).toBe(88);
+      expect([...fileStore.keys()].filter((key) => key.includes(".tmp-"))).toEqual([]);
+    });
+
+    it("cleans up temp index writes when the final rename fails (#2145)", async () => {
+      const idx = makeIndex();
+      mockVfsRename.mockRejectedValueOnce(Object.assign(new Error("locked"), { code: "EPERM" }));
+
+      await expect(store.saveIndex(idx)).rejects.toThrow("locked");
+
+      expect(mockVfsDeleteFile).toHaveBeenCalledWith(
+        expect.stringMatching(/^\.illusions\/history\/index\.json\.tmp-/),
+      );
     });
   });
 
@@ -305,6 +396,19 @@ describe("HistoryStore", () => {
 
     it("does NOT throw when deleting a non-existent file", async () => {
       await expect(store.deleteSnapshotFile("test.mdi", "ghost.history")).resolves.toBeUndefined();
+    });
+
+    it("throws non-missing delete failures so callers do not drop index entries (#2144)", async () => {
+      const error = Object.assign(new Error("locked"), { code: "EPERM" });
+      removeEntryHook = () => {
+        throw error;
+      };
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await expect(store.deleteSnapshotFile("test.mdi", "locked.history")).rejects.toBe(error);
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("locked.history"), error);
+      warnSpy.mockRestore();
     });
   });
 

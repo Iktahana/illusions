@@ -52,6 +52,8 @@ export interface SnapshotEntry {
   fileSize: number;
   /** SHA-256 hex digest of the content */
   checksum: string;
+  /** True when the index entry exists but the backing .history file is missing. */
+  isMissing?: boolean;
 }
 
 /**
@@ -95,6 +97,8 @@ export interface RestoreResult {
   content?: string;
   /** Error message (if unsuccessful) */
   error?: string;
+  /** Machine-readable failure state for recoverable UI decisions. */
+  reason?: "snapshot-not-found" | "snapshot-file-missing" | "checksum-mismatch" | "read-error";
 }
 
 // -----------------------------------------------------------------------

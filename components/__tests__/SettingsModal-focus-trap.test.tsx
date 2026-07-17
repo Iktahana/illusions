@@ -35,6 +35,7 @@ vi.mock("@/components/settings/tab-registry", () => ({
 
 vi.mock("@/components/settings/settings-category", () => ({
   resolveLegacyCategory: (_cat: unknown) => "account",
+  isCategoryInScope: () => true,
 }));
 
 vi.mock("@/components/settings/primitives", () => ({

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { fetchAppState } from "@/lib/storage/app-state-manager";
+import { fetchAppState, subscribeToAppStateUpdates } from "@/lib/storage/app-state-manager";
 
 import type { Severity } from "@/lib/linting/types";
 import type { CorrectionConfig } from "@/lib/linting/correction-config";
@@ -92,6 +92,31 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
   // Load persisted settings on mount
   useEffect(() => {
     let mounted = true;
+    let initialSnapshotApplied = false;
+    let queuedSnapshot: Record<string, unknown> | null = null;
+
+    // Incoming snapshots are canonical main-process state.  Applying them
+    // through the existing hydration functions changes local React state only;
+    // it deliberately does not write back and therefore cannot create a
+    // renderer-to-renderer feedback loop.
+    const applySnapshot = (appState: Record<string, unknown>) => {
+      applyPersistedDisplaySettings(appState);
+      applyPersistedAiSettings(appState);
+      applyPersistedDictSettings(appState);
+      applyPersistedUpdateSettings(appState);
+      applyPersistedAnalyticsSettings(appState);
+      incrementEditorKey();
+    };
+
+    const unsubscribe = subscribeToAppStateUpdates((appState) => {
+      if (!mounted) return;
+      if (!initialSnapshotApplied) {
+        // Do not let an in-flight initial load overwrite a newer broadcast.
+        queuedSnapshot = appState as Record<string, unknown>;
+        return;
+      }
+      applySnapshot(appState as Record<string, unknown>);
+    });
 
     const loadSettings = async () => {
       try {
@@ -99,19 +124,18 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
         if (!mounted) return;
 
         if (appState) {
-          applyPersistedDisplaySettings(appState as Record<string, unknown>);
-          applyPersistedAiSettings(appState as Record<string, unknown>);
-          applyPersistedDictSettings(appState as Record<string, unknown>);
-          applyPersistedUpdateSettings(appState as Record<string, unknown>);
-          applyPersistedAnalyticsSettings(appState as Record<string, unknown>);
-
-          // Force editor rebuild to apply restored settings (e.g. custom font)
-          incrementEditorKey();
+          applySnapshot(appState as Record<string, unknown>);
         }
       } catch (error) {
         console.error("Failed to load settings:", error);
       } finally {
-        if (mounted) setSettingsHydrated(true);
+        if (mounted) {
+          initialSnapshotApplied = true;
+          // A broadcast that raced the initial read is newer than its result.
+          if (queuedSnapshot) applySnapshot(queuedSnapshot);
+          queuedSnapshot = null;
+          setSettingsHydrated(true);
+        }
       }
     };
 
@@ -119,6 +143,7 @@ export function useEditorSettings(incrementEditorKey: () => void): UseEditorSett
 
     return () => {
       mounted = false;
+      unsubscribe();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

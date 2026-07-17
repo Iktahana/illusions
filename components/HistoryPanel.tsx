@@ -323,6 +323,10 @@ export default function HistoryPanel({
    * スナップショット復元の確認ダイアログを表示する。
    */
   const handleRestore = useCallback((snapshot: SnapshotEntry) => {
+    if (snapshot.isMissing) {
+      setError("このスナップショットの履歴ファイルが見つかりません。");
+      return;
+    }
     setRestoreConfirm(snapshot);
   }, []);
 
@@ -405,6 +409,10 @@ export default function HistoryPanel({
   const handleCompare = useCallback(
     async (snapshot: SnapshotEntry) => {
       try {
+        if (snapshot.isMissing) {
+          setError("このスナップショットの履歴ファイルが見つかりません。");
+          return;
+        }
         setLoadingDiffId(snapshot.id);
         const historyService = getHistoryService();
         // Use restoreSnapshot (read-only) directly so the SPECIFIC failure

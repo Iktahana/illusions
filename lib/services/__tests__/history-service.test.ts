@@ -29,11 +29,19 @@ import type { HistoryIndex } from "@/lib/services/history-policy";
 // -----------------------------------------------------------------------
 
 const fileStore = new Map<string, string>();
-
-// When set, the mock write() below throws for any file whose name matches
-// this value — used to simulate a disk-write failure mid-operation (e.g.
-// saveIndex() failing after writeSnapshotFile() already succeeded).
-let breakWriteFor: string | null = null;
+let removeEntryHook: ((entryName: string) => void) | null = null;
+const mockVfsWriteFile = vi.fn(async (path: string, content: string): Promise<void> => {
+  fileStore.set(path, content);
+});
+const mockVfsRename = vi.fn(async (oldPath: string, newPath: string): Promise<void> => {
+  const content = fileStore.get(oldPath);
+  if (content === undefined) throw new Error(`File not found: ${oldPath}`);
+  fileStore.set(newPath, content);
+  fileStore.delete(oldPath);
+});
+const mockVfsDeleteFile = vi.fn(async (path: string): Promise<void> => {
+  fileStore.delete(path);
+});
 
 function createMockFileHandle(name: string, dirPath: string): VFSFileHandle {
   const fullPath = dirPath ? `${dirPath}/${name}` : name;
@@ -46,9 +54,6 @@ function createMockFileHandle(name: string, dirPath: string): VFSFileHandle {
       return content;
     }),
     write: vi.fn(async (content: string): Promise<void> => {
-      if (breakWriteFor !== null && name === breakWriteFor) {
-        throw new Error("Simulated disk write failure");
-      }
       fileStore.set(fullPath, content);
     }),
     getFile: vi.fn(async () => new File([""], name)),
@@ -75,6 +80,7 @@ function createMockDirectoryHandle(name: string, path: string): VFSDirectoryHand
       },
     ),
     removeEntry: vi.fn(async (entryName: string): Promise<void> => {
+      removeEntryHook?.(entryName);
       const fullPath = path ? `${path}/${entryName}` : entryName;
       fileStore.delete(fullPath);
     }),
@@ -87,6 +93,14 @@ function createMockDirectoryHandle(name: string, path: string): VFSDirectoryHand
 vi.mock("@/lib/services/project-file-service", () => ({
   getProjectFileService: () => ({
     getDirectoryHandle: vi.fn(async () => createMockDirectoryHandle("", "")),
+    readFile: vi.fn(async (path: string) => {
+      const content = fileStore.get(path);
+      if (content === undefined) throw new Error(`File not found: ${path}`);
+      return content;
+    }),
+    writeFile: mockVfsWriteFile,
+    rename: mockVfsRename,
+    deleteFile: mockVfsDeleteFile,
   }),
 }));
 
@@ -138,7 +152,10 @@ describe("HistoryService", () => {
 
   beforeEach(() => {
     fileStore.clear();
-    breakWriteFor = null;
+    removeEntryHook = null;
+    mockVfsWriteFile.mockClear();
+    mockVfsRename.mockClear();
+    mockVfsDeleteFile.mockClear();
     mockCryptoSubtle();
     resetHistoryService();
     service = new HistoryService();
@@ -363,6 +380,28 @@ describe("HistoryService", () => {
       expect(listener).toHaveBeenCalledWith(entry);
     });
 
+    it("rolls back the written snapshot file when saving the index fails (#2143)", async () => {
+      const store = (
+        service as unknown as {
+          store: {
+            saveIndex: (index: HistoryIndex) => Promise<void>;
+          };
+        }
+      ).store;
+      store.saveIndex = vi.fn(async () => {
+        throw new Error("index write failed");
+      });
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await expect(
+        service.createSnapshot({ sourcePath: "main.mdi", content: "orphan candidate" }),
+      ).rejects.toThrow("index write failed");
+
+      const historyFiles = Array.from(fileStore.keys()).filter((key) => key.endsWith(".history"));
+      expect(historyFiles).toEqual([]);
+      errorSpy.mockRestore();
+    });
+
     it("listener is not called when throttled (returns null)", async () => {
       const listener = vi.fn();
       service.onSnapshotCreated(listener);
@@ -386,58 +425,6 @@ describe("HistoryService", () => {
   });
 
   // -----------------------------------------------------------------------
-  // createSnapshot — index write failure (saveIndex throws after
-  // writeSnapshotFile already succeeded)
-  // -----------------------------------------------------------------------
-
-  describe("createSnapshot — index write failure", () => {
-    it("rejects with the underlying error instead of swallowing it", async () => {
-      breakWriteFor = "index.json";
-      await expect(
-        service.createSnapshot({ sourcePath: "main.mdi", content: "content" }),
-      ).rejects.toThrow("Simulated disk write failure");
-    });
-
-    it("leaves the snapshot content file written despite the index update failing (documents current orphaned-file behavior)", async () => {
-      breakWriteFor = "index.json";
-      await expect(
-        service.createSnapshot({ sourcePath: "main.mdi", content: "orphaned content" }),
-      ).rejects.toThrow();
-
-      const historyFiles = Array.from(fileStore.entries()).filter(([k]) => k.endsWith(".history"));
-      expect(historyFiles).toHaveLength(1);
-      expect(historyFiles[0]![1]).toBe("orphaned content");
-    });
-
-    it("does not add the new entry to the index when saveIndex fails", async () => {
-      breakWriteFor = "index.json";
-      await expect(
-        service.createSnapshot({ sourcePath: "main.mdi", content: "should not be indexed" }),
-      ).rejects.toThrow();
-
-      breakWriteFor = null;
-      const snapshots = await service.getSnapshots("main.mdi");
-      expect(snapshots).toHaveLength(0);
-    });
-
-    it("releases the index lock even when saveIndex throws (a subsequent call does not hang)", async () => {
-      breakWriteFor = "index.json";
-      await expect(
-        service.createSnapshot({ sourcePath: "main.mdi", content: "first (fails)" }),
-      ).rejects.toThrow();
-
-      breakWriteFor = null;
-      const entry = await service.createSnapshot({
-        sourcePath: "main.mdi",
-        content: "second (should succeed)",
-        type: "manual",
-      });
-      expect(entry).not.toBeNull();
-      expect(entry!.type).toBe("manual");
-    });
-  });
-
-  // -----------------------------------------------------------------------
   // getSnapshots
   // -----------------------------------------------------------------------
 
@@ -454,6 +441,23 @@ describe("HistoryService", () => {
       const snaps = await service.getSnapshots();
       expect(snaps.length).toBe(2);
       expect(snaps[0].timestamp).toBeGreaterThanOrEqual(snaps[1].timestamp);
+    });
+
+    it("marks snapshots whose backing .history file is missing", async () => {
+      const entry = await service.createSnapshot({
+        sourcePath: "main.mdi",
+        content: "A",
+        type: "manual",
+      });
+      const snapshotKey = Array.from(fileStore.keys()).find((k) => k.endsWith(entry!.filename));
+      expect(snapshotKey).toBeTruthy();
+      fileStore.delete(snapshotKey!);
+
+      const snaps = await service.getSnapshots();
+
+      expect(snaps).toHaveLength(1);
+      expect(snaps[0].id).toBe(entry!.id);
+      expect(snaps[0].isMissing).toBe(true);
     });
 
     it("filters snapshots by source path", async () => {
@@ -565,6 +569,24 @@ describe("HistoryService", () => {
       const result = await service.restoreSnapshot(entry!.id);
       expect(result.success).toBe(false);
       expect(result.error).toContain("Checksum mismatch");
+      expect(result.reason).toBe("checksum-mismatch");
+    });
+
+    it("returns a first-class missing-file result when the index entry has no .history file", async () => {
+      const entry = await service.createSnapshot({
+        sourcePath: "main.mdi",
+        content: "Original",
+        type: "manual",
+      });
+      const snapshotKey = Array.from(fileStore.keys()).find((k) => k.endsWith(entry!.filename));
+      expect(snapshotKey).toBeTruthy();
+      fileStore.delete(snapshotKey!);
+
+      const result = await service.restoreSnapshot(entry!.id);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toBe("snapshot-file-missing");
+      expect(result.error).toContain("Snapshot file missing");
     });
   });
 
@@ -590,7 +612,8 @@ describe("HistoryService", () => {
       expect(result.success).toBe(false);
       expect(result.error).not.toContain("Snapshot not found");
       expect(result.error).not.toContain("Checksum mismatch");
-      expect(result.error).toContain("Failed to restore snapshot");
+      expect(result.error).toContain("Snapshot file missing");
+      expect(result.reason).toBe("snapshot-file-missing");
     });
 
     it("getSnapshotContent returns null (not throw) when the underlying file is missing", async () => {
@@ -654,6 +677,25 @@ describe("HistoryService", () => {
       });
       await service.deleteSnapshot(entry!.id);
       expect(await service.getSnapshots()).toHaveLength(0);
+    });
+
+    it("keeps the index entry when snapshot file deletion fails (#2144)", async () => {
+      const entry = await service.createSnapshot({
+        sourcePath: "main.mdi",
+        content: "locked",
+        type: "manual",
+      });
+      const error = Object.assign(new Error("locked"), { code: "EPERM" });
+      removeEntryHook = () => {
+        throw error;
+      };
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      await expect(service.deleteSnapshot(entry!.id)).rejects.toBe(error);
+
+      const snapshots = await service.getSnapshots();
+      expect(snapshots.some((snapshot) => snapshot.id === entry!.id)).toBe(true);
+      warnSpy.mockRestore();
     });
   });
 

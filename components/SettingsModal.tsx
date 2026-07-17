@@ -8,7 +8,12 @@ import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { SettingsNav } from "./settings/primitives";
 import { buildSettingsNavConfig } from "./settings/nav-config";
 import { buildSettingsTabRegistry } from "./settings/tab-registry";
-import { resolveLegacyCategory, type SettingsCategory } from "./settings/settings-category";
+import {
+  isCategoryInScope,
+  resolveLegacyCategory,
+  type SettingsCategory,
+  type SettingsScope,
+} from "./settings/settings-category";
 
 export type { SettingsCategory } from "./settings/settings-category";
 
@@ -33,16 +38,34 @@ interface SettingsModalProps {
   onClose: () => void;
   /** Open modal on a specific tab. Legacy category values are normalized. */
   initialCategory?: SettingsCategory;
+  /** Render inside the dedicated Settings BrowserWindow rather than an overlay. */
+  presentation?: "modal" | "window";
+  /** `global` excludes document/project scoped configuration. */
+  scope?: SettingsScope;
 }
 
-export default function SettingsModal({ isOpen, onClose, initialCategory }: SettingsModalProps) {
+export default function SettingsModal({
+  isOpen,
+  onClose,
+  initialCategory,
+  presentation = "modal",
+  scope = "all",
+}: SettingsModalProps) {
   const isElectron = isElectronRenderer();
 
-  const navGroups = useMemo(() => buildSettingsNavConfig(), []);
-  const tabRegistry = useMemo(() => buildSettingsTabRegistry({ isElectron }), [isElectron]);
+  const navGroups = useMemo(() => buildSettingsNavConfig(scope), [scope]);
+  const tabRegistry = useMemo(
+    () => buildSettingsTabRegistry({ isElectron, scope }),
+    [isElectron, scope],
+  );
+
+  const resolveCategory = (category: SettingsCategory | undefined): SettingsCategory => {
+    const resolved = resolveLegacyCategory(category, { isElectron });
+    return isCategoryInScope(resolved, scope) ? resolved : "account";
+  };
 
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>(() =>
-    resolveLegacyCategory(initialCategory, { isElectron }),
+    resolveCategory(initialCategory),
   );
   const modalRef = useRef<HTMLDivElement>(null);
   /** Element that had focus before the modal opened — restored on close. */
@@ -51,19 +74,19 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
 
   useEffect(() => {
     if (isOpen && initialCategory) {
-      setActiveCategory(resolveLegacyCategory(initialCategory, { isElectron }));
+      setActiveCategory(resolveCategory(initialCategory));
     }
-  }, [isOpen, initialCategory, isElectron]);
+  }, [isOpen, initialCategory, isElectron, scope]);
 
   // Body scroll lock
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && presentation === "modal") {
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = "";
       };
     }
-  }, [isOpen]);
+  }, [isOpen, presentation]);
 
   // Capture return-focus target and move focus into modal on open;
   // restore focus to that target on close.
@@ -170,18 +193,25 @@ export default function SettingsModal({ isOpen, onClose, initialCategory }: Sett
 
   return (
     <div
-      data-settings-modal-overlay=""
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      data-settings-modal-overlay={presentation === "modal" ? "" : undefined}
+      className={clsx(
+        presentation === "modal"
+          ? "fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+          : "h-screen w-screen bg-background",
+      )}
       onClick={handleOverlayClick}
     >
       <div
         ref={modalRef}
         role="dialog"
-        aria-modal="true"
+        aria-modal={presentation === "modal" ? "true" : undefined}
         aria-labelledby={headingId}
         tabIndex={-1}
         className={clsx(
-          "relative w-full h-[80vh] mx-4 rounded-xl bg-background-elevated shadow-xl border border-border flex flex-col transition-[max-width] duration-200",
+          "relative w-full bg-background-elevated flex flex-col transition-[max-width] duration-200",
+          presentation === "modal"
+            ? "h-[80vh] mx-4 rounded-xl shadow-xl border border-border"
+            : "h-full",
           isWide ? "max-w-6xl" : "max-w-4xl",
         )}
       >

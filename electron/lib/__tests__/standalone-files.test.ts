@@ -7,9 +7,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { promises as fs } from "fs";
+import fsSync, { promises as fs } from "fs";
 import os from "os";
 import path from "path";
+import { fileURLToPath } from "url";
 
 // CommonJS module under test.
 import {
@@ -100,5 +101,12 @@ describe("standalone-files (#1965 persisted allowlist)", () => {
     );
     clearStandalonePathsCache();
     expect(await loadStandalonePaths(file)).toEqual(new Set(["/abs/ok.mdi"]));
+  });
+
+  it("persists via the shared atomic writer (#2146)", () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const source = fsSync.readFileSync(path.resolve(here, "../standalone-files.js"), "utf-8");
+    expect(source).toContain("writeUtf8FileAtomically");
+    expect(source).not.toMatch(/fs\.writeFile\(/);
   });
 });

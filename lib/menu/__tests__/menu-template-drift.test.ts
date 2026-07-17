@@ -137,7 +137,7 @@ describe("shared menu template drift prevention", () => {
     const native = electronMenu.buildApplicationMenu([], "win32");
 
     MENU_TEMPLATE.forEach((section, sectionIndex) => {
-      const sharedItems = nonSeparator(section.items);
+      const sharedItems = nonSeparator(section.items).filter((item) => item.webVisible !== false);
       const webItems = nonSeparator(WEB_MENU_STRUCTURE[sectionIndex].items);
       const nativeItems = nonSeparator(native[sectionIndex].submenu ?? []);
 
@@ -164,7 +164,7 @@ describe("shared menu template drift prevention", () => {
 
   it("Web actions use the shared item ids", () => {
     MENU_TEMPLATE.forEach((section, sectionIndex) => {
-      const sharedItems = nonSeparator(section.items);
+      const sharedItems = nonSeparator(section.items).filter((item) => item.webVisible !== false);
       const webItems = nonSeparator(WEB_MENU_STRUCTURE[sectionIndex].items);
       sharedItems.forEach((sharedItem, i) => {
         if (sharedItem.submenu && !sharedItem.dynamicSubmenu) return; // containers
@@ -308,17 +308,33 @@ describe("shared menu template drift prevention", () => {
     expect(save?.accelerator).toBeUndefined();
   });
 
+  it("Settings uses its nav.settings keymap binding", () => {
+    electronMenu.setKeymapOverrides(
+      { "nav.settings": { modifiers: ["CmdOrCtrl", "Shift"], key: "s" } },
+      2,
+    );
+    electronMenu.setActiveWindowId(2);
+    const native = electronMenu.buildApplicationMenu([], "darwin");
+    const settings = native[0].submenu?.find((i) => i.label === "設定…");
+    expect(settings?.accelerator).toBe("CmdOrCtrl+Shift+S");
+  });
+
   // -------------------------------------------------------------------------
   // macOS app menu (role-based) and platform-only items
   // -------------------------------------------------------------------------
 
-  it("macOS keeps the role-based app menu and drops the file-menu quit item", () => {
+  it("macOS puts Settings in the app menu and drops the file-menu quit item", () => {
     const native = electronMenu.buildApplicationMenu([], "darwin");
     expect(native[0].label).toBe("illusions");
-    expect(native[0].submenu?.every((i) => i.role || i.type === "separator")).toBe(true);
+    expect(
+      native[0].submenu?.every((i) => i.role || i.type === "separator" || i.label === "設定…"),
+    ).toBe(true);
+    const settings = native[0].submenu?.find((i) => i.label === "設定…");
+    expect(settings?.accelerator).toBe("CmdOrCtrl+,");
 
     const fileSection = native.find((s) => s.label === "ファイル");
     expect(fileSection?.submenu?.some((i) => i.role === "quit")).toBe(false);
+    expect(fileSection?.submenu?.some((i) => i.label === "設定…")).toBe(false);
   });
 
   it("non-macOS appends quit to the file menu", () => {
@@ -326,6 +342,7 @@ describe("shared menu template drift prevention", () => {
     const fileSection = native.find((s) => s.label === "ファイル");
     const last = fileSection?.submenu?.[fileSection.submenu.length - 1];
     expect(last).toMatchObject({ role: "quit", label: "終了" });
+    expect(fileSection?.submenu?.some((i) => i.label === "設定…")).toBe(true);
   });
 });
 

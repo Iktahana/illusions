@@ -35,6 +35,8 @@ declare global {
     /** #1839: signal main that a requested close was aborted (save failed). */
     notifyCloseAborted?: () => void;
     newWindow?: () => Promise<void>;
+    /** Opens or focuses the singleton system-level Settings window. */
+    openSettingsWindow?: () => Promise<boolean>;
     /** beta opt-in トグル変更時にメインプロセスへ channel 再評価を依頼する */
     reevaluateUpdateChannel?: () => Promise<boolean>;
     openDictionaryPopup?: (url: string, title: string) => Promise<boolean>;
@@ -72,6 +74,7 @@ declare global {
     onMenuSaveAs?: (callback: () => void) => (() => void) | void;
     onMenuCloseTab?: (callback: () => void) => (() => void) | void;
     onMenuNewTab?: (callback: () => void) => (() => void) | void;
+    onMenuOpenSettings?: (callback: () => void) => (() => void) | void;
     onMenuOpenProject?: (callback: () => void) => (() => void) | void;
     onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
     rebuildMenu?: () => Promise<boolean>;
@@ -182,6 +185,10 @@ declare global {
       loadSession: () => Promise<StorageSession | null>;
       saveAppState: (appState: AppState) => Promise<void>;
       loadAppState: () => Promise<AppState | null>;
+      /** Atomically merge partial state in main and return its canonical snapshot. */
+      updateAppState: (updates: Partial<AppState>) => Promise<AppState>;
+      /** Subscribe to canonical AppState snapshots written by another app window. */
+      onAppStateUpdated: (callback: (appState: AppState) => void) => () => void;
       addToRecent: (file: RecentFile) => Promise<void>;
       getRecentFiles: () => Promise<RecentFile[]>;
       removeFromRecent: (filePath: string) => Promise<void>;
@@ -255,6 +262,8 @@ declare global {
         subscription_status: string;
       }>;
       logout: () => Promise<{ success: boolean }>;
+      /** Opens the account-deletion flow in an app-owned MAS window. */
+      openDeleteAccount: () => Promise<boolean>;
       onCallback: (
         callback: (data: {
           code?: string | null;

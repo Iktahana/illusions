@@ -69,6 +69,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMenuSaveAs: eventChannel(MENU_CHANNELS.event.saveAsTriggered, { arity: 0 }),
   onMenuCloseTab: eventChannel(MENU_CHANNELS.event.closeTab, { arity: 0 }),
   onMenuNewTab: eventChannel(MENU_CHANNELS.event.newTab, { arity: 0 }),
+  onMenuOpenSettings: eventChannel(MENU_CHANNELS.event.openSettings, { arity: 0 }),
   onSaveBeforeClose: eventChannel(SYSTEM_CHANNELS.event.requestSaveBeforeClose, { arity: 0 }),
   onFlushStateBeforeClose: eventChannel(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose, {
     arity: 0,
@@ -86,6 +87,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMenuOpenProject: eventChannel(MENU_CHANNELS.event.openProject, { arity: 0 }),
   onMenuOpenRecentProject: eventChannel(MENU_CHANNELS.event.openRecentProject),
   rebuildMenu: invokeChannel(MENU_CHANNELS.invoke.rebuild, { arity: 0 }),
+  openSettingsWindow: invokeChannel(MENU_CHANNELS.invoke.openSettingsWindow, { arity: 0 }),
   syncMenuUiState: invokeChannel(MENU_CHANNELS.invoke.syncUiState, { arity: 1 }),
   updateKeymapOverrides: invokeChannel(MENU_CHANNELS.invoke.updateKeymapOverrides, { arity: 1 }),
   onMenuShowInFileManager: eventChannel(MENU_CHANNELS.event.showInFileManager, { arity: 0 }),
@@ -143,6 +145,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     loadSession: invokeChannel(STORAGE_CHANNELS.invoke.loadSession, { arity: 0 }),
     saveAppState: invokeChannel(STORAGE_CHANNELS.invoke.saveAppState, { arity: 1 }),
     loadAppState: invokeChannel(STORAGE_CHANNELS.invoke.loadAppState, { arity: 0 }),
+    updateAppState: invokeChannel(STORAGE_CHANNELS.invoke.updateAppState, { arity: 1 }),
+    onAppStateUpdated: eventChannel(STORAGE_CHANNELS.event.appStateUpdated, { arity: 1 }),
     addToRecent: invokeChannel(STORAGE_CHANNELS.invoke.addToRecent, { arity: 1 }),
     getRecentFiles: invokeChannel(STORAGE_CHANNELS.invoke.getRecentFiles, { arity: 0 }),
     removeFromRecent: invokeChannel(STORAGE_CHANNELS.invoke.removeFromRecent, { arity: 1 }),
@@ -181,6 +185,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     refreshToken: invokeChannel(AUTH_CHANNELS.invoke.refreshToken, { arity: 1 }),
     getUserInfo: invokeChannel(AUTH_CHANNELS.invoke.getUserInfo, { arity: 1 }),
     logout: invokeChannel(AUTH_CHANNELS.invoke.logout, { arity: 0 }),
+    openDeleteAccount: invokeChannel(AUTH_CHANNELS.invoke.openDeleteAccount, { arity: 0 }),
     onCallback: eventChannel(AUTH_CHANNELS.event.callback),
   },
   safeStorage: {

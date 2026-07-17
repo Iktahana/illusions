@@ -30,6 +30,7 @@
  */
 
 const fs = require("fs/promises");
+const { writeUtf8FileAtomically } = require("./atomic-file");
 
 /** Maximum standalone paths retained before oldest-first eviction. */
 const MAX_STANDALONE_PATHS = 500;
@@ -109,7 +110,7 @@ async function addStandalonePath(filePath, p) {
   const capped =
     next.length > MAX_STANDALONE_PATHS ? next.slice(next.length - MAX_STANDALONE_PATHS) : next;
   pathsCache = capped;
-  await fs.writeFile(filePath, JSON.stringify({ version: 1, paths: capped }, null, 2), "utf-8");
+  await writeUtf8FileAtomically(filePath, JSON.stringify({ version: 1, paths: capped }, null, 2));
 }
 
 /**

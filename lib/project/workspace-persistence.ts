@@ -2,7 +2,7 @@
  * Mutex-protected read-modify-write for .illusions/workspace.json.
  *
  * All writes to workspace.json MUST go through persistWorkspaceJson()
- * to prevent TOCTOU races and partial overwrites.
+ * to serialize updates and preserve a last-known-good backup.
  *
  * workspace.json への書き込みはすべて persistWorkspaceJson() を通す。
  * TOCTOU レースコンディションと部分上書きを防止する。
@@ -16,10 +16,34 @@ import { getDefaultWorkspaceState } from "./project-types";
 
 const workspaceMutex = new AsyncMutex();
 const WORKSPACE_JSON_PATH = ".illusions/workspace.json";
+const WORKSPACE_JSON_BACKUP_PATH = ".illusions/workspace.json.bak";
+
+function stableWorkspaceJson(state: WorkspaceState): string {
+  return JSON.stringify(state, null, 2);
+}
+
+async function readWorkspaceState(vfs: ReturnType<typeof getProjectFileService>): Promise<{
+  state: WorkspaceState;
+  lastKnownGoodJson: string;
+}> {
+  for (const path of [WORKSPACE_JSON_PATH, WORKSPACE_JSON_BACKUP_PATH]) {
+    try {
+      const text = await vfs.readFile(path);
+      const state = JSON.parse(text) as WorkspaceState;
+      return { state, lastKnownGoodJson: stableWorkspaceJson(state) };
+    } catch {
+      // Try the next source. Missing/corrupt primary falls back to backup.
+    }
+  }
+
+  const state = getDefaultWorkspaceState();
+  return { state, lastKnownGoodJson: stableWorkspaceJson(state) };
+}
 
 /**
- * Merge partial updates into .illusions/workspace.json atomically.
- * Reads the current file, shallow-merges the given fields, and writes back.
+ * Merge partial updates into .illusions/workspace.json.
+ * Reads the current file, falls back to a backup when the primary is corrupt,
+ * shallow-merges the given fields, and replaces the primary via a temp file.
  * No-ops silently if VFS root is not set (standalone mode).
  *
  * @param updates - Partial workspace state fields to merge
@@ -31,15 +55,22 @@ export async function persistWorkspaceJson(updates: Partial<WorkspaceState>): Pr
     // Guard: VFS root must be set (project mode)
     if ("isReady" in vfs && typeof vfs.isReady === "function" && !vfs.isReady()) return;
 
-    let current: WorkspaceState;
-    try {
-      const text = await vfs.readFile(WORKSPACE_JSON_PATH);
-      current = JSON.parse(text) as WorkspaceState;
-    } catch {
-      current = getDefaultWorkspaceState();
-    }
+    const { state: current, lastKnownGoodJson } = await readWorkspaceState(vfs);
     const merged: WorkspaceState = { ...current, ...updates };
-    await vfs.writeFile(WORKSPACE_JSON_PATH, JSON.stringify(merged, null, 2));
+    const tempPath = `${WORKSPACE_JSON_PATH}.tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    try {
+      await vfs.writeFile(WORKSPACE_JSON_BACKUP_PATH, lastKnownGoodJson);
+      await vfs.writeFile(tempPath, stableWorkspaceJson(merged));
+      await vfs.rename(tempPath, WORKSPACE_JSON_PATH);
+    } catch (error) {
+      try {
+        await vfs.deleteFile(tempPath);
+      } catch {
+        // Best-effort cleanup only.
+      }
+      throw error;
+    }
   } catch {
     // Non-fatal: workspace.json write failure should not crash the app
   } finally {

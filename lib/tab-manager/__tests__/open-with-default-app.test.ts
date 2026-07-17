@@ -48,6 +48,15 @@ describe("resolveNativePath", () => {
     expect(resolveNativePath("C:\\Users\\me\\doc.pdf", null)).toBe("C:\\Users\\me\\doc.pdf");
   });
 
+  it("passes through Windows UNC paths", () => {
+    expect(resolveNativePath("\\\\server\\share\\project\\doc.pdf", "C:/root")).toBe(
+      "\\\\server\\share\\project\\doc.pdf",
+    );
+    expect(resolveNativePath("//server/share/project/doc.pdf", "C:/root")).toBe(
+      "//server/share/project/doc.pdf",
+    );
+  });
+
   it("joins relative paths onto the root", () => {
     expect(resolveNativePath("sub/doc.pdf", "/root")).toBe("/root/sub/doc.pdf");
   });
