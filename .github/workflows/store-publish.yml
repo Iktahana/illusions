@@ -29,6 +29,11 @@ on:
         description: "Desktop Build and Release run ID to pull the signed MAS .pkg from (appstore-testflight — defaults to latest successful build-mas run if omitted)"
         required: false
         type: string
+      skip_appstore_upload:
+        description: "Skip uploading the MAS package and only enable an already-uploaded build for internal TestFlight testers"
+        required: false
+        type: boolean
+        default: false
       dry_run:
         description: "Dry run — log actions without mutating store state (Microsoft Store jobs only)"
         required: false
@@ -202,6 +207,7 @@ jobs:
           chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 
       - name: Upload to App Store Connect
+        if: ${{ !inputs.skip_appstore_upload }}
         shell: bash
         run: |
           PKG_FILE=$(find dist-electron -name "*.pkg" -type f | head -n 1)

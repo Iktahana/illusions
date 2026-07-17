@@ -60,7 +60,9 @@ async function asc(path, options = {}) {
   if (!res.ok) {
     console.error(`ASC API ${options.method || "GET"} ${path} -> ${res.status}`);
     console.error(JSON.stringify(body, null, 2));
-    throw new Error(`ASC API request failed: ${res.status}`);
+    const error = new Error(`ASC API request failed: ${res.status}`);
+    error.status = res.status;
+    throw error;
   }
   return body;
 }
@@ -105,16 +107,29 @@ async function findOrGetInternalGroup() {
   return group;
 }
 
-async function grantGroupAccessToBuild(groupId, buildId) {
+async function grantGroupAccessToBuild(groupId, buildId, { retries = 20, delayMs = 30000 } = {}) {
   // App Store Connect exposes the association from both resources. Creating it
-  // from the build side is more reliable immediately after upload: the build
-  // is already addressable at /builds/{id}, while its reverse lookup from a
-  // beta group can still return RESOURCE_NOT_FOUND for a short period.
-  await asc(`/builds/${buildId}/relationships/betaGroups`, {
-    method: "POST",
-    body: JSON.stringify({ data: [{ type: "betaGroups", id: groupId }] }),
-  });
-  console.log("Internal TestFlight group granted access to build.");
+  // from the build side. Apple can report the build as VALID before that
+  // relationship endpoint has caught up; retry its temporary 404 rather than
+  // failing the release after a successful upload.
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await asc(`/builds/${buildId}/relationships/betaGroups`, {
+        method: "POST",
+        body: JSON.stringify({ data: [{ type: "betaGroups", id: groupId }] }),
+      });
+      console.log("Internal TestFlight group granted access to build.");
+      return;
+    } catch (error) {
+      if (error.status !== 404 || attempt === retries) {
+        throw error;
+      }
+      console.log(
+        `Build relationship is not ready yet, waiting... (attempt ${attempt}/${retries})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
 }
 
 const build = await findBuild(buildNumber);
