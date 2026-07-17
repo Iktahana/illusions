@@ -4,7 +4,9 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const { VFS_CHANNELS } = require("../../../electron/lib/ipc-channels") as {
-  VFS_CHANNELS: { invoke: { openDirectory: string; writeFile: string } };
+  VFS_CHANNELS: {
+    invoke: { openDirectory: string; writeFile: string; delete: string; rename: string };
+  };
 };
 
 type Handler = (event: { sender: { id: number } }, ...args: unknown[]) => Promise<unknown>;
@@ -14,6 +16,10 @@ interface Harness {
   fsMock: {
     realpath: ReturnType<typeof vi.fn>;
     open: ReturnType<typeof vi.fn>;
+    stat: ReturnType<typeof vi.fn>;
+    rm: ReturnType<typeof vi.fn>;
+    unlink: ReturnType<typeof vi.fn>;
+    rename: ReturnType<typeof vi.fn>;
   };
   fileHandle: {
     writeFile: ReturnType<typeof vi.fn>;
@@ -143,6 +149,24 @@ async function writeFile(harness: Harness, filePath: string, content: unknown, s
   return handler({ sender: { id: senderId } }, filePath, content);
 }
 
+async function deleteEntry(harness: Harness, filePath: string, senderId = 101) {
+  const handler = harness.handlers.get(VFS_CHANNELS.invoke.delete);
+  if (!handler) throw new Error("delete handler was not registered");
+  return handler({ sender: { id: senderId } }, filePath);
+}
+
+async function renameEntry(harness: Harness, oldPath: string, newPath: string, senderId = 101) {
+  const handler = harness.handlers.get(VFS_CHANNELS.invoke.rename);
+  if (!handler) throw new Error("rename handler was not registered");
+  return handler({ sender: { id: senderId } }, oldPath, newPath);
+}
+
+function codedError(code: string): Error & { code: string } {
+  const error = new Error(code) as Error & { code: string };
+  error.code = code;
+  return error;
+}
+
 describe("vfs-ipc writeFile handler", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -220,5 +244,30 @@ describe("vfs-ipc writeFile handler", () => {
     await writeFile(harness, "\\\\server\\share\\Novel\\chapter1.mdi", "content");
 
     expect(harness.fsMock.open).toHaveBeenCalledWith("//server/share/Novel/chapter1.mdi", "w");
+  });
+
+  it("retries delete after a transient Windows file-lock error", async () => {
+    const harness = installHarness();
+    harness.fsMock.stat.mockResolvedValue({ isDirectory: () => false });
+    harness.fsMock.unlink
+      .mockRejectedValueOnce(codedError("EPERM"))
+      .mockResolvedValueOnce(undefined);
+    await openRoot(harness);
+
+    await deleteEntry(harness, nativeFile);
+
+    expect(harness.fsMock.unlink).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries rename after a transient Windows file-lock error", async () => {
+    const harness = installHarness();
+    harness.fsMock.rename
+      .mockRejectedValueOnce(codedError("EBUSY"))
+      .mockResolvedValueOnce(undefined);
+    await openRoot(harness);
+
+    await renameEntry(harness, nativeFile, nativeFile.replace("chapter1.mdi", "chapter2.mdi"));
+
+    expect(harness.fsMock.rename).toHaveBeenCalledTimes(2);
   });
 });

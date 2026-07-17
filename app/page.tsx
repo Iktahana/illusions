@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTheme } from "@/contexts/ThemeContext";
 import EditorLayout from "@/components/EditorLayout";
+import SettingsModal from "@/components/SettingsModal";
+import SettingsWindow from "@/components/SettingsWindow";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
@@ -41,6 +43,8 @@ import { getAppRuntimeInfo, isElectronRenderer } from "@/lib/utils/runtime-env";
 import WebMenuBar from "@/components/WebMenuBar";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import { useEditorMode } from "@/contexts/EditorModeContext";
+import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
+import { IgnoredCorrectionsProvider } from "@/contexts/IgnoredCorrectionsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
@@ -101,7 +105,7 @@ function detectPopoutMode(): typeof _popoutBufferInfo {
   return _popoutBufferInfo;
 }
 
-export default function EditorPage() {
+function EditorPageContent() {
   // Early check: if this is a popout window, render simplified editor
   const popoutInfo = detectPopoutMode();
   if (popoutInfo) {
@@ -763,6 +767,19 @@ export default function EditorPage() {
 
   // Electron menu "New" and "Open" bindings (with safety checks)
   useElectronMenuHandlers(newFile, openFile);
+
+  // The native Settings item is available even when this window shows WelcomeScreen.
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+
+    const cleanup = window.electronAPI?.onMenuOpenSettings?.(() => {
+      setShowSettingsModal(true);
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, setShowSettingsModal]);
 
   // Export hook: handles PDF/EPUB/DOCX export with notifications.
   // #1840: flush the live editor doc first so export/print never use
@@ -1457,53 +1474,66 @@ export default function EditorPage() {
     }
 
     return (
-      <div className="h-screen flex flex-col overflow-hidden relative">
-        {/* Web版サービス終了の告知（Web版でのみ毎回表示） */}
-        <WebSunsetNotice />
+      <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
+        <IgnoredCorrectionsProvider value={ignoredCorrectionsContextValue}>
+          <div className="h-screen flex flex-col overflow-hidden relative">
+            {/* Web版サービス終了の告知（Web版でのみ毎回表示） */}
+            <WebSunsetNotice />
 
-        {/* Web menu bar (only for non-Electron environment) */}
-        {!isElectron && (
-          <WebMenuBar
-            onMenuAction={handleMenuAction}
-            recentProjects={recentProjects}
-            checkedState={{ compactMode }}
-          />
-        )}
+            {/* Web menu bar (only for non-Electron environment) */}
+            {!isElectron && (
+              <WebMenuBar
+                onMenuAction={handleMenuAction}
+                recentProjects={recentProjects}
+                checkedState={{ compactMode }}
+              />
+            )}
 
-        <WelcomeScreen
-          onCreateProject={handleCreateProject}
-          onOpenProject={() => void handleOpenProject()}
-          onOpenStandaloneFile={() => void handleOpenStandaloneFile()}
-          onOpenRecentProject={(id) => void handleOpenRecentProject(id)}
-          onDeleteRecentProject={(id) => void handleDeleteRecentProject(id)}
-          recentProjects={recentProjects}
-          isProjectModeSupported={features.projectMode}
-          restoreError={restoreError}
-          onDismissRestoreError={() => setRestoreError(null)}
-          onOpenAccountSettings={() => {
-            setSettingsInitialCategory("account");
-            setShowSettingsModal(true);
-          }}
-        />
+            <WelcomeScreen
+              onCreateProject={handleCreateProject}
+              onOpenProject={() => void handleOpenProject()}
+              onOpenStandaloneFile={() => void handleOpenStandaloneFile()}
+              onOpenRecentProject={(id) => void handleOpenRecentProject(id)}
+              onDeleteRecentProject={(id) => void handleDeleteRecentProject(id)}
+              recentProjects={recentProjects}
+              isProjectModeSupported={features.projectMode}
+              restoreError={restoreError}
+              onDismissRestoreError={() => setRestoreError(null)}
+              onOpenAccountSettings={() => {
+                setSettingsInitialCategory("account");
+                setShowSettingsModal(true);
+              }}
+            />
 
-        {/* CreateProjectWizard dialog */}
-        <CreateProjectWizard
-          isOpen={showCreateWizard}
-          onClose={() => setShowCreateWizard(false)}
-          onProjectCreated={handleProjectCreated}
-        />
+            {/* CreateProjectWizard dialog */}
+            <CreateProjectWizard
+              isOpen={showCreateWizard}
+              onClose={() => setShowCreateWizard(false)}
+              onProjectCreated={handleProjectCreated}
+            />
 
-        {/* Permission prompt for re-opening stored projects */}
-        {permissionPromptData && (
-          <PermissionPrompt
-            isOpen={showPermissionPrompt}
-            projectName={permissionPromptData.projectName}
-            handle={permissionPromptData.handle}
-            onGranted={handlePermissionGranted}
-            onDenied={handlePermissionDenied}
-          />
-        )}
-      </div>
+            {/* Permission prompt for re-opening stored projects */}
+            {permissionPromptData && (
+              <PermissionPrompt
+                isOpen={showPermissionPrompt}
+                projectName={permissionPromptData.projectName}
+                handle={permissionPromptData.handle}
+                onGranted={handlePermissionGranted}
+                onDenied={handlePermissionDenied}
+              />
+            )}
+
+            <SettingsModal
+              isOpen={showSettingsModal}
+              onClose={() => {
+                setShowSettingsModal(false);
+                setSettingsInitialCategory(undefined);
+              }}
+              initialCategory={settingsInitialCategory}
+            />
+          </div>
+        </IgnoredCorrectionsProvider>
+      </EditorSettingsProvider>
     );
   }
 
@@ -1789,4 +1819,19 @@ export default function EditorPage() {
       />
     </>
   );
+}
+
+/**
+ * `?settings` is used rather than a second HTML entry point so Electron can
+ * load the dedicated Settings window from the same Next static export.
+ */
+export default function EditorPage() {
+  const [route, setRoute] = useState<"pending" | "editor" | "settings">("pending");
+
+  useEffect(() => {
+    setRoute(new URLSearchParams(window.location.search).has("settings") ? "settings" : "editor");
+  }, []);
+
+  if (route === "pending") return <div className="h-screen bg-background" />;
+  return route === "settings" ? <SettingsWindow /> : <EditorPageContent />;
 }

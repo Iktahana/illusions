@@ -13,6 +13,10 @@ const CLOSE_HANDSHAKE_TIMEOUT_MS = 30000;
 
 let mainWindow = null;
 const allWindows = new Set();
+// Settings is a singleton utility window, not an editor window.  Keeping it
+// outside `allWindows` prevents editor close/save and power broadcasts from
+// treating settings as a document-bearing window.
+let settingsWindow = null;
 
 // --- Power state monitoring ---
 
@@ -47,6 +51,81 @@ function getMainWindow() {
 
 function getAllWindows() {
   return allWindows;
+}
+
+function getSettingsWindow() {
+  return settingsWindow;
+}
+
+function isSettingsWindow(win) {
+  return Boolean(win && settingsWindow === win && !win.isDestroyed());
+}
+
+/**
+ * Create (or focus) the one global Settings window.
+ *
+ * The page is still index.html with a query mode so it works with Next's
+ * static export as well as the development server; no separately emitted
+ * settings.html artifact is required.
+ */
+async function createSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    if (settingsWindow.isMinimized()) settingsWindow.restore();
+    settingsWindow.show();
+    settingsWindow.focus();
+    return settingsWindow;
+  }
+
+  const preloadPath = path.join(__dirname, "preload.js");
+  const newWindow = new BrowserWindow({
+    width: 960,
+    height: 760,
+    minWidth: 680,
+    minHeight: 520,
+    show: false,
+    title: "設定",
+    backgroundColor: "#0f172a",
+    webPreferences: {
+      preload: preloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      plugins: true,
+    },
+  });
+  settingsWindow = newWindow;
+
+  newWindow.webContents.on("will-navigate", (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl);
+    if (parsedUrl.protocol === "file:") return;
+    if (isDev && parsedUrl.hostname === "localhost") return;
+    event.preventDefault();
+    console.warn("[Security] Blocked navigation to:", navigationUrl);
+  });
+  newWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeExternalUrl(url)) {
+      shell.openExternal(normalizeExternalUrl(url)).catch((error) => {
+        console.warn("[Security] shell.openExternal failed:", error);
+      });
+    }
+    return { action: "deny" };
+  });
+  newWindow.webContents.on("preload-error", (_event, preloadPathForError, error) => {
+    console.error("[Main] Preload error:", preloadPathForError, error);
+  });
+  newWindow.once("ready-to-show", () => newWindow.show());
+  newWindow.on("closed", () => {
+    if (settingsWindow === newWindow) settingsWindow = null;
+  });
+
+  if (isDev) {
+    newWindow.loadURL("http://localhost:3020?settings");
+  } else {
+    const filePath = path.join(app.getAppPath(), "out", "index.html");
+    newWindow.loadURL(require("url").pathToFileURL(filePath).href + "?settings");
+  }
+
+  return newWindow;
 }
 
 // 新しいウィンドウを作成（マルチウィンドウ対応）
@@ -325,8 +404,11 @@ async function _handleWindowBeforeQuit(win) {
 module.exports = {
   getMainWindow,
   getAllWindows,
+  getSettingsWindow,
+  isSettingsWindow,
   createWindow,
   createMainWindow,
+  createSettingsWindow,
   broadcastPowerState,
   broadcastPowerEvent,
   saveAllBeforeQuitAndInstall,

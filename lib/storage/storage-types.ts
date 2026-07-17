@@ -299,6 +299,16 @@ export interface IStorageService {
   saveAppState(appState: AppState): Promise<void>;
 
   /**
+   * Atomically merge an AppState patch when the platform supports a
+   * main-process canonical store (Electron). Web storage intentionally falls
+   * back to the renderer mutex in persistAppState.
+   */
+  updateAppState?(updates: Partial<AppState>): Promise<AppState>;
+
+  /** Subscribe to canonical AppState snapshots emitted by the platform. */
+  onAppStateUpdated?(callback: (appState: AppState) => void): () => void;
+
+  /**
    * アプリ状態を読み込む。
    */
   loadAppState(): Promise<AppState | null>;

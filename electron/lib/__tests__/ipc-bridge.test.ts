@@ -80,6 +80,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       loadSession: "storage:load-session",
       saveAppState: "storage:save-app-state",
       loadAppState: "storage:load-app-state",
+      updateAppState: "storage:update-app-state",
       addToRecent: "storage:add-to-recent",
       getRecentFiles: "storage:get-recent-files",
       removeFromRecent: "storage:remove-from-recent",
@@ -96,7 +97,9 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       removeItem: "storage:remove-item",
       getKeysByPrefix: "storage:get-keys-by-prefix",
     });
-    expect(STORAGE_CHANNELS.event).toEqual({});
+    expect(STORAGE_CHANNELS.event).toEqual({
+      appStateUpdated: "storage:app-state-updated",
+    });
   });
 
   it("dict invoke/event channels keep their historical string values", () => {
@@ -173,6 +176,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       rebuild: "menu:rebuild",
       syncUiState: "menu:sync-ui-state",
       updateKeymapOverrides: "menu:update-keymap-overrides",
+      openSettingsWindow: "menu:open-settings-window",
     });
     expect(MENU_CHANNELS.event).toEqual({
       newTriggered: "menu-new-triggered",
@@ -196,6 +200,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       exportDocx: "menu-export-docx",
       reportBug: "menu-report-bug",
       reportAiInappropriate: "menu-report-ai-inappropriate",
+      openSettings: "menu-open-settings",
     });
   });
 
@@ -225,6 +230,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       refreshToken: "auth:refresh-token",
       getUserInfo: "auth:get-userinfo",
       logout: "auth:logout",
+      openDeleteAccount: "auth:open-delete-account",
     });
     expect(AUTH_CHANNELS.event).toEqual({
       callback: "auth:callback",

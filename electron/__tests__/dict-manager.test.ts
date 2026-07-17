@@ -3,6 +3,8 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -29,7 +31,7 @@ vi.mock("electron", () => ({
   },
 }));
 
-class MockResponse extends EventEmitter {
+class MockResponse extends PassThrough {
   statusCode: number;
   headers: Record<string, string>;
   private readonly body: string | Buffer;
@@ -41,22 +43,12 @@ class MockResponse extends EventEmitter {
     this.body = body;
   }
 
-  resume(): void {}
-
-  setEncoding(): void {}
-
-  pipe<T extends { write: (chunk: string | Buffer) => unknown; end: () => unknown }>(dest: T): T {
-    this.on("data", (chunk: string | Buffer) => dest.write(chunk));
-    this.on("end", () => dest.end());
-    return dest;
-  }
-
   start(): void {
     queueMicrotask(() => {
       if (this.body.length > 0) {
-        this.emit("data", this.body);
+        this.write(this.body);
       }
-      this.emit("end");
+      this.end();
     });
   }
 }
@@ -317,5 +309,34 @@ describe("DictManager.download security", () => {
     expect(result).toEqual({ success: true, version: "v9.9.9" });
     expect(fs.readFileSync(path.join(dictDir, "genji.db"))).toEqual(dbContent);
     expect(fs.readFileSync(path.join(dictDir, "genji_version.txt"), "utf8")).toBe("v9.9.9");
+  });
+});
+
+describe("DictManager stream cleanup regression guard (#2149)", () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const source = fs.readFileSync(path.resolve(here, "../dict-manager.js"), "utf8");
+
+  it("uses stream/promises pipeline for download and gzip writes", () => {
+    expect(source).toContain('require("stream/promises")');
+    expect(source).toContain('require("./lib/transient-io-retry")');
+
+    const downloadFileMatch = source.match(
+      /_downloadFile\(url, destPath, onProgress\)[\s\S]*?(?=\n\s*\/\*\*)/,
+    );
+    const downloadFile = downloadFileMatch ? downloadFileMatch[0] : "";
+    expect(downloadFile).toContain("pipeline(res, fileStream)");
+    expect(downloadFile).not.toContain("res.pipe(fileStream)");
+
+    const decompressMatch = source.match(/async _decompressGzip[\s\S]*?(?=\n\s*\})/);
+    const decompress = decompressMatch ? decompressMatch[0] : "";
+    expect(decompress).toContain("await pipeline(");
+    expect(decompress).not.toContain(".pipe(");
+
+    const doDownloadMatch = source.match(/async _doDownload\(onProgress\)[\s\S]*?(?=\n\s*\/\*\*)/);
+    const doDownload = doDownloadMatch ? doDownloadMatch[0] : "";
+    expect(doDownload).toContain("withTransientIoRetry(() => fsp.unlink(tempPath))");
+    expect(doDownload).toContain(
+      'withTransientIoRetry(() => fsp.rename(finalPath + ".decompressing", finalPath))',
+    );
   });
 });

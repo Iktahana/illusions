@@ -31,6 +31,10 @@ export interface MenuTemplateItem {
   nativeAccelerator?: string;
   /** Static Web accelerator display string */
   webAccelerator?: string | { mac: string; other: string };
+  /** When false, omit this native-only item from the Web menu bar. */
+  webVisible?: false;
+  /** Restrict a native item to non-macOS desktop platforms. */
+  electronPlatform?: "non-mac";
   /** Electron menu role (platform-native behavior, e.g. undo/copy/zoom) */
   electronRole?: string;
   /** IPC channel sent to the focused window when clicked (Electron) */
@@ -62,6 +66,8 @@ export interface MenuTemplateSection {
 }
 
 export declare const MENU_TEMPLATE: MenuTemplateSection[];
+/** Native Settings item, placed in File on non-macOS and the app menu on macOS. */
+export declare const SETTINGS_MENU_ITEM: MenuTemplateItem;
 
 /** Shared label format for the version info row in the help menu. */
 export declare function formatVersionLabel(version: string): string;

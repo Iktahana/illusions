@@ -24,6 +24,15 @@ const crypto = require("crypto");
 const { pipeline } = require("stream");
 
 const { OFFICIAL_RULESETS } = require("./official-rulesets");
+const { withTransientIoRetrySync } = require("./lib/transient-io-retry");
+
+function rmSyncWithRetry(target, options) {
+  return withTransientIoRetrySync(() => fs.rmSync(target, options));
+}
+
+function renameSyncWithRetry(oldPath, newPath) {
+  return withTransientIoRetrySync(() => fs.renameSync(oldPath, newPath));
+}
 
 // Mirrors ENGINE_API_VERSION in lib/linting/sdk/ruleset-types.ts. A downloaded
 // ruleset whose manifest targets a different engine is skipped (incompatible).
@@ -175,9 +184,9 @@ class RulesetsManager {
       if (!this._isInstalledComplete(id)) {
         for (const src of [staging, backup]) {
           if (this._dirHasFullRelease(src)) {
-            fs.rmSync(dir, { recursive: true, force: true });
+            rmSyncWithRetry(dir, { recursive: true, force: true });
             fs.mkdirSync(path.dirname(dir), { recursive: true });
-            fs.renameSync(src, dir);
+            renameSyncWithRetry(src, dir);
             console.log(
               `[Rulesets] recovered ${src === staging ? "staged" : "backup"} install for ${id}`,
             );
@@ -186,8 +195,8 @@ class RulesetsManager {
         }
       }
       // Drop any leftover transient dirs (already-consumed ones rm to no-ops).
-      fs.rmSync(staging, { recursive: true, force: true });
-      fs.rmSync(backup, { recursive: true, force: true });
+      rmSyncWithRetry(staging, { recursive: true, force: true });
+      rmSyncWithRetry(backup, { recursive: true, force: true });
     } catch {
       /* best-effort recovery — never throws */
     }
@@ -391,9 +400,12 @@ class RulesetsManager {
     }
     try {
       const dir = this._rulesetDir(id);
-      fs.rmSync(dir, { recursive: true, force: true });
-      fs.rmSync(`${dir}.backup`, { recursive: true, force: true });
-      fs.rmSync(path.join(this._rootDir(), `.staging-${id}`), { recursive: true, force: true });
+      rmSyncWithRetry(dir, { recursive: true, force: true });
+      rmSyncWithRetry(`${dir}.backup`, { recursive: true, force: true });
+      rmSyncWithRetry(path.join(this._rootDir(), `.staging-${id}`), {
+        recursive: true,
+        force: true,
+      });
       console.log(`[Rulesets] uninstalled ${id}`);
       return { ok: true };
     } catch (err) {
@@ -442,7 +454,7 @@ class RulesetsManager {
     }
 
     try {
-      fs.rmSync(staging, { recursive: true, force: true });
+      rmSyncWithRetry(staging, { recursive: true, force: true });
       fs.mkdirSync(staging, { recursive: true });
 
       // 1. manifest first — validate engineApi before fetching code.
@@ -476,30 +488,30 @@ class RulesetsManager {
       fs.writeFileSync(path.join(staging, INTEGRITY_FILE), indexHash, "utf8");
       fs.mkdirSync(path.dirname(dir), { recursive: true });
       const backup = `${dir}.backup`;
-      fs.rmSync(backup, { recursive: true, force: true });
+      rmSyncWithRetry(backup, { recursive: true, force: true });
       const hadOld = fs.existsSync(dir);
-      if (hadOld) fs.renameSync(dir, backup);
+      if (hadOld) renameSyncWithRetry(dir, backup);
       try {
-        fs.renameSync(staging, dir);
+        renameSyncWithRetry(staging, dir);
       } catch (err) {
         if (hadOld) {
           try {
-            fs.rmSync(dir, { recursive: true, force: true });
+            rmSyncWithRetry(dir, { recursive: true, force: true });
           } catch {
             /* ignore */
           }
-          fs.renameSync(backup, dir); // restore the old install
+          renameSyncWithRetry(backup, dir); // restore the old install
         }
         throw err;
       }
-      fs.rmSync(backup, { recursive: true, force: true });
+      rmSyncWithRetry(backup, { recursive: true, force: true });
 
       console.log(`[Rulesets] installed ${spec.id} ${latestTag}`);
       return { id: spec.id, status: "installed", detail: latestTag };
     } finally {
       // Remove staging if the swap did not consume it (error / skip path).
       try {
-        fs.rmSync(staging, { recursive: true, force: true });
+        rmSyncWithRetry(staging, { recursive: true, force: true });
       } catch {
         /* ignore cleanup errors */
       }

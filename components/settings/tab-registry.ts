@@ -14,7 +14,7 @@ import TerminalSettingsTab from "./TerminalSettingsTab";
 import TypographySettingsTab from "./TypographySettingsTab";
 import VerticalSettingsTab from "./VerticalSettingsTab";
 
-import type { SettingsCategory } from "./settings-category";
+import { isCategoryInScope, type SettingsCategory, type SettingsScope } from "./settings-category";
 
 export interface TabRegistryEntry {
   component: ComponentType;
@@ -32,7 +32,10 @@ export interface TabRegistryEntry {
  */
 export type SettingsTabRegistry = Partial<Record<SettingsCategory, TabRegistryEntry>>;
 
-export function buildSettingsTabRegistry(options: { isElectron: boolean }): SettingsTabRegistry {
+export function buildSettingsTabRegistry(options: {
+  isElectron: boolean;
+  scope?: SettingsScope;
+}): SettingsTabRegistry {
   const base: SettingsTabRegistry = {
     account: { component: AccountSettingsTab },
     "ai-connection": { component: AiApiSettingsTab },
@@ -50,5 +53,10 @@ export function buildSettingsTabRegistry(options: { isElectron: boolean }): Sett
     base.power = { component: PowerSettingsTab };
     base.privacy = { component: PrivacySettingsTab };
   }
-  return base;
+  const scope = options.scope ?? "all";
+  return Object.fromEntries(
+    Object.entries(base).filter(([category]) =>
+      isCategoryInScope(category as SettingsCategory, scope),
+    ),
+  ) as SettingsTabRegistry;
 }

@@ -29,12 +29,13 @@ export function isEditableExtension(vfsPath: string): boolean {
 /**
  * Resolve a VFS path to a native absolute path for `shell.openPath`.
  *
- * Already-absolute paths (POSIX `/…` or Windows `C:\…`) pass through; relative
- * paths are joined onto `rootPath`. Returns null when a relative path cannot be
- * resolved (no open root), so the caller can fall back to the normal read path.
+ * Already-absolute paths (POSIX `/…`, Windows `C:\…`, or UNC `\\server\share`)
+ * pass through; relative paths are joined onto `rootPath`. Returns null when a
+ * relative path cannot be resolved (no open root), so the caller can fall back
+ * to the normal read path.
  */
 export function resolveNativePath(vfsPath: string, rootPath: string | null): string | null {
-  if (vfsPath.startsWith("/") || /^[a-zA-Z]:[/\\]/.test(vfsPath)) {
+  if (vfsPath.startsWith("/") || /^[a-zA-Z]:[/\\]/.test(vfsPath) || /^[/\\]{2}/.test(vfsPath)) {
     return vfsPath;
   }
   return rootPath ? rootPath + "/" + vfsPath : null;

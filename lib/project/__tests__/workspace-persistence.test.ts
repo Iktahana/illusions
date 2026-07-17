@@ -18,10 +18,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockReadFile = vi.fn<(path: string) => Promise<string>>();
 const mockWriteFile = vi.fn<(path: string, content: string) => Promise<void>>();
+const mockRename = vi.fn<(oldPath: string, newPath: string) => Promise<void>>();
+const mockDeleteFile = vi.fn<(path: string) => Promise<void>>();
 
 const mockVFS = {
   readFile: (path: string) => mockReadFile(path),
   writeFile: (path: string, content: string) => mockWriteFile(path, content),
+  rename: (oldPath: string, newPath: string) => mockRename(oldPath, newPath),
+  deleteFile: (path: string) => mockDeleteFile(path),
   isRootOpen: vi.fn(() => true),
 };
 
@@ -61,36 +65,80 @@ describe("persistWorkspaceJson", () => {
     };
     mockReadFile.mockResolvedValue(JSON.stringify(existing));
     mockWriteFile.mockResolvedValue(undefined);
+    mockRename.mockResolvedValue(undefined);
 
     await persistWorkspaceJson({ editorState: { cursorPosition: 99, scrollTop: 10 } });
 
-    expect(mockWriteFile).toHaveBeenCalledOnce();
-    const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string);
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      ".illusions/workspace.json.bak",
+      JSON.stringify(existing, null, 2),
+    );
+    const tempWrite = mockWriteFile.mock.calls.find(([path]) =>
+      path.startsWith(".illusions/workspace.json.tmp-"),
+    );
+    expect(tempWrite).toBeDefined();
+    const written = JSON.parse(tempWrite![1] as string);
     expect(written.editorState.cursorPosition).toBe(99);
     // Unchanged fields preserved
     expect(written.lastOpenedAt).toBe(1000);
     expect(written.viewState.activeView).toBe("chapters");
+    expect(mockRename).toHaveBeenCalledWith(
+      expect.stringMatching(/^\.illusions\/workspace\.json\.tmp-/),
+      ".illusions/workspace.json",
+    );
   });
 
   it("uses default workspace state when file is missing (read throws)", async () => {
     mockReadFile.mockRejectedValue(new Error("file not found"));
     mockWriteFile.mockResolvedValue(undefined);
+    mockRename.mockResolvedValue(undefined);
 
     await persistWorkspaceJson({ lastOpenedAt: 9876 });
 
-    expect(mockWriteFile).toHaveBeenCalledOnce();
-    const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string);
+    const tempWrite = mockWriteFile.mock.calls.find(([path]) =>
+      path.startsWith(".illusions/workspace.json.tmp-"),
+    );
+    expect(tempWrite).toBeDefined();
+    const written = JSON.parse(tempWrite![1] as string);
     expect(written.lastOpenedAt).toBe(9876);
     // Other fields come from defaults (getDefaultWorkspaceState uses editorState)
     expect(written).toHaveProperty("editorState");
   });
 
+  it("recovers from workspace.json.bak when the primary JSON is corrupt (#2150)", async () => {
+    const backup = {
+      openTabs: [{ id: "tab-1", type: "editor", title: "Recovered" }],
+      lastOpenedAt: 1000,
+    };
+    mockReadFile.mockImplementation(async (path) => {
+      if (path === ".illusions/workspace.json") return "{bad json";
+      if (path === ".illusions/workspace.json.bak") return JSON.stringify(backup);
+      throw new Error("unexpected path");
+    });
+    mockWriteFile.mockResolvedValue(undefined);
+    mockRename.mockResolvedValue(undefined);
+
+    await persistWorkspaceJson({ lastOpenedAt: 2000 });
+
+    const tempWrite = mockWriteFile.mock.calls.find(([path]) =>
+      path.startsWith(".illusions/workspace.json.tmp-"),
+    );
+    expect(tempWrite).toBeDefined();
+    const written = JSON.parse(tempWrite![1] as string);
+    expect(written.openTabs).toEqual(backup.openTabs);
+    expect(written.lastOpenedAt).toBe(2000);
+  });
+
   it("swallows write errors (non-fatal — must not throw)", async () => {
     mockReadFile.mockResolvedValue(JSON.stringify({ openTabs: [] }));
     mockWriteFile.mockRejectedValue(new Error("disk full"));
+    mockDeleteFile.mockResolvedValue(undefined);
 
     // Should not throw
     await expect(persistWorkspaceJson({ lastOpenedAt: 100 })).resolves.toBeUndefined();
+    expect(mockDeleteFile).toHaveBeenCalledWith(
+      expect.stringMatching(/^\.illusions\/workspace\.json\.tmp-/),
+    );
   });
 
   it("no-ops when vfs.isReady() returns false (standalone guard)", async () => {
@@ -111,6 +159,7 @@ describe("persistWorkspaceJson", () => {
     // If vfs has no isReady, it's treated as project mode (open).
     mockReadFile.mockResolvedValue(JSON.stringify({}));
     mockWriteFile.mockResolvedValue(undefined);
+    mockRename.mockResolvedValue(undefined);
     await persistWorkspaceJson({ lastOpenedAt: 1111 });
     // Normal path: write was called (mockVFS has no isReady — guard doesn't fire)
     expect(mockWriteFile).toHaveBeenCalled();
@@ -119,10 +168,11 @@ describe("persistWorkspaceJson", () => {
   it("writes to the correct path (.illusions/workspace.json)", async () => {
     mockReadFile.mockResolvedValue("{}");
     mockWriteFile.mockResolvedValue(undefined);
+    mockRename.mockResolvedValue(undefined);
 
     await persistWorkspaceJson({ lastOpenedAt: 5555 });
 
-    expect(mockWriteFile.mock.calls[0][0]).toBe(".illusions/workspace.json");
+    expect(mockRename.mock.calls[0][1]).toBe(".illusions/workspace.json");
   });
 
   it("merged JSON is valid and contains all updated fields", async () => {
@@ -130,13 +180,18 @@ describe("persistWorkspaceJson", () => {
       JSON.stringify({ editorState: { cursorPosition: 0, scrollTop: 0 }, lastOpenedAt: 1000 }),
     );
     mockWriteFile.mockResolvedValue(undefined);
+    mockRename.mockResolvedValue(undefined);
 
     await persistWorkspaceJson({
       lastOpenedAt: 9999,
       editorState: { cursorPosition: 42, scrollTop: 5 },
     });
 
-    const written = JSON.parse(mockWriteFile.mock.calls[0][1] as string);
+    const tempWrite = mockWriteFile.mock.calls.find(([path]) =>
+      path.startsWith(".illusions/workspace.json.tmp-"),
+    );
+    expect(tempWrite).toBeDefined();
+    const written = JSON.parse(tempWrite![1] as string);
     expect(written.lastOpenedAt).toBe(9999);
     expect(written.editorState.cursorPosition).toBe(42);
   });

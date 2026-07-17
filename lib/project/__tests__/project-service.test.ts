@@ -14,17 +14,33 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock project-file-service before any imports
 // ---------------------------------------------------------------------------
 
-const mockReadFile = vi.fn<(path: string) => Promise<string>>();
-
-vi.mock("@/lib/services/project-file-service", () => ({
-  getProjectFileService: () => ({
-    readFile: (path: string) => mockReadFile(path),
-    isRootOpen: vi.fn(() => true),
-    openDirectory: vi.fn(),
+const mocks = vi.hoisted(() => {
+  const rootDirectoryHandle = {
+    getFileHandle: vi.fn(),
     getDirectoryHandle: vi.fn(),
+  };
+
+  return {
+    readFile: vi.fn(),
     writeFile: vi.fn(),
     deleteFile: vi.fn(),
     rename: vi.fn(),
+    isRootOpen: vi.fn(),
+    getDirectoryHandle: vi.fn(),
+    rootDirectoryHandle,
+    mainFileWrite: vi.fn(),
+  };
+});
+
+vi.mock("@/lib/services/project-file-service", () => ({
+  getProjectFileService: () => ({
+    readFile: mocks.readFile,
+    isRootOpen: mocks.isRootOpen,
+    openDirectory: vi.fn(),
+    getDirectoryHandle: mocks.getDirectoryHandle,
+    writeFile: mocks.writeFile,
+    deleteFile: mocks.deleteFile,
+    rename: mocks.rename,
     getFileMetadata: vi.fn(),
     listDirectory: vi.fn(),
     getRootPath: vi.fn(() => null),
@@ -47,6 +63,29 @@ vi.mock("../project-manager", () => ({
 // ---------------------------------------------------------------------------
 
 import { validateProjectName, getProjectService } from "@/lib/project/project-service";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.isRootOpen.mockReturnValue(true);
+  mocks.getDirectoryHandle.mockResolvedValue(mocks.rootDirectoryHandle);
+  mocks.rootDirectoryHandle.getDirectoryHandle.mockResolvedValue({
+    getFileHandle: vi.fn(),
+  });
+  mocks.rootDirectoryHandle.getFileHandle.mockResolvedValue({
+    write: mocks.mainFileWrite,
+  });
+  mocks.readFile.mockResolvedValue(
+    JSON.stringify({
+      version: "1.0.0",
+      projectId: "existing",
+      name: "Existing",
+      mainFile: "Existing.mdi",
+    }),
+  );
+  mocks.writeFile.mockResolvedValue(undefined);
+  mocks.rename.mockResolvedValue(undefined);
+  mocks.deleteFile.mockResolvedValue(undefined);
+});
 
 // ---------------------------------------------------------------------------
 // Tests: validateProjectName (pure function)
@@ -152,6 +191,82 @@ describe("getProjectService", () => {
     expect(typeof service.validateProjectStructure).toBe("function");
     expect(typeof service.readProjectContent).toBe("function");
     expect(typeof service.readStandaloneContent).toBe("function");
+  });
+});
+
+describe("project metadata persistence", () => {
+  it("saves project.json through backup + temp rename", async () => {
+    const project = {
+      type: "project",
+      projectId: "project-1",
+      name: "Novel",
+      metadata: {
+        version: "1.0.0",
+        projectId: "project-1",
+        name: "Novel",
+        mainFile: "Novel.mdi",
+        lastModified: 1,
+      },
+      workspaceState: {
+        editorState: {},
+        viewState: {},
+        lastOpenedAt: 1,
+      },
+    } as Parameters<ReturnType<typeof getProjectService>["saveProjectMetadata"]>[0];
+
+    const projectJsonFileHandle = { write: vi.fn() };
+    const illusionsDirectoryHandle = {
+      getFileHandle: vi.fn().mockResolvedValue(projectJsonFileHandle),
+    };
+    mocks.rootDirectoryHandle.getDirectoryHandle.mockResolvedValue(illusionsDirectoryHandle);
+    mocks.readFile.mockResolvedValue('{"version":"old"}');
+
+    await getProjectService().saveProjectMetadata(project);
+
+    expect(mocks.writeFile).toHaveBeenCalledWith(
+      ".illusions/project.json.bak",
+      JSON.stringify({ version: "old" }, null, 2),
+    );
+    expect(mocks.writeFile).toHaveBeenCalledWith(
+      expect.stringMatching(/^\.illusions\/project\.json\.tmp-/),
+      expect.stringContaining('"projectId": "project-1"'),
+    );
+    expect(mocks.rename).toHaveBeenCalledWith(
+      expect.stringMatching(/^\.illusions\/project\.json\.tmp-/),
+      ".illusions/project.json",
+    );
+    expect(illusionsDirectoryHandle.getFileHandle).not.toHaveBeenCalledWith(
+      "project.json",
+      expect.anything(),
+    );
+    expect(projectJsonFileHandle.write).not.toHaveBeenCalled();
+  });
+
+  it("removes temp project.json when rename fails", async () => {
+    const project = {
+      type: "project",
+      projectId: "project-1",
+      name: "Novel",
+      metadata: {
+        version: "1.0.0",
+        projectId: "project-1",
+        name: "Novel",
+        mainFile: "Novel.mdi",
+      },
+      workspaceState: {
+        editorState: {},
+        viewState: {},
+        lastOpenedAt: 1,
+      },
+    } as Parameters<ReturnType<typeof getProjectService>["saveProjectMetadata"]>[0];
+    const renameError = new Error("rename failed");
+    mocks.rename.mockRejectedValueOnce(renameError);
+
+    await expect(getProjectService().saveProjectMetadata(project)).rejects.toThrow("rename failed");
+
+    expect(mocks.deleteFile).toHaveBeenCalledWith(
+      expect.stringMatching(/^\.illusions\/project\.json\.tmp-/),
+    );
   });
 });
 

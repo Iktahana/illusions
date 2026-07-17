@@ -35,6 +35,24 @@ async function rememberStandalonePath(resolvedPath) {
   }
 }
 
+/**
+ * Write generated binary exports with the same flush/close discipline as the
+ * normal save path. This reduces false-success writes on Windows cloud/network
+ * folders where fs.writeFile can return before bytes are durably persisted.
+ *
+ * @param {string} target
+ * @param {Buffer | Uint8Array} buffer
+ */
+async function writeBufferDurably(target, buffer) {
+  const fileHandle = await fs.open(target, "w");
+  try {
+    await fileHandle.writeFile(buffer);
+    await fileHandle.sync();
+  } finally {
+    await fileHandle.close();
+  }
+}
+
 // --- save-file path security validation ---
 // Tracks file paths that have been approved via native dialog or system file association,
 // scoped per BrowserWindow (webContentsId) to prevent cross-window path reuse.
@@ -467,7 +485,7 @@ function registerFileHandlers() {
       });
 
       if (!filePath) return null;
-      await fs.writeFile(filePath, pdfBuffer);
+      await writeBufferDurably(filePath, pdfBuffer);
       log.info(`Exported PDF: ${filePath}`);
       return filePath;
     } catch (error) {
@@ -664,7 +682,7 @@ function registerFileHandlers() {
       });
 
       if (!filePath) return null;
-      await fs.writeFile(filePath, epubBuffer);
+      await writeBufferDurably(filePath, epubBuffer);
       log.info(`Exported EPUB: ${filePath}`);
       return filePath;
     } catch (error) {
@@ -695,7 +713,7 @@ function registerFileHandlers() {
       });
 
       if (!filePath) return null;
-      await fs.writeFile(filePath, docxBuffer);
+      await writeBufferDurably(filePath, docxBuffer);
       log.info(`Exported DOCX: ${filePath}`);
       return filePath;
     } catch (error) {

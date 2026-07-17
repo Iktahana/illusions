@@ -3,7 +3,7 @@
  * Network/fs paths are not exercised here (they require live GitHub/disk); the
  * extracted pure helpers carry the version/compatibility/selection logic.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -179,6 +179,7 @@ describe("RulesetsManager.readModule / uninstall (isolated HOME)", () => {
     const prevUserProfile = process.env.USERPROFILE;
     process.env.HOME = home;
     process.env.USERPROFILE = home;
+    const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(home);
     try {
       const mgr = new RulesetsManager();
       const id = "com.example.thirdparty";
@@ -204,6 +205,7 @@ describe("RulesetsManager.readModule / uninstall (isolated HOME)", () => {
       // missing install
       expect((await mgr.readModule("com.example.missing")).ok).toBe(false);
     } finally {
+      homedirSpy.mockRestore();
       fs.rmSync(home, { recursive: true, force: true });
       if (prev === undefined) delete process.env.HOME;
       else process.env.HOME = prev;
@@ -218,6 +220,7 @@ describe("RulesetsManager.readModule / uninstall (isolated HOME)", () => {
     const prevUserProfile = process.env.USERPROFILE;
     process.env.HOME = home;
     process.env.USERPROFILE = home;
+    const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(home);
     try {
       const mgr = new RulesetsManager();
       const tp = "com.example.thirdparty";
@@ -230,12 +233,26 @@ describe("RulesetsManager.readModule / uninstall (isolated HOME)", () => {
       expect(refuse.ok).toBe(false);
       expect(fs.existsSync(path.join(home, ".illusions", "rulesets", official))).toBe(true);
 
+      const realRmSync = fs.rmSync.bind(fs);
+      let failedOnce = false;
+      const rmSpy = vi.spyOn(fs, "rmSync").mockImplementation((target, options) => {
+        if (String(target).endsWith(path.join("rulesets", tp)) && !failedOnce) {
+          failedOnce = true;
+          const error = Object.assign(new Error("locked"), { code: "EPERM" });
+          throw error;
+        }
+        return realRmSync(target, options);
+      });
+
       const removed = mgr.uninstall(tp);
       expect(removed.ok).toBe(true);
+      expect(failedOnce).toBe(true);
       expect(fs.existsSync(path.join(home, ".illusions", "rulesets", tp))).toBe(false);
+      rmSpy.mockRestore();
 
       expect(mgr.uninstall("../../etc").ok).toBe(false);
     } finally {
+      homedirSpy.mockRestore();
       fs.rmSync(home, { recursive: true, force: true });
       if (prev === undefined) delete process.env.HOME;
       else process.env.HOME = prev;
