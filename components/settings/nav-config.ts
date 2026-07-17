@@ -17,7 +17,7 @@ import {
 import type { SettingsNavGroup } from "@/components/settings/primitives";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 
-import type { SettingsCategory } from "./settings-category";
+import { isCategoryInScope, type SettingsCategory, type SettingsScope } from "./settings-category";
 
 /**
  * Build the grouped navigation configuration for the settings modal.
@@ -26,9 +26,11 @@ import type { SettingsCategory } from "./settings-category";
  * The runtime check must happen at call-time (not at module load) because
  * `isElectronRenderer` depends on `window`.
  */
-export function buildSettingsNavConfig(): ReadonlyArray<SettingsNavGroup<SettingsCategory>> {
+export function buildSettingsNavConfig(
+  scope: SettingsScope = "all",
+): ReadonlyArray<SettingsNavGroup<SettingsCategory>> {
   const isElectron = isElectronRenderer();
-  return [
+  const groups: ReadonlyArray<SettingsNavGroup<SettingsCategory>> = [
     {
       label: "AI/LLM",
       items: [{ id: "ai-connection", label: "AI API 接続", icon: Bot }],
@@ -72,4 +74,13 @@ export function buildSettingsNavConfig(): ReadonlyArray<SettingsNavGroup<Setting
       items: [{ id: "about", label: "illusions について", icon: Info }],
     },
   ];
+
+  // A dedicated BrowserWindow may only expose global preferences.  Filtering
+  // here (rather than hiding individual entries) also removes empty headings.
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => isCategoryInScope(item.id, scope)),
+    }))
+    .filter((group) => group.items.length > 0);
 }

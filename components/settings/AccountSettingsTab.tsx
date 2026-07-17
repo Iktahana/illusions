@@ -10,6 +10,19 @@ function openExternal(url: string): void {
   }
 }
 
+function openAccountDeletion(): void {
+  // App Review Guideline 5.1.1(v): the MAS build must initiate account
+  // deletion inside the app rather than dispatching users to their browser.
+  if (
+    window.electronAPI?.appRuntime?.distributionProvider === "app-store" &&
+    window.electronAPI.auth?.openDeleteAccount
+  ) {
+    void window.electronAPI.auth.openDeleteAccount();
+    return;
+  }
+  openExternal("https://my.illusions.app/delete-account");
+}
+
 function UserInitials({ name }: { name: string }) {
   const initials = name
     .split(/\s+/)
@@ -111,7 +124,7 @@ export default function AccountSettingsTab() {
 
       <button
         type="button"
-        onClick={() => openExternal("https://my.illusions.app/delete-account")}
+        onClick={openAccountDeletion}
         className="text-xs text-foreground-tertiary underline-offset-2 hover:text-foreground-secondary hover:underline"
       >
         アカウントを削除

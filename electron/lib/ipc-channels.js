@@ -30,6 +30,10 @@ const STORAGE_CHANNELS = Object.freeze({
     loadSession: "storage:load-session",
     saveAppState: "storage:save-app-state",
     loadAppState: "storage:load-app-state",
+    // Atomically merges a partial AppState in the main process and returns the
+    // canonical persisted snapshot. This avoids renderer-to-renderer TOCTOU
+    // races when more than one window updates preferences.
+    updateAppState: "storage:update-app-state",
     addToRecent: "storage:add-to-recent",
     getRecentFiles: "storage:get-recent-files",
     removeFromRecent: "storage:remove-from-recent",
@@ -46,7 +50,10 @@ const STORAGE_CHANNELS = Object.freeze({
     removeItem: "storage:remove-item",
     getKeysByPrefix: "storage:get-keys-by-prefix",
   }),
-  event: Object.freeze({}),
+  event: Object.freeze({
+    // Canonical snapshot emitted after every successful updateAppState write.
+    appStateUpdated: "storage:app-state-updated",
+  }),
 });
 
 const DICT_CHANNELS = Object.freeze({
@@ -132,6 +139,7 @@ const MENU_CHANNELS = Object.freeze({
     rebuild: "menu:rebuild",
     syncUiState: "menu:sync-ui-state",
     updateKeymapOverrides: "menu:update-keymap-overrides",
+    openSettingsWindow: "menu:open-settings-window",
   }),
   event: Object.freeze({
     newTriggered: "menu-new-triggered",
@@ -155,6 +163,7 @@ const MENU_CHANNELS = Object.freeze({
     exportDocx: "menu-export-docx",
     reportBug: "menu-report-bug",
     reportAiInappropriate: "menu-report-ai-inappropriate",
+    openSettings: "menu-open-settings",
   }),
 });
 
@@ -186,6 +195,7 @@ const AUTH_CHANNELS = Object.freeze({
     refreshToken: "auth:refresh-token",
     getUserInfo: "auth:get-userinfo",
     logout: "auth:logout",
+    openDeleteAccount: "auth:open-delete-account",
   }),
   event: Object.freeze({
     callback: "auth:callback",

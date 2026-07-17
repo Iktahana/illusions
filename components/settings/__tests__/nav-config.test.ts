@@ -71,4 +71,25 @@ describe("buildSettingsNavConfig — structure", () => {
       ]),
     );
   });
+
+  it("global scope only exposes non-document settings", () => {
+    const ids = buildSettingsNavConfig("global").flatMap((group) =>
+      group.items.map((item) => item.id),
+    );
+    expect(ids.sort()).toEqual(
+      [
+        "account",
+        "ai-connection",
+        "typography",
+        "scroll",
+        "dictionary",
+        "keymap",
+        "speech",
+        "terminal",
+        "power",
+        "privacy",
+        "about",
+      ].sort(),
+    );
+  });
 });

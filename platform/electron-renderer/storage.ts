@@ -31,6 +31,8 @@ export class ElectronStorageProvider implements IStorageService {
       loadSession: () => Promise<StorageSession | null>;
       saveAppState: (appState: AppState) => Promise<void>;
       loadAppState: () => Promise<AppState | null>;
+      updateAppState: (updates: Partial<AppState>) => Promise<AppState>;
+      onAppStateUpdated: (callback: (appState: AppState) => void) => () => void;
       addToRecent: (file: RecentFile) => Promise<void>;
       getRecentFiles: () => Promise<RecentFile[]>;
       removeFromRecent: (path: string) => Promise<void>;
@@ -71,6 +73,19 @@ export class ElectronStorageProvider implements IStorageService {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.loadAppState();
+  }
+
+  /**
+   * Main-process atomic AppState merge. Unlike load + save in a renderer this
+   * cannot lose a concurrent preference update from another window.
+   */
+  async updateAppState(updates: Partial<AppState>): Promise<AppState> {
+    await this.initialize();
+    return this.getElectronAPI().updateAppState(updates);
+  }
+
+  onAppStateUpdated(callback: (appState: AppState) => void): () => void {
+    return this.getElectronAPI().onAppStateUpdated(callback);
   }
 
   async addToRecent(file: RecentFile): Promise<void> {

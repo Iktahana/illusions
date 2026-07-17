@@ -72,7 +72,7 @@ function toWebMenuItem(item: MenuTemplateItem): MenuItem {
 
 export const WEB_MENU_STRUCTURE: MenuSection[] = MENU_TEMPLATE.map((section) => ({
   label: section.label,
-  items: section.items.map(toWebMenuItem),
+  items: section.items.filter((item) => item.webVisible !== false).map(toWebMenuItem),
 }));
 
 /**
@@ -84,7 +84,7 @@ export const WEB_MENU_STRUCTURE: MenuSection[] = MENU_TEMPLATE.map((section) => 
 export const ACTION_TO_COMMAND_ID: Partial<Record<string, CommandId>> = (() => {
   const map: Partial<Record<string, CommandId>> = {};
   forEachTemplateItem((item) => {
-    if (item.id && item.commandId && item.webCommandLookup !== false) {
+    if (item.webVisible !== false && item.id && item.commandId && item.webCommandLookup !== false) {
       map[item.id] = item.commandId;
     }
   });

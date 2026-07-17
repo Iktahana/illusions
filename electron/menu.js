@@ -9,6 +9,7 @@
 const { app, BrowserWindow, Menu, shell } = require("electron");
 const {
   MENU_TEMPLATE,
+  SETTINGS_MENU_ITEM,
   formatVersionLabel,
   getNativeDefaultAccelerators,
 } = require("../lib/menu/menu-template");
@@ -143,6 +144,12 @@ function buildClickHandler(item, sendToFocused) {
       createWindow({ showWelcome: true });
     };
   }
+  if (item.electronHandler === "open-settings-window") {
+    return () => {
+      const { createSettingsWindow } = require("./window-manager");
+      void createSettingsWindow();
+    };
+  }
   if (item.electronOpenExternal) {
     const url = item.electronOpenExternal;
     return () => {
@@ -166,6 +173,7 @@ function buildClickHandler(item, sendToFocused) {
  *   sendToFocused: (channel: string, ...args: unknown[]) => void,
  *   menuUiState: typeof DEFAULT_MENU_UI_STATE,
  *   recentProjects: Array<{ id: string, name: string }>,
+ *   isSettingsWindow: boolean,
  * }} ctx
  * @returns {object}
  */
@@ -183,6 +191,17 @@ function toNativeMenuItem(item, ctx) {
 
   /** @type {Record<string, unknown>} */
   const native = { label };
+
+  // Settings is not an editor window: file/format/window commands must never
+  // be delivered to its renderer. Native edit roles remain available for
+  // text fields inside the settings UI.
+  if (
+    ctx.isSettingsWindow &&
+    item.electronChannel &&
+    item.electronHandler !== "open-settings-window"
+  ) {
+    native.enabled = false;
+  }
 
   // Dynamic submenu insertion point: recent projects
   if (item.dynamicSubmenu === "recent-projects") {
@@ -233,6 +252,11 @@ function toNativeMenuItem(item, ctx) {
   if (click) native.click = click;
 
   return native;
+}
+
+/** @param {import("../lib/menu/menu-template").MenuTemplateItem} item @param {boolean} isMac */
+function isNativeItemVisible(item, isMac) {
+  return item.electronPlatform !== "non-mac" || !isMac;
 }
 
 /**
@@ -319,8 +343,13 @@ function buildApplicationMenu(recentProjects = [], platform = process.platform) 
     if (win) win.webContents.send(channel, ...args);
   };
 
-  const ctx = { sendToFocused, menuUiState, recentProjects };
-
+  const { isSettingsWindow } = require("./window-manager");
+  const ctx = {
+    sendToFocused,
+    menuUiState,
+    recentProjects,
+    isSettingsWindow: isSettingsWindow(BrowserWindow.getFocusedWindow()),
+  };
   const template = [];
 
   // アプリ（macOSのみ・role ベースの実装を維持）
@@ -331,6 +360,9 @@ function buildApplicationMenu(recentProjects = [], platform = process.platform) 
         { role: "about", label: `${APP_NAME}について` },
         { type: "separator" },
         { role: "services", label: "サービス" },
+        { type: "separator" },
+        // macOS convention: Settings belongs in the application menu, not File.
+        toNativeMenuItem(SETTINGS_MENU_ITEM, ctx),
         { type: "separator" },
         { role: "hide", label: `${APP_NAME}を隠す` },
         { role: "hideOthers", label: "他を隠す" },
@@ -345,7 +377,13 @@ function buildApplicationMenu(recentProjects = [], platform = process.platform) 
     const { prepend, append } = getElectronSectionExtras(section.id, isMac);
     template.push({
       label: section.label,
-      submenu: [...prepend, ...section.items.map((item) => toNativeMenuItem(item, ctx)), ...append],
+      submenu: [
+        ...prepend,
+        ...section.items
+          .filter((item) => isNativeItemVisible(item, isMac))
+          .map((item) => toNativeMenuItem(item, ctx)),
+        ...append,
+      ],
     });
   }
 

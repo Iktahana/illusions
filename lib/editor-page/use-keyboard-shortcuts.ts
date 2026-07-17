@@ -135,7 +135,15 @@ export function useKeyboardShortcuts({
       "view.compactMode": handleToggleCompactMode,
       "format.ruby": isEditorTabActive ? handleOpenRubyDialog : undefined,
       "format.tcy": isEditorTabActive ? handleToggleTcy : undefined,
-      "nav.settings": () => setShowSettingsModal(true),
+      // On desktop, ⌘, / Ctrl+, belongs to the single global Settings window.
+      // The in-editor modal remains available for document/project-scoped tabs.
+      "nav.settings": () => {
+        if (isElectron && window.electronAPI?.openSettingsWindow) {
+          void window.electronAPI.openSettingsWindow();
+        } else {
+          setShowSettingsModal(true);
+        }
+      },
       "nav.search": isEditorTabActive ? () => setSearchOpenTrigger((prev) => prev + 1) : undefined,
       // タブ往復で history を保つため remount しない (#1878)。
       "nav.nextTab": () => nextTab(),

@@ -21,11 +21,18 @@ export async function fetchAppState(): Promise<AppState | null> {
 }
 
 export async function persistAppState(updates: Partial<AppState>): Promise<AppState> {
+  const storage = getStorageService();
+  await storage.initialize();
+
+  // Electron owns the read/merge/write transaction. Keeping it in the main
+  // process prevents two renderer windows from both reading stale state and
+  // overwriting each other's preference change.
+  if (storage.updateAppState) {
+    return storage.updateAppState(updates);
+  }
+
   const release = await persistMutex.acquire();
   try {
-    const storage = getStorageService();
-    await storage.initialize();
-
     const existing = (await storage.loadAppState()) ?? {};
     const merged: AppState = {
       ...existing,
@@ -37,6 +44,18 @@ export async function persistAppState(updates: Partial<AppState>): Promise<AppSt
   } finally {
     release();
   }
+}
+
+/**
+ * Subscribe to canonical AppState writes made by any application window.
+ * Electron delivers these from the main process; web storage has no
+ * cross-window bridge, so it deliberately returns a no-op unsubscribe.
+ *
+ * Consumers should apply the supplied *full snapshot* to local UI state and
+ * must not persist it again, avoiding renderer-to-renderer feedback loops.
+ */
+export function subscribeToAppStateUpdates(callback: (appState: AppState) => void): () => void {
+  return getStorageService().onAppStateUpdated?.(callback) ?? (() => undefined);
 }
 
 // ---------------------------------------------------------------------------

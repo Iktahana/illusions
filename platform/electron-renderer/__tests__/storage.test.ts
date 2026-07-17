@@ -33,6 +33,10 @@ function createMockStorageAPI() {
     loadSession: vi.fn<() => Promise<StorageSession | null>>().mockResolvedValue(null),
     saveAppState: vi.fn<(a: AppState) => Promise<void>>().mockResolvedValue(undefined),
     loadAppState: vi.fn<() => Promise<AppState | null>>().mockResolvedValue(null),
+    updateAppState: vi.fn<(a: Partial<AppState>) => Promise<AppState>>().mockResolvedValue({}),
+    onAppStateUpdated: vi
+      .fn<(callback: (appState: AppState) => void) => () => void>()
+      .mockReturnValue(() => undefined),
     addToRecent: vi.fn<(f: RecentFile) => Promise<void>>().mockResolvedValue(undefined),
     getRecentFiles: vi.fn<() => Promise<RecentFile[]>>().mockResolvedValue([]),
     removeFromRecent: vi.fn<(p: string) => Promise<void>>().mockResolvedValue(undefined),
@@ -183,6 +187,24 @@ describe("ElectronStorageProvider", () => {
 
       const result = await provider.loadAppState();
       expect(result).toBeNull();
+    });
+
+    it("delegates atomic AppState patches and returns the canonical snapshot", async () => {
+      const provider = new ElectronStorageProvider();
+      const expected = makeAppState({ fontScale: 1.2 });
+      mockStorage.updateAppState.mockResolvedValue(expected);
+
+      await expect(provider.updateAppState({ fontScale: 1.2 })).resolves.toEqual(expected);
+      expect(mockStorage.updateAppState).toHaveBeenCalledWith({ fontScale: 1.2 });
+    });
+
+    it("exposes a removable AppState update subscription", () => {
+      const provider = new ElectronStorageProvider();
+      const callback = vi.fn();
+      const unsubscribe = provider.onAppStateUpdated(callback);
+
+      expect(mockStorage.onAppStateUpdated).toHaveBeenCalledWith(callback);
+      expect(typeof unsubscribe).toBe("function");
     });
   });
 

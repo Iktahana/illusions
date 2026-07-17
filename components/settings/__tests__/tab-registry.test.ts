@@ -45,6 +45,25 @@ describe("buildSettingsTabRegistry — platform gating", () => {
 });
 
 describe("buildSettingsTabRegistry — entry contract", () => {
+  it("global scope excludes document and project scoped tabs", () => {
+    const registry = buildSettingsTabRegistry({ isElectron: true, scope: "global" });
+    expect(Object.keys(registry).sort()).toEqual(
+      [
+        "account",
+        "ai-connection",
+        "typography",
+        "scroll",
+        "dictionary",
+        "keymap",
+        "speech",
+        "terminal",
+        "power",
+        "privacy",
+        "about",
+      ].sort(),
+    );
+  });
+
   it("always provides an entry for every non-platform-gated category", () => {
     const registry = buildSettingsTabRegistry({ isElectron: false });
     const expected = [
