@@ -105,12 +105,16 @@ async function findOrGetInternalGroup() {
   return group;
 }
 
-async function addBuildToGroup(groupId, buildId) {
-  await asc(`/betaGroups/${groupId}/relationships/builds`, {
+async function grantGroupAccessToBuild(groupId, buildId) {
+  // App Store Connect exposes the association from both resources. Creating it
+  // from the build side is more reliable immediately after upload: the build
+  // is already addressable at /builds/{id}, while its reverse lookup from a
+  // beta group can still return RESOURCE_NOT_FOUND for a short period.
+  await asc(`/builds/${buildId}/relationships/betaGroups`, {
     method: "POST",
-    body: JSON.stringify({ data: [{ type: "builds", id: buildId }] }),
+    body: JSON.stringify({ data: [{ type: "betaGroups", id: groupId }] }),
   });
-  console.log("Build added to internal TestFlight group.");
+  console.log("Internal TestFlight group granted access to build.");
 }
 
 const build = await findBuild(buildNumber);
@@ -120,5 +124,5 @@ const build = await findBuild(buildNumber);
 // PATCH /builds/{id} 409s with "You cannot update when the value is already
 // set", so there's nothing to do here.
 const group = await findOrGetInternalGroup();
-await addBuildToGroup(group.id, build.id);
+await grantGroupAccessToBuild(group.id, build.id);
 console.log(`\n✅ Build ${buildNumber} is now available via TestFlight to internal testers.`);
