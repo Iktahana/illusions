@@ -1183,6 +1183,10 @@ function EditorPageContent() {
     onOpenProject: () => void handleOpenProject(),
     onOpenRecentProject: (projectId: string) => openRecentProjectRef.current(projectId),
     onCloseWindow: () => window.close(),
+    onOpenSettings: () => {
+      setSettingsInitialCategory(undefined);
+      setShowSettingsModal(true);
+    },
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onExport: (format) => void exportAs(format),
     onPrint: () => printDocument(),

@@ -10,6 +10,9 @@ const isMicrosoftStoreApp = process.windowsStore === true;
 
 // Mac App Store (MAS) ビルドかどうかを判定（Electron が MAS パッケージ時に自動設定）
 // MAS はサンドボックス制約により auto-updater・ターミナル(node-pty)・QuickLook 同梱を無効化する
-const isMasBuild = process.mas === true;
+// `MAS_BUILD=1` enables the same code path during local development. The
+// Electron-provided `process.mas` remains the source of truth in packaged MAS
+// builds, where sandboxing and entitlements are applied by the bundle.
+const isMasBuild = process.mas === true || process.env.MAS_BUILD === "1";
 
 module.exports = { isDev, APP_NAME, isMicrosoftStoreApp, isMasBuild };
