@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * Makes an already-uploaded build available to internal TestFlight testers.
+ * Waits until an already-uploaded build is valid for internal TestFlight
+ * testers. Internal testers receive valid builds automatically; App Store
+ * Connect rejects attempts to assign those builds to an internal beta group.
  *
  * Requires env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_API_KEY (base64 .p8), ASC_APP_ID.
  * Usage: node scripts/asc-testflight-enable.mjs <CFBundleVersion>
@@ -60,9 +62,7 @@ async function asc(path, options = {}) {
   if (!res.ok) {
     console.error(`ASC API ${options.method || "GET"} ${path} -> ${res.status}`);
     console.error(JSON.stringify(body, null, 2));
-    const error = new Error(`ASC API request failed: ${res.status}`);
-    error.status = res.status;
-    throw error;
+    throw new Error(`ASC API request failed: ${res.status}`);
   }
   return body;
 }
@@ -92,52 +92,10 @@ async function findBuild(buildNumber, { retries = 20, delayMs = 30000 } = {}) {
   throw new Error(`Build ${buildNumber} did not become VALID within timeout`);
 }
 
-async function findOrGetInternalGroup() {
-  // `filter[isInternalGroup]` isn't a supported query param on this
-  // endpoint (confirmed via a 400 PARAMETER_ERROR.ILLEGAL response) — fetch
-  // all groups for the app and filter client-side instead.
-  const res = await asc(`/apps/${ASC_APP_ID}/betaGroups`);
-  const group = res.data?.find((g) => g.attributes.isInternalGroup === true);
-  if (!group) {
-    throw new Error(
-      "No internal beta group found for this app. Create one in App Store Connect → TestFlight → Internal Testing first (this is a one-time manual step Apple requires).",
-    );
-  }
-  console.log(`Internal group: ${group.attributes.name} (${group.id})`);
-  return group;
-}
-
-async function grantGroupAccessToBuild(groupId, buildId, { retries = 20, delayMs = 30000 } = {}) {
-  // App Store Connect exposes the association from both resources. Creating it
-  // from the build side. Apple can report the build as VALID before that
-  // relationship endpoint has caught up; retry its temporary 404 rather than
-  // failing the release after a successful upload.
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      await asc(`/builds/${buildId}/relationships/betaGroups`, {
-        method: "POST",
-        body: JSON.stringify({ data: [{ type: "betaGroups", id: groupId }] }),
-      });
-      console.log("Internal TestFlight group granted access to build.");
-      return;
-    } catch (error) {
-      if (error.status !== 404 || attempt === retries) {
-        throw error;
-      }
-      console.log(
-        `Build relationship is not ready yet, waiting... (attempt ${attempt}/${retries})`,
-      );
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-}
-
-const build = await findBuild(buildNumber);
+await findBuild(buildNumber);
 // Export compliance is declared once via ITSAppUsesNonExemptEncryption in
 // the Info.plist (package.json's mac.extendInfo) — App Store Connect reads
 // it from the binary automatically, and re-confirming the same value via
 // PATCH /builds/{id} 409s with "You cannot update when the value is already
 // set", so there's nothing to do here.
-const group = await findOrGetInternalGroup();
-await grantGroupAccessToBuild(group.id, build.id);
-console.log(`\n✅ Build ${buildNumber} is now available via TestFlight to internal testers.`);
+console.log(`\n✅ Build ${buildNumber} is valid and available via TestFlight to internal testers.`);
