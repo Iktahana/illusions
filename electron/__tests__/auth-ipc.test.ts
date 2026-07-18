@@ -109,11 +109,10 @@ describe("auth-ipc.js — platform OAuth routing", () => {
     }
   });
 
-  it("keeps MAS account deletion in a restricted app-owned window", () => {
-    expect(source).toContain("ACCOUNT_DELETION_URL = `${PROVIDER_URL}/delete-account`");
-    expect(source).toContain("openMasAccountDeletionWindow");
-    expect(source).toContain("AUTH_CHANNELS.invoke.openDeleteAccount");
-    expect(source).toContain("Blocked account-deletion navigation");
+  it("does not create an embedded account-deletion window", () => {
+    expect(source).not.toContain("openMasAccountDeletionWindow");
+    expect(source).not.toContain("openDeleteAccount");
+    expect(source).not.toContain("ACCOUNT_DELETION_URL");
   });
 
   it("does not route callbacks with an unknown state to the focused window", () => {

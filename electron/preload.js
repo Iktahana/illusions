@@ -185,7 +185,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     refreshToken: invokeChannel(AUTH_CHANNELS.invoke.refreshToken, { arity: 1 }),
     getUserInfo: invokeChannel(AUTH_CHANNELS.invoke.getUserInfo, { arity: 1 }),
     logout: invokeChannel(AUTH_CHANNELS.invoke.logout, { arity: 0 }),
-    openDeleteAccount: invokeChannel(AUTH_CHANNELS.invoke.openDeleteAccount, { arity: 0 }),
     onCallback: eventChannel(AUTH_CHANNELS.event.callback),
   },
   safeStorage: {

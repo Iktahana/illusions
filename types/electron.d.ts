@@ -262,8 +262,6 @@ declare global {
         subscription_status: string;
       }>;
       logout: () => Promise<{ success: boolean }>;
-      /** Opens the account-deletion flow in an app-owned MAS window. */
-      openDeleteAccount: () => Promise<boolean>;
       onCallback: (
         callback: (data: {
           code?: string | null;
