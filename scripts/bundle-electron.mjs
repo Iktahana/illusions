@@ -287,7 +287,10 @@ for (const dep of runtimeDeps) {
   const src = resolvePackageDir(dep);
   const dest = join(nodeModulesDest, dep);
   if (src) {
-    fs.cpSync(src, dest, { recursive: true });
+    // Local file: dependencies are symlinked from node_modules. Package the
+    // target directory, not the symlink, because its absolute development
+    // path cannot exist inside an ASAR-unpacked application.
+    fs.cpSync(fs.realpathSync(src), dest, { recursive: true });
     // Remove .bin directories that contain symlinks breaking macOS code signing
     removeDotBinDirs(dest);
     console.log(`  ✅ ${dep}`);
