@@ -78,6 +78,8 @@ describe("auth-ipc.js — platform OAuth routing", () => {
   });
 
   it("cancels the request that belongs to a closed source window", async () => {
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { ...platformDescriptor, value: "darwin" });
     let onClosed: (() => void) | undefined;
     const sourceWindow = {
       id: 41,
@@ -91,15 +93,20 @@ describe("auth-ipc.js — platform OAuth routing", () => {
     startMacOSAuthSession.mockClear();
     cancelMacOSAuthSession.mockClear();
 
-    authIpc.registerAuthHandlers();
-    const startLogin = authHandlers.get("auth:start-login");
-    expect(startLogin).toBeDefined();
-    await startLogin?.({ sender: {} });
+    try {
+      authIpc.registerAuthHandlers();
+      const startLogin = authHandlers.get("auth:start-login");
+      expect(startLogin).toBeDefined();
+      await startLogin?.({ sender: {} });
+      await Promise.resolve();
 
-    const requestId = startMacOSAuthSession.mock.calls[0]?.[2];
-    expect(requestId).toEqual(expect.any(String));
-    onClosed?.();
-    expect(cancelMacOSAuthSession).toHaveBeenCalledWith(requestId);
+      const requestId = startMacOSAuthSession.mock.calls[0]?.[2];
+      expect(requestId).toEqual(expect.any(String));
+      onClosed?.();
+      expect(cancelMacOSAuthSession).toHaveBeenCalledWith(requestId);
+    } finally {
+      Object.defineProperty(process, "platform", platformDescriptor!);
+    }
   });
 
   it("keeps MAS account deletion in a restricted app-owned window", () => {
