@@ -2,25 +2,19 @@ const { ipcMain, shell, BrowserWindow, app } = require("electron");
 const crypto = require("crypto");
 const { AUTH_CHANNELS } = require("../lib/ipc-channels");
 const { isMasBuild } = require("../app-constants");
+const {
+  startMacOSAuthSession,
+  cancelMacOSAuthSession,
+  cancelAllMacOSAuthSessionsForShutdown,
+} = require("../lib/macos-auth-session");
 
 const PROVIDER_URL = "https://my.illusions.app";
 const OAUTH_CLIENT_ID = "illusions";
 const REDIRECT_URI = "illusions://auth/callback";
 const ACCOUNT_DELETION_URL = `${PROVIDER_URL}/delete-account`;
 
-// These are the top-level identity-provider origins offered by the hosted
-// sign-in page. Keep the allowlist exact: an OAuth BrowserWindow must not turn
-// into a general-purpose browser just because it hosts third-party sign-in.
-const OAUTH_IDP_ORIGINS = new Set([
-  "https://github.com",
-  "https://accounts.google.com",
-  "https://appleid.apple.com",
-]);
-
 /** @type {Map<string, { codeVerifier: string, windowId: number }>} state → { codeVerifier, windowId } */
 const pendingAuthByState = new Map();
-/** @type {Map<string, Electron.BrowserWindow>} state → MAS authorization window */
-const authWindowByState = new Map();
 
 function isProviderUrl(url) {
   try {
@@ -29,97 +23,6 @@ function isProviderUrl(url) {
   } catch {
     return false;
   }
-}
-
-function isAllowedOAuthUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.protocol === "https:" &&
-      (parsed.origin === PROVIDER_URL || OAUTH_IDP_ORIGINS.has(parsed.origin))
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isAuthCallbackUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.protocol === "illusions:" && parsed.host === "auth" && parsed.pathname === "/callback"
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Open the authorization page inside a restricted, parented window for the
- * Mac App Store build. OAuth credentials never receive the app preload or
- * Node APIs, and top-level navigation is limited to the first-party provider
- * until it returns to the custom-scheme callback.
- */
-function openMasAuthWindow({ authUrl, parent, state }) {
-  const authWindow = new BrowserWindow({
-    parent: parent && !parent.isDestroyed() ? parent : undefined,
-    modal: Boolean(parent && !parent.isDestroyed()),
-    width: 520,
-    height: 720,
-    minWidth: 400,
-    minHeight: 500,
-    show: false,
-    title: "Sign in to illusions",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-  authWindowByState.set(state, authWindow);
-
-  let receivedCallback = false;
-  const cancelPendingLogin = () => {
-    if (!receivedCallback) pendingAuthByState.delete(state);
-  };
-
-  const interceptNavigation = (event, navigationUrl) => {
-    // Chromium may emit both redirect and navigation events for a redirect;
-    // process the callback exactly once even in that case.
-    if (receivedCallback) {
-      event.preventDefault();
-      return;
-    }
-    if (isAuthCallbackUrl(navigationUrl)) {
-      event.preventDefault();
-      receivedCallback = true;
-      handleAuthCallback(navigationUrl);
-      authWindow.close();
-      return;
-    }
-    if (!isAllowedOAuthUrl(navigationUrl)) {
-      event.preventDefault();
-      console.warn("[auth] Blocked OAuth window navigation to:", navigationUrl);
-    }
-  };
-  authWindow.webContents.on("will-navigate", interceptNavigation);
-  // OAuth server redirects to the custom protocol, so intercept it before
-  // Chromium attempts to hand the URL to an external protocol handler.
-  authWindow.webContents.on("will-redirect", interceptNavigation);
-  authWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  authWindow.once("ready-to-show", () => authWindow.show());
-  authWindow.on("closed", () => {
-    authWindowByState.delete(state);
-    cancelPendingLogin();
-  });
-
-  // Do not await loadURL: the renderer should enter its login-pending state
-  // immediately, rather than wait for the user to finish authorization.
-  void authWindow.loadURL(authUrl).catch((error) => {
-    console.error("[auth] Failed to load OAuth authorization page:", error);
-    cancelPendingLogin();
-    if (!authWindow.isDestroyed()) authWindow.close();
-  });
 }
 
 /**
@@ -189,8 +92,32 @@ function registerAuthHandlers() {
     });
 
     const authUrl = `${PROVIDER_URL}/api/oauth/authorize?${params}`;
-    if (isMasBuild) {
-      openMasAuthWindow({ authUrl, parent: win, state });
+    if (process.platform === "darwin") {
+      // ASWebAuthenticationSession uses the system browser and returns the
+      // matching callback directly to this process. It avoids embedding any
+      // identity provider (especially Apple Account) in an Electron view.
+      void Promise.resolve()
+        .then(() => startMacOSAuthSession(authUrl, "illusions", state))
+        .then((callbackUrl) => handleAuthCallback(callbackUrl))
+        .catch(async (error) => {
+          if (error?.code === "ERR_AUTH_CANCELLED") {
+            pendingAuthByState.delete(state);
+            return;
+          }
+          console.warn(
+            "[auth] ASWebAuthenticationSession unavailable; opening system browser:",
+            error,
+          );
+          try {
+            await shell.openExternal(authUrl);
+          } catch (fallbackError) {
+            pendingAuthByState.delete(state);
+            console.error(
+              "[auth] Failed to open OAuth authorization page in browser:",
+              fallbackError,
+            );
+          }
+        });
     } else {
       try {
         await shell.openExternal(authUrl);
@@ -274,8 +201,7 @@ function registerAuthHandlers() {
       for (const [state, entry] of pendingAuthByState) {
         if (entry.windowId === winId) {
           pendingAuthByState.delete(state);
-          const authWindow = authWindowByState.get(state);
-          if (authWindow && !authWindow.isDestroyed()) authWindow.close();
+          cancelMacOSAuthSession(state);
         }
       }
     }
@@ -295,8 +221,7 @@ function registerAuthHandlers() {
       for (const [state, entry] of pendingAuthByState) {
         if (entry.windowId === winId) {
           pendingAuthByState.delete(state);
-          const authWindow = authWindowByState.get(state);
-          if (authWindow && !authWindow.isDestroyed()) authWindow.close();
+          cancelMacOSAuthSession(state);
         }
       }
     });
@@ -308,6 +233,12 @@ function registerAuthHandlers() {
   // Register for future windows
   app.on("browser-window-created", (_, win) => {
     attachAuthCleanup(win);
+  });
+  app.once("before-quit", () => {
+    // Do not let AuthenticationServices call back into a Node runtime that is
+    // being torn down. The native bridge suppresses completion callbacks after
+    // this explicit shutdown cancellation.
+    cancelAllMacOSAuthSessionsForShutdown();
   });
 }
 
@@ -352,6 +283,5 @@ function handleAuthCallback(url) {
 module.exports = {
   registerAuthHandlers,
   handleAuthCallback,
-  isAllowedOAuthUrl,
   isProviderUrl,
 };

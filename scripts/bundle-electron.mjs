@@ -44,6 +44,8 @@ await esbuild.build({
     "better-sqlite3",
     // node-pty is a native module for terminal support
     "node-pty",
+    // macOS-only native bridge for ASWebAuthenticationSession
+    "@illusions/as-web-authentication",
   ],
   define: {
     "process.env.APTABASE_APP_KEY": JSON.stringify(process.env.APTABASE_APP_KEY || ""),
@@ -132,8 +134,8 @@ function collectDepsRecursive(pkgName, collected) {
 // risk even when the code path is dead (docs/release/mac-app-store.md).
 const isMasBuild = process.env.MAS_BUILD === "1";
 const externalRoots = isMasBuild
-  ? ["kuromoji", "better-sqlite3"]
-  : ["kuromoji", "better-sqlite3", "node-pty"];
+  ? ["kuromoji", "better-sqlite3", "@illusions/as-web-authentication"]
+  : ["kuromoji", "better-sqlite3", "node-pty", "@illusions/as-web-authentication"];
 
 // Collect all transitive production dependencies
 const allDeps = new Set();
@@ -193,6 +195,15 @@ function rebuildBetterSqliteForArch(arch) {
   const electronVersion = getElectronVersion();
   execSync(
     `npx electron-rebuild --force --only better-sqlite3 --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
+    { cwd: projectRoot, stdio: "inherit" },
+  );
+}
+
+function rebuildAsWebAuthenticationForArch(arch) {
+  if (process.platform !== "darwin") return;
+  const electronVersion = getElectronVersion();
+  execSync(
+    `npx electron-rebuild --force --only @illusions/as-web-authentication --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
     { cwd: projectRoot, stdio: "inherit" },
   );
 }
@@ -268,6 +279,9 @@ async function prepareNativeModulesForArch(arch) {
 
 await prepareNativeModulesForArch(targetArch);
 ensureHostBetterSqliteArch(targetArch);
+// Build against Electron's headers every time. This is quick and avoids
+// accidentally packaging a binary compiled against the developer's Node SDK.
+rebuildAsWebAuthenticationForArch(targetArch);
 
 for (const dep of runtimeDeps) {
   const src = resolvePackageDir(dep);

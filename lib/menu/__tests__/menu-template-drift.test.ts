@@ -350,8 +350,8 @@ describe("shared menu template drift prevention", () => {
 // Behavior pinning: the derived Web structure equals the pre-refactor literal
 // ---------------------------------------------------------------------------
 
-describe("WEB_MENU_STRUCTURE preserves the pre-#1433 structure", () => {
-  it("matches the previous hardcoded definition exactly", () => {
+describe("WEB_MENU_STRUCTURE", () => {
+  it("includes the Settings entry in the shared Web menu definition", () => {
     const APP_VERSION = (() => {
       const v = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
       const parts = v.split(".");
@@ -390,6 +390,7 @@ describe("WEB_MENU_STRUCTURE preserves the pre-#1433 structure", () => {
           { type: "separator" },
           { label: "新しいタブ", accelerator: "Ctrl+T", action: "new-tab" },
           { label: "タブを閉じる", accelerator: "Ctrl+W", action: "close-tab" },
+          { label: "設定…", action: "settings" },
         ],
       },
       {
@@ -486,7 +487,7 @@ describe("WEB_MENU_STRUCTURE preserves the pre-#1433 structure", () => {
     expect(WEB_MENU_STRUCTURE).toEqual(expected);
   });
 
-  it("ACTION_TO_COMMAND_ID preserves the pre-#1433 mapping exactly", () => {
+  it("maps Settings to its keyboard command", () => {
     expect(ACTION_TO_COMMAND_ID).toEqual({
       "new-window": "file.newWindow",
       "open-file": "file.open",
@@ -502,6 +503,7 @@ describe("WEB_MENU_STRUCTURE preserves the pre-#1433 structure", () => {
       "zoom-in": "view.zoomIn",
       "zoom-out": "view.zoomOut",
       "toggle-compact-mode": "view.compactMode",
+      settings: "nav.settings",
     });
   });
 });
