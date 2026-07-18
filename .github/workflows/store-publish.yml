@@ -31,7 +31,7 @@ on:
         required: false
         type: string
       skip_appstore_upload:
-        description: "Skip uploading the MAS package and only enable an already-uploaded build for internal TestFlight testers"
+        description: "Skip uploading the MAS package and only confirm an already-uploaded build is available to internal TestFlight testers"
         required: false
         type: boolean
         default: false
