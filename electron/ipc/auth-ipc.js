@@ -1,7 +1,6 @@
 const { ipcMain, shell, BrowserWindow, app } = require("electron");
 const crypto = require("crypto");
 const { AUTH_CHANNELS } = require("../lib/ipc-channels");
-const { isMasBuild } = require("../app-constants");
 const {
   startMacOSAuthSession,
   cancelMacOSAuthSession,
@@ -11,57 +10,9 @@ const {
 const PROVIDER_URL = "https://my.illusions.app";
 const OAUTH_CLIENT_ID = "illusions";
 const REDIRECT_URI = "illusions://auth/callback";
-const ACCOUNT_DELETION_URL = `${PROVIDER_URL}/delete-account`;
 
 /** @type {Map<string, { codeVerifier: string, windowId: number }>} state → { codeVerifier, windowId } */
 const pendingAuthByState = new Map();
-
-function isProviderUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:" && parsed.origin === PROVIDER_URL;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Guideline 5.1.1(v) requires account deletion to begin in the app. The
- * account service already owns the authenticated confirmation flow, so MAS
- * hosts that page in a restricted, app-owned window rather than Safari.
- */
-function openMasAccountDeletionWindow(parent) {
-  const deletionWindow = new BrowserWindow({
-    parent: parent && !parent.isDestroyed() ? parent : undefined,
-    modal: Boolean(parent && !parent.isDestroyed()),
-    width: 560,
-    height: 720,
-    minWidth: 440,
-    minHeight: 560,
-    show: false,
-    title: "アカウントを削除",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-    },
-  });
-
-  const interceptDeletionNavigation = (event, navigationUrl) => {
-    if (!isProviderUrl(navigationUrl)) {
-      event.preventDefault();
-      console.warn("[auth] Blocked account-deletion navigation to:", navigationUrl);
-    }
-  };
-  deletionWindow.webContents.on("will-navigate", interceptDeletionNavigation);
-  deletionWindow.webContents.on("will-redirect", interceptDeletionNavigation);
-  deletionWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  deletionWindow.once("ready-to-show", () => deletionWindow.show());
-  void deletionWindow.loadURL(ACCOUNT_DELETION_URL).catch((error) => {
-    console.error("[auth] Failed to load account deletion page:", error);
-    if (!deletionWindow.isDestroyed()) deletionWindow.close();
-  });
-}
 
 function generateCodeVerifier() {
   return crypto.randomBytes(32).toString("base64url");
@@ -208,12 +159,6 @@ function registerAuthHandlers() {
     return { success: true };
   });
 
-  ipcMain.handle(AUTH_CHANNELS.invoke.openDeleteAccount, async (event) => {
-    if (!isMasBuild) return false;
-    openMasAccountDeletionWindow(BrowserWindow.fromWebContents(event.sender));
-    return true;
-  });
-
   // Clean up pending auth entries when a window is closed
   function attachAuthCleanup(win) {
     win.on("closed", () => {
@@ -283,5 +228,4 @@ function handleAuthCallback(url) {
 module.exports = {
   registerAuthHandlers,
   handleAuthCallback,
-  isProviderUrl,
 };

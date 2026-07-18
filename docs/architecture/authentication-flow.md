@@ -50,7 +50,7 @@ PKCE は以下の 3 つのステップで構成されます。
 
 - **State パラメータ**: CSRF（クロスサイトリクエストフォージェリ）防止のため、ランダムな `state` 値を検証に使用します。
 - **macOS 認可セッション**: OAuth は Electron の `BrowserWindow` 内では表示しません。`ASWebAuthenticationSession` が callback scheme と一致する URL だけを main process に返すため、Apple／Google／GitHub のログインをシステムブラウザで一貫して処理できます。ユーザーのキャンセル時は保留中の state を破棄し、session を開始できない場合のみ外部ブラウザ fallback を試みます。
-- **MAS アカウント削除**: アカウント削除ページは、外部ブラウザではなく同じく制限付きの app-owned window で開きます。
+- **アカウント削除**: 設定画面の「アカウントを削除」は、既定のブラウザで `https://my.illusions.app/delete-account` を直接開きます。
 - **セキュアな保存**: 取得した `access_token` および `refresh_token` は、環境に応じたセキュアなストレージ（ブラウザの HttpOnly Cookie、Electron の安全な暗号化ストア等）に保持されます。
 - **有効期限**: トークンには有効期限を設定し、必要に応じてリフレッシュトークンによる更新を行います。
 

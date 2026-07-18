@@ -195,7 +195,6 @@ const AUTH_CHANNELS = Object.freeze({
     refreshToken: "auth:refresh-token",
     getUserInfo: "auth:get-userinfo",
     logout: "auth:logout",
-    openDeleteAccount: "auth:open-delete-account",
   }),
   event: Object.freeze({
     callback: "auth:callback",

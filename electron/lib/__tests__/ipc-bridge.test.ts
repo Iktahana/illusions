@@ -230,7 +230,6 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       refreshToken: "auth:refresh-token",
       getUserInfo: "auth:get-userinfo",
       logout: "auth:logout",
-      openDeleteAccount: "auth:open-delete-account",
     });
     expect(AUTH_CHANNELS.event).toEqual({
       callback: "auth:callback",
