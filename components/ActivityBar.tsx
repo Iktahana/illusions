@@ -512,17 +512,30 @@ export default function ActivityBar({
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    login();
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
-                >
-                  <UserCircle className="w-4 h-4" />
-                  ログイン
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onOpenAccountSettings?.();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    設定
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      login();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-hover transition-colors"
+                  >
+                    <UserCircle className="w-4 h-4" />
+                    ログイン
+                  </button>
+                </>
               )}
             </div>
           )}

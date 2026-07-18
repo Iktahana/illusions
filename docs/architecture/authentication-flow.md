@@ -42,14 +42,14 @@ PKCE は以下の 3 つのステップで構成されます。
 ### Electron 版のフロー
 
 1. **ログイン開始**: レンダラーから IPC (`auth:login`) を通じてメインプロセスへ要求を送ります。
-2. **ブラウザ起動**: メインプロセスが PKCE パラメータを生成します。通常版は `shell.openExternal` でシステム標準ブラウザを開き、Mac App Store 版は Node API を持たない制限付き `BrowserWindow` 内で認可画面を開きます。
+2. **ブラウザ起動**: メインプロセスが PKCE パラメータを生成します。macOS ではネイティブ bridge 経由で `ASWebAuthenticationSession` を開始し、システムブラウザから `illusions://auth/callback` の結果を直接受け取ります。Windows／Linux では `shell.openExternal` でシステム標準ブラウザを開きます。macOS で session を開始できない場合だけ、同じ PKCE URL を `shell.openExternal` に fallback します。
 3. **認可と返却**: ブラウザで認可が完了すると、カスタムプロトコル（`illusions://auth/callback`）を通じて認可コードが Electron アプリに返されます。
 4. **トークン取得**: メインプロセスがトークン交換を行い、結果をレンダラーに通知します。
 
 ## セキュリティ上の考慮事項
 
 - **State パラメータ**: CSRF（クロスサイトリクエストフォージェリ）防止のため、ランダムな `state` 値を検証に使用します。
-- **MAS 認可ウィンドウ**: ポップアップを拒否し、`my.illusions.app`、GitHub／Google／Apple の既知の認可 origin、および検証済みの `illusions://auth/callback` 以外へのトップレベル遷移を拒否します。キャンセル・ロード失敗・親ウィンドウ終了時には保留中の state を破棄します。
+- **macOS 認可セッション**: OAuth は Electron の `BrowserWindow` 内では表示しません。`ASWebAuthenticationSession` が callback scheme と一致する URL だけを main process に返すため、Apple／Google／GitHub のログインをシステムブラウザで一貫して処理できます。ユーザーのキャンセル時は保留中の state を破棄し、session を開始できない場合のみ外部ブラウザ fallback を試みます。
 - **MAS アカウント削除**: アカウント削除ページは、外部ブラウザではなく同じく制限付きの app-owned window で開きます。
 - **セキュアな保存**: 取得した `access_token` および `refresh_token` は、環境に応じたセキュアなストレージ（ブラウザの HttpOnly Cookie、Electron の安全な暗号化ストア等）に保持されます。
 - **有効期限**: トークンには有効期限を設定し、必要に応じてリフレッシュトークンによる更新を行います。

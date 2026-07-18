@@ -1,0 +1,13 @@
+{
+  "name": "@illusions/as-web-authentication",
+  "version": "1.0.0",
+  "private": true,
+  "gypfile": true,
+  "main": "index.js",
+  "os": [
+    "darwin"
+  ],
+  "scripts": {
+    "install": "node-gyp rebuild"
+  }
+}

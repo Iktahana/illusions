@@ -32,6 +32,8 @@ interface UseWebMenuHandlersProps {
   onCloseTab?: () => void;
   /** Handler for opening the bug/feedback report dialog with a preset category */
   onReportBug?: (category: BugReportCategory) => void;
+  /** Opens application settings. Available even when the user is not logged in. */
+  onOpenSettings?: () => void;
 }
 
 export function useWebMenuHandlers({
@@ -54,6 +56,7 @@ export function useWebMenuHandlers({
   onNewTab,
   onCloseTab,
   onReportBug,
+  onOpenSettings,
 }: UseWebMenuHandlersProps) {
   const handleMenuAction = useCallback(
     (action: string) => {
@@ -86,6 +89,9 @@ export function useWebMenuHandlers({
           break;
         case "close-tab":
           onCloseTab?.();
+          break;
+        case "settings":
+          onOpenSettings?.();
           break;
 
         // Print
@@ -283,6 +289,7 @@ export function useWebMenuHandlers({
       onNewTab,
       onCloseTab,
       onReportBug,
+      onOpenSettings,
     ],
   );
 
