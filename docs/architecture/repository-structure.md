@@ -29,13 +29,14 @@ illusions/
     generated/
   electron/
   native/
+    as-web-authentication/
+    quicklook/
   packages/
   public/
   assets/
     branding/
     store/
   build/
-  quicklook/
   scripts/
   docs/
 
