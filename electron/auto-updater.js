@@ -255,7 +255,15 @@ async function checkForUpdates(manual = false) {
   isManualUpdateCheck = manual;
   // 設定変更を反映するため、チェック直前に opt-in を再評価して channel を確定する
   await applyBetaOptIn();
-  autoUpdater.checkForUpdates();
+  // electron-updater can reject before it emits its `error` event (for example
+  // when a Store package has no app-update.yml). Always consume that promise so
+  // a failed background check never reaches the process-level unhandledRejection
+  // handler or error reporting.
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (error) {
+    log.error("アップデート確認の開始に失敗しました:", error);
+  }
 }
 
 /**

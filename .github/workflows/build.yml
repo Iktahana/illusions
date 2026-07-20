@@ -351,9 +351,9 @@ jobs:
     # Build-only: produces a signed .pkg artifact, nothing more. Publishing
     # (App Store Connect/TestFlight upload) lives entirely in
     # store-publish.yml's appstore-testflight job, triggered separately and
-    # explicitly — this job never uploads anywhere. Auto-runs on beta pushes
-    # (same as the other platform build jobs) purely to keep a fresh signed
-    # artifact available; tag pushes (main/stable) don't trigger it yet.
+    # explicitly — this job never uploads anywhere. It runs for beta builds
+    # and stable main builds so Store Publish can use the exact signed package
+    # that belongs to the triggering release.
     # Runs in parallel with the test matrix, same as every other platform
     # build job — nothing here is gated on tests, since it has no external
     # side effects to guard.
@@ -362,7 +362,7 @@ jobs:
       needs.compute-version.result == 'success' &&
       (
         (github.event_name == 'workflow_dispatch' && inputs.run_mas_build == true) ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/beta' && needs.detect-changes.outputs.desktop_changed == 'true')
+        (github.event_name == 'push' && (github.ref == 'refs/heads/beta' || github.ref == 'refs/heads/main') && needs.detect-changes.outputs.desktop_changed == 'true')
       )
     runs-on: macos-latest
     environment: Apple
