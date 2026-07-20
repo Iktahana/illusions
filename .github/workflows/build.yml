@@ -10,12 +10,12 @@ on:
     tags:
       - "v*"
     paths-ignore:
-      - "store/**"
+      - "assets/store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
       - ".github/workflows/store-publish.yml"
   pull_request:
     paths-ignore:
-      - "store/**"
+      - "assets/store/**"
       - ".github/workflows/sync-ms-store-listing.yml"
       - ".github/workflows/store-publish.yml"
   workflow_dispatch:
@@ -53,7 +53,7 @@ jobs:
           filters: |
             desktop_changed:
               - '**'
-              - '!store/**' # Store listing changes should not trigger desktop builds
+              - '!assets/store/**' # Store listing changes should not trigger desktop builds
               - '!docs/**'
               - '!README.md'
               - '!TERMS.md'

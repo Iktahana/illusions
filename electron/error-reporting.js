@@ -2,7 +2,7 @@ const {
   sanitizeErrorText,
   scrubRendererErrorPayload,
   scrubSentryEvent,
-} = require("../lib/error-reporting/scrub-error-event");
+} = require("../src/lib/error-reporting/scrub-error-event");
 
 let sentryMain = null;
 let captureException = null;

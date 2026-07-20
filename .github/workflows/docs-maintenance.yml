@@ -45,8 +45,8 @@ jobs:
             --format="%h %s" \
             -- \
             '*.ts' '*.tsx' '*.js' '*.mjs' \
-            'components/**' 'lib/**' 'electron/**' 'app/**' \
-            'contexts/**' 'packages/**' \
+            'src/components/**' 'src/lib/**' 'electron/**' 'src/app/**' \
+            'src/contexts/**' 'packages/**' \
             | grep -v "^[0-9a-f]* docs:" \
             || true)
 
@@ -64,8 +64,8 @@ jobs:
             DIFF_STAT=$(git diff --stat "$BASE_COMMIT" HEAD \
               -- \
               '*.ts' '*.tsx' '*.js' '*.mjs' \
-              'components/**' 'lib/**' 'electron/**' 'app/**' \
-              'contexts/**' 'packages/**' \
+              'src/components/**' 'src/lib/**' 'electron/**' 'src/app/**' \
+              'src/contexts/**' 'packages/**' \
               2>/dev/null || echo "Diff not available")
           else
             DIFF_STAT="Diff not available (no commits older than 7 days)"
@@ -174,8 +174,8 @@ jobs:
             --format="%h %s" \
             -- \
             '*.ts' '*.tsx' '*.js' '*.mjs' \
-            'components/**' 'lib/**' 'electron/**' 'app/**' \
-            'contexts/**' 'packages/**' 'package.json' \
+            'src/components/**' 'src/lib/**' 'electron/**' 'src/app/**' \
+            'src/contexts/**' 'packages/**' 'package.json' \
             | grep -v "^[0-9a-f]* docs:" \
             | grep -v "^[0-9a-f]* chore:" \
             || true)
@@ -193,8 +193,8 @@ jobs:
             DIFF_STAT=$(git diff --stat "$BASE_COMMIT" HEAD \
               -- \
               '*.ts' '*.tsx' '*.js' '*.mjs' \
-              'components/**' 'lib/**' 'electron/**' 'app/**' \
-              'contexts/**' 'packages/**' 'package.json' \
+              'src/components/**' 'src/lib/**' 'electron/**' 'src/app/**' \
+              'src/contexts/**' 'packages/**' 'package.json' \
               2>/dev/null || echo "Diff not available")
           else
             DIFF_STAT="Diff not available (no commits older than 7 days)"
@@ -327,15 +327,15 @@ jobs:
 
           # ── Check B: Anchor file existence ──
           ANCHOR_FILES=(
-            "lib/storage/storage-service.ts"
-            "lib/storage/storage-types.ts"
-            "platform/electron-renderer/storage.ts"
-            "platform/browser/storage.ts"
-            "lib/vfs/index.ts"
-            "lib/linting/rule-runner.ts"
-            "lib/linting/types.ts"
-            "lib/linting/base-rule.ts"
-            "lib/nlp-client/nlp-client.ts"
+            "src/lib/storage/storage-service.ts"
+            "src/lib/storage/storage-types.ts"
+            "src/platform/electron-renderer/storage.ts"
+            "src/platform/browser/storage.ts"
+            "src/lib/vfs/index.ts"
+            "src/lib/linting/rule-runner.ts"
+            "src/lib/linting/types.ts"
+            "src/lib/linting/base-rule.ts"
+            "src/lib/nlp-client/nlp-client.ts"
           )
 
           for f in "${ANCHOR_FILES[@]}"; do

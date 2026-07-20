@@ -4,15 +4,15 @@ import { fileURLToPath } from "url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoots = [
-  "app",
-  "application",
-  "components",
-  "contexts",
-  "features",
-  "lib",
+  "src/app",
+  "src/application",
+  "src/components",
+  "src/contexts",
+  "src/features",
+  "src/lib",
+  "src/platform",
+  "src/shared",
   "packages",
-  "platform",
-  "shared",
 ];
 const sourceExtension = /\.(?:js|mjs|ts|tsx)$/;
 
@@ -200,7 +200,13 @@ function collectSourceFiles() {
 export function checkRepositoryBoundaries() {
   const violations = [];
   for (const absolutePath of collectSourceFiles()) {
-    const filePath = path.relative(projectRoot, absolutePath).split(path.sep).join("/");
+    // Boundary rules are expressed against pre-src/ layout prefixes; strip "src/"
+    // so rule patterns and LEGACY_PACKAGE_IMPORTS keys stay layout-agnostic.
+    const filePath = path
+      .relative(projectRoot, absolutePath)
+      .split(path.sep)
+      .join("/")
+      .replace(/^src\//, "");
     const source = fs.readFileSync(absolutePath, "utf8");
     for (const specifier of extractModuleSpecifiers(source)) {
       const reason = validateImportBoundary(filePath, specifier);

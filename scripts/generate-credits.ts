@@ -43,7 +43,7 @@ checker.init(
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    const outDir = resolve(projectRoot, "generated");
+    const outDir = resolve(projectRoot, "src", "generated");
     mkdirSync(outDir, { recursive: true });
 
     const outPath = resolve(outDir, "credits.json");

@@ -13,7 +13,7 @@
 
 const { ipcMain } = require("electron");
 const path = require("path");
-const { nlpProcessor } = require("../../lib/nlp-backend/nlp-processor");
+const { nlpProcessor } = require("../../src/lib/nlp-backend/nlp-processor");
 const { NLP_CHANNELS } = require("../lib/ipc-channels");
 
 /**

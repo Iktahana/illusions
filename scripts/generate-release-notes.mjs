@@ -22,8 +22,8 @@ import { execSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
-const TEMPLATE_PATH = resolve(REPO_ROOT, "store/microsoft/ja-JP/release-note-template.md");
-const DEFAULT_OUT = resolve(REPO_ROOT, "store/microsoft/ja-JP/release-notes.md");
+const TEMPLATE_PATH = resolve(REPO_ROOT, "assets/store/microsoft/ja-JP/release-note-template.md");
+const DEFAULT_OUT = resolve(REPO_ROOT, "assets/store/microsoft/ja-JP/release-notes.md");
 const FALLBACK = "動作の安定性を向上しました";
 const MAX_CHARS = 500;
 const MAX_PRS = 10;

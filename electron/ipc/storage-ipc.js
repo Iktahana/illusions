@@ -17,7 +17,7 @@ function getStorageManager() {
   if (!storageManager) {
     // Load lazily: storage handlers are not needed by narrow main-process
     // utilities, and this keeps the atomic handler independently testable.
-    const { ElectronStorageManager } = require("../../lib/storage/electron-storage-manager");
+    const { ElectronStorageManager } = require("../../src/lib/storage/electron-storage-manager");
     storageManager = new ElectronStorageManager();
   }
   return storageManager;
