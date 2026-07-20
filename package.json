@@ -122,7 +122,7 @@
     "react-dom": "^19.2.7",
     "serwist": "^9.5.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "unist-util-visit": "^5.0.0",
     "vitest": "^4.0.18",
     "wait-on": "^9.0.10"
