@@ -77,6 +77,7 @@ Web メニューの見た目と action 文字列は [`lib/menu/menu-definitions.
 | `view.zoomOut`             | `Cmd/Ctrl+-`                   | 縮小                     |
 | `view.resetZoom`           | `Cmd/Ctrl+0`                   | ズームリセット           |
 | `view.compactMode`         | `Shift+Cmd/Ctrl+M`             | コンパクトモード切替     |
+| `view.toggleWritingMode`   | `Option/Alt+V`                 | 縦書き／横書き切替       |
 | `view.splitRight`          | `Cmd/Ctrl+\\`                  | 右に分割                 |
 | `view.splitDown`           | `Shift+Cmd/Ctrl+\\`            | 下に分割                 |
 | `nav.nextTab`              | `Ctrl+Tab`                     | 次のタブ                 |
@@ -85,7 +86,14 @@ Web メニューの見た目と action 文字列は [`lib/menu/menu-definitions.
 | `nav.settings`             | `Cmd/Ctrl+,`                   | 設定を開く               |
 | `nav.search`               | `Cmd/Ctrl+F`                   | 検索を開く               |
 | `panel.explorer`           | `Ctrl+Shift+E`                 | エクスプローラー切替     |
+| `panel.files`              | `Shift+Cmd/Ctrl+O`             | ファイル切替             |
 | `panel.search`             | `Ctrl+Shift+F`                 | 検索パネル切替           |
+| `panel.dictionary`         | `Ctrl+Shift+D`                 | 辞書切替                 |
+| `panel.wordfreq`           | `Ctrl+Shift+G`                 | 語彙統計切替             |
+| `terminal.new`             | `Ctrl+Shift+J`                 | 新規ターミナル           |
+| `inspector.corrections`    | `Ctrl+Shift+C`                 | 校正パネルを表示         |
+| `inspector.stats`          | `Ctrl+Shift+I`                 | 統計パネルを表示         |
+| `inspector.history`        | `Ctrl+Shift+H`                 | 履歴パネルを表示         |
 | `format.ruby`              | `Shift+Cmd/Ctrl+R`             | ルビダイアログ           |
 | `format.tcy`               | `Shift+Cmd/Ctrl+T`             | 縦中横切替               |
 

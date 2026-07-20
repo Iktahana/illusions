@@ -67,6 +67,8 @@ interface EditorProps {
   onExternalContentApplied?: () => void;
   /** Register an on-demand live-content flush used by save flows (#1840). */
   registerFlush?: (flush: (() => string | null) | null) => void;
+  /** Registers the active editor's writing-mode toggle for menus and shortcuts. */
+  registerWritingModeToggle?: (toggle: (() => void) | null) => void;
 }
 
 /** 検索を配線しない NovelEditor 用途向けの安定 no-op。 */
@@ -99,6 +101,7 @@ export default function NovelEditor({
   externalContent,
   onExternalContentApplied,
   registerFlush,
+  registerWritingModeToggle,
 }: EditorProps) {
   const { fontScale, lineHeight, fontFamily, charsPerLine, autoCharsPerLine } =
     useTypographySettings();
@@ -338,6 +341,11 @@ export default function NovelEditor({
     hasVerticalInitialScrollRef.current = false;
     setIsVertical((prev) => !prev);
   }, [isVertical]);
+
+  useEffect(() => {
+    registerWritingModeToggle?.(handleToggleVertical);
+    return () => registerWritingModeToggle?.(null);
+  }, [handleToggleVertical, registerWritingModeToggle]);
 
   const handleLayoutReady = useCallback(() => {
     const container = scrollContainerRef.current;

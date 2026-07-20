@@ -190,6 +190,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       openRecentProject: "menu-open-recent-project",
       showInFileManager: "menu-show-in-file-manager",
       toggleCompactMode: "menu-toggle-compact-mode",
+      toggleWritingMode: "menu-toggle-writing-mode",
       format: "menu-format",
       theme: "menu-theme",
       print: "menu-print",

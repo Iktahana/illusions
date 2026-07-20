@@ -13,6 +13,7 @@ interface UseKeyboardShortcutsParams {
   saveFile: () => Promise<void>;
   handlePasteAsPlaintext: () => Promise<void>;
   handleToggleCompactMode: () => void;
+  handleToggleWritingMode: () => void;
   handleOpenRubyDialog: () => void;
   handleToggleTcy: () => void;
   setShowSettingsModal: (value: boolean) => void;
@@ -39,8 +40,12 @@ interface UseKeyboardShortcutsParams {
   splitEditorRight?: () => void;
   splitEditorDown?: () => void;
   // Panel toggle operations
+  toggleFiles?: () => void;
   toggleExplorer?: () => void;
   toggleSearch?: () => void;
+  toggleDictionary?: () => void;
+  toggleWordfreq?: () => void;
+  newTerminal?: () => void;
   toggleOutline?: () => void;
   /** Web-only: dispatches menu actions for commands not handled by Electron IPC.
    *  Required when isElectron is false so that file.open, file.saveAs,
@@ -57,6 +62,7 @@ export function useKeyboardShortcuts({
   saveFile,
   handlePasteAsPlaintext,
   handleToggleCompactMode,
+  handleToggleWritingMode,
   handleOpenRubyDialog,
   handleToggleTcy,
   setShowSettingsModal,
@@ -71,8 +77,12 @@ export function useKeyboardShortcuts({
   isEditorTabActive,
   splitEditorRight,
   splitEditorDown,
+  toggleFiles,
   toggleExplorer,
   toggleSearch,
+  toggleDictionary,
+  toggleWordfreq,
+  newTerminal,
   toggleOutline,
   handleMenuAction,
 }: UseKeyboardShortcutsParams): void {
@@ -133,6 +143,7 @@ export function useKeyboardShortcuts({
       // Editor-only commands: no-op when a terminal or diff tab is active
       "edit.pasteAsPlaintext": isEditorTabActive ? () => void handlePasteAsPlaintext() : undefined,
       "view.compactMode": handleToggleCompactMode,
+      "view.toggleWritingMode": isEditorTabActive ? handleToggleWritingMode : undefined,
       "format.ruby": isEditorTabActive ? handleOpenRubyDialog : undefined,
       "format.tcy": isEditorTabActive ? handleToggleTcy : undefined,
       // On desktop, ⌘, / Ctrl+, belongs to the single global Settings window.
@@ -154,8 +165,12 @@ export function useKeyboardShortcuts({
       "file.closeTab": closeTabHandler,
       "view.splitRight": splitEditorRight,
       "view.splitDown": splitEditorDown,
+      "panel.files": toggleFiles,
       "panel.explorer": toggleExplorer,
       "panel.search": toggleSearch,
+      "panel.dictionary": toggleDictionary,
+      "panel.wordfreq": toggleWordfreq,
+      "terminal.new": newTerminal,
       // TODO: Outline feature — planned for v1.3.0
       // "panel.outline": toggleOutline,
       ...tabHandlers,
@@ -166,6 +181,7 @@ export function useKeyboardShortcuts({
     saveFile,
     handlePasteAsPlaintext,
     handleToggleCompactMode,
+    handleToggleWritingMode,
     handleOpenRubyDialog,
     handleToggleTcy,
     setShowSettingsModal,
@@ -180,8 +196,12 @@ export function useKeyboardShortcuts({
     isEditorTabActive,
     splitEditorRight,
     splitEditorDown,
+    toggleFiles,
     toggleExplorer,
     toggleSearch,
+    toggleDictionary,
+    toggleWordfreq,
+    newTerminal,
     toggleOutline,
     handleMenuAction,
   ]);

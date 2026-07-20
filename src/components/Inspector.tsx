@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { AlertCircle, BarChart3, Edit2, X, History } from "lucide-react";
 import clsx from "clsx";
 
 import { useEditorMode } from "@/contexts/EditorModeContext";
 import { localPreferences } from "@/lib/storage/local-preferences";
+import { useKeymap } from "@/contexts/KeymapContext";
+import { useKeymapListener } from "@/lib/keymap/use-keymap-listener";
+import { formatBinding } from "@/lib/keymap/keymap-utils";
+import type { CommandId } from "@/lib/keymap/command-ids";
 import HistoryPanel from "./HistoryPanel";
 import CorrectionsPanel from "./inspector/CorrectionsPanel";
 import StatsPanel from "./inspector/StatsPanel";
@@ -80,6 +84,24 @@ export default function Inspector({
   const [isClient, setIsClient] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
   const tabBarRef = useRef<HTMLDivElement>(null);
+  const { effectiveBindings } = useKeymap();
+  const shortcutHandlers = useMemo<Partial<Record<CommandId, () => void>>>(
+    () => ({
+      "inspector.corrections": () => setActiveTab("corrections"),
+      "inspector.stats": () => setActiveTab("stats"),
+      "inspector.history": isProject ? () => setActiveTab("history") : undefined,
+    }),
+    [isProject],
+  );
+  useKeymapListener(shortcutHandlers, effectiveBindings);
+
+  const tabTooltip = useCallback(
+    (label: string, commandId: CommandId) => {
+      const shortcut = formatBinding(effectiveBindings[commandId]);
+      return shortcut === "未設定" ? label : `${label} (${shortcut})`;
+    },
+    [effectiveBindings],
+  );
 
   useEffect(() => {
     setIsClient(true);
@@ -319,45 +341,54 @@ export default function Inspector({
         <button
           onClick={() => setActiveTab("corrections")}
           className={clsx(
-            "flex-1 h-full flex items-center justify-center text-sm transition-colors",
+            "group relative flex-1 h-full flex items-center justify-center text-sm transition-colors",
             showLabels ? "gap-2" : "gap-0",
             activeTab === "corrections"
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground-tertiary hover:text-foreground-secondary",
           )}
-          title="校正"
+          title={tabTooltip("校正", "inspector.corrections")}
         >
           <AlertCircle className="w-4 h-4 shrink-0" />
           {showLabels && <span>校正</span>}
+          <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-background-elevated px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+            {tabTooltip("校正", "inspector.corrections")}
+          </span>
         </button>
         <button
           onClick={() => setActiveTab("stats")}
           className={clsx(
-            "flex-1 h-full flex items-center justify-center text-sm transition-colors",
+            "group relative flex-1 h-full flex items-center justify-center text-sm transition-colors",
             showLabels ? "gap-2" : "gap-0",
             activeTab === "stats"
               ? "text-foreground border-b-2 border-accent"
               : "text-foreground-tertiary hover:text-foreground-secondary",
           )}
-          title="統計"
+          title={tabTooltip("統計", "inspector.stats")}
         >
           <BarChart3 className="w-4 h-4 shrink-0" />
           {showLabels && <span>統計</span>}
+          <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-background-elevated px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+            {tabTooltip("統計", "inspector.stats")}
+          </span>
         </button>
         {isProject && (
           <button
             onClick={() => setActiveTab("history")}
             className={clsx(
-              "flex-1 h-full flex items-center justify-center text-sm transition-colors",
+              "group relative flex-1 h-full flex items-center justify-center text-sm transition-colors",
               showLabels ? "gap-2" : "gap-0",
               activeTab === "history"
                 ? "text-foreground border-b-2 border-accent"
                 : "text-foreground-tertiary hover:text-foreground-secondary",
             )}
-            title="履歴"
+            title={tabTooltip("履歴", "inspector.history")}
           >
             <History className="w-4 h-4 shrink-0" />
             {showLabels && <span>履歴</span>}
+            <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-background-elevated px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+              {tabTooltip("履歴", "inspector.history")}
+            </span>
           </button>
         )}
       </div>

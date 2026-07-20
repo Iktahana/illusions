@@ -21,3 +21,9 @@
 | `electron/lib/`                                              | Main-process shared primitives                                      |
 
 References: `docs/architecture/storage-system.md`, `src/types/electron.d.ts`. MDI format spec: https://github.com/illusions-lab/MDI
+
+## Native menu availability
+
+- When adding or changing a menu item, define its availability for every application state, including the welcome screen, an active editor tab, and the Settings window.
+- A command that requires an open editor tab (for example save, print, export, or close tab) must be disabled when no editor tab is active; do not leave an action enabled if it cannot succeed in the current screen.
+- Keep the renderer-reported menu UI state, `electron/menu.js`, and the shared menu template in sync, and add or update a native-menu test for new state-dependent behavior.

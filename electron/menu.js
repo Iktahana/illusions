@@ -21,6 +21,7 @@ const DEFAULT_MENU_UI_STATE = {
   showParagraphNumbers: true,
   themeMode: "auto", // 'auto' | 'light' | 'dark'
   autoCharsPerLine: true,
+  hasActiveEditor: false,
 };
 
 // Per-window UI state (BrowserWindow.id → menuUiState object)
@@ -201,6 +202,12 @@ function toNativeMenuItem(item, ctx) {
     item.electronHandler !== "open-settings-window"
   ) {
     native.enabled = false;
+  }
+
+  // Apply this before returning nested submenus so their parent menu item is
+  // also unavailable while the welcome screen has no editor tab.
+  if (item.requiresActiveEditor) {
+    native.enabled = ctx.menuUiState.hasActiveEditor;
   }
 
   // Dynamic submenu insertion point: recent projects
