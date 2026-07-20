@@ -53,6 +53,10 @@ import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { useEditorLifecycle } from "@/lib/editor-page/use-editor-lifecycle";
 import { useElectronEvents } from "@/lib/editor-page/use-electron-events";
+import {
+  openPendingSystemFiles,
+  type PendingSystemFile,
+} from "@/lib/editor-page/pending-system-files";
 import { useProjectLifecycle } from "@/lib/editor-page/use-project-lifecycle";
 import { useLinting } from "@/lib/editor-page/use-linting";
 import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
@@ -1250,6 +1254,44 @@ function EditorPageContent() {
     confirmBeforeAction: unsavedWarning.confirmBeforeAction,
     onReportBug: (category) => setBugReportCategory(category),
   });
+
+  // #2181: Finder can deliver a .mdi file before the renderer has registered
+  // its IPC listeners. The main process queues those files; drain the queue
+  // once the project and tab lifecycles are ready.
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const pendingFiles: PendingSystemFile[] =
+          (await window.electronAPI?.getPendingFile?.()) ?? [];
+        if (cancelled || pendingFiles.length === 0) return;
+
+        await openPendingSystemFiles(pendingFiles, {
+          openProject: (projectPath, initialFile) =>
+            unsavedWarning.confirmBeforeAction(() => handleOpenAsProject(projectPath, initialFile)),
+          openStandalone: (filePath, fileContent) => {
+            tabLoadSystemFile(filePath, fileContent);
+            incrementEditorKey();
+          },
+        });
+      } catch (error) {
+        console.error("Failed to open pending system files:", error);
+        notificationManager.error("システムから指定されたファイルを開けませんでした。");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    handleOpenAsProject,
+    incrementEditorKey,
+    isElectron,
+    tabLoadSystemFile,
+    unsavedWarning.confirmBeforeAction,
+  ]);
 
   contentRef.current = content;
 
