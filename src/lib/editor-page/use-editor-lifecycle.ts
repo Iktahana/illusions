@@ -84,7 +84,36 @@ export function useEditorLifecycle({
     }
   }, [skipAutoRestore]);
 
-  // Phase 3: getPendingFile 経路は削除。Phase 8 で再導入する。
+  // Consume files handed to a cold-started Electron app by the OS. macOS sends
+  // these through `open-file`; Windows supplies them via argv. The main process
+  // queues both until the renderer has mounted, so this must run after the file
+  // IPC handlers and project-opening hooks are available.
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+
+    const api = window.electronAPI;
+    if (!api?.getPendingFile) return;
+    const getPendingFile = api.getPendingFile;
+
+    void (async () => {
+      try {
+        const results = await getPendingFile();
+
+        for (const result of results ?? []) {
+          if (result.type === "project") {
+            await handleOpenAsProject(result.projectPath, result.initialFile);
+          } else {
+            tabLoadSystemFile(result.path, result.content);
+            incrementEditorKey();
+          }
+        }
+      } catch (error) {
+        // Do not leave an IPC rejection silent: the app is intentionally on the
+        // welcome screen while a pending OS-open request is being processed.
+        console.error("Failed to open file requested at startup:", error);
+      }
+    })();
+  }, [isElectron, handleOpenAsProject, tabLoadSystemFile, incrementEditorKey]);
 
   useEffect(() => {
     // #1966 H-5/H-6: バッファ選択待ちの間は自動フェードアウトしない（ユーザーの
