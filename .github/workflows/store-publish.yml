@@ -31,7 +31,7 @@ on:
         required: false
         type: string
       skip_appstore_upload:
-        description: "Skip uploading the MAS package and only enable an already-uploaded build for internal TestFlight testers"
+        description: "Skip uploading the MAS package and only confirm an already-uploaded build is available to internal TestFlight testers"
         required: false
         type: boolean
         default: false
@@ -143,9 +143,14 @@ jobs:
 
   appstore-testflight:
     name: Publish (Mac App Store / TestFlight)
-    if: github.event_name == 'workflow_dispatch' && inputs.target == 'appstore-testflight'
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'beta' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'appstore-testflight')
     runs-on: macos-latest
     environment: Apple
+    concurrency:
+      group: "appstore-testflight-upload"
+      cancel-in-progress: false
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -162,12 +167,19 @@ jobs:
         run: |
           if [ -n "${{ inputs.build_run_id }}" ]; then
             RUN_ID="${{ inputs.build_run_id }}"
+            RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # Upload exactly the build that triggered this workflow. Do not
+            # resolve "latest" here: another beta build could finish first.
+            RUN_ID="${{ github.event.workflow_run.id }}"
+            RUN_ATTEMPT="${{ github.event.workflow_run.run_attempt }}"
           else
             RUN_ID=$(gh run list --repo "${{ github.repository }}" \
               --workflow "Desktop Build and Release" \
               --status success \
               --json databaseId,workflowName \
               --jq '[.[] | select(.workflowName == "Desktop Build and Release")][0].databaseId')
+            RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
           fi
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
             echo "::error::No successful Desktop Build and Release run found"
@@ -176,7 +188,6 @@ jobs:
           # build-mas sets --config.mas.bundleVersion=<run_id><run_attempt> —
           # need the exact attempt number of the resolved run to reconstruct
           # the same CFBundleVersion for the TestFlight lookup below.
-          RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
           echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
           echo "run_attempt=${RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
           echo "Using build run ${RUN_ID}, attempt ${RUN_ATTEMPT}"
@@ -228,7 +239,7 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Enable build for internal TestFlight testers
+      - name: Wait for build to become available to internal TestFlight testers
         # Apple takes a few minutes to finish processing an uploaded build
         # before it's visible via the API, hence the polling/retry loop
         # inside this script. build-mas set --config.mas.bundleVersion to
