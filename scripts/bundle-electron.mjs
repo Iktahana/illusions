@@ -200,7 +200,13 @@ function rebuildBetterSqliteForArch(arch) {
   // execFileSync with an argv array (instead of execSync with an
   // interpolated shell string) avoids shell parsing entirely, so
   // projectRoot's absolute path can never be misinterpreted as shell
-  // syntax regardless of what characters it contains.
+  // syntax regardless of what characters it contains. Windows still
+  // needs shell:true here: npx.cmd is a batch script, and Win32's
+  // CreateProcess (which spawnSync/execFileSync call without a shell)
+  // can only launch real .exe binaries directly. With shell:true, Node
+  // does its own platform-correct argv escaping, so this doesn't
+  // reintroduce the string-interpolation injection this function used
+  // to have.
   execFileSync(
     NPX_CMD,
     [
@@ -215,7 +221,7 @@ function rebuildBetterSqliteForArch(arch) {
       "--module-dir",
       projectRoot,
     ],
-    { cwd: projectRoot, stdio: "inherit" },
+    { cwd: projectRoot, stdio: "inherit", shell: process.platform === "win32" },
   );
 }
 
