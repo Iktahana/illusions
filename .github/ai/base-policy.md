@@ -37,3 +37,10 @@ Status: Active canonical policy
 
 - Prioritize correctness, data integrity, security, and user-facing regressions.
 - Do not block merges for purely stylistic nitpicks that do not change behavior.
+
+## 7. GitHub API Budget
+
+- Treat GitHub API quota as a shared, limited resource.
+- Do not use high-frequency polling (`gh run watch`, repeated `gh pr checks`, or equivalent API loops) for CI or release status.
+- Query only when the result can change the next action; prefer a single final status check, webhook/event-driven updates when available, or non-API evidence such as a pushed Git tag.
+- After a rate-limit response, stop API polling immediately and use a low-frequency alternative rather than retrying the same endpoint.
