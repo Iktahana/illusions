@@ -3,7 +3,7 @@ title: ターミナルの使い方
 slug: terminal-guide
 type: guide
 status: active
-updated: 2026-04-06
+updated: 2026-07-20
 tags:
   - guide
   - terminal
@@ -47,4 +47,5 @@ illusions では、エディタ内で直接シェル（PowerShell, bash, zsh な
 ## 注意事項
 
 - ターミナル機能は **デスクトップ版 (Electron)** 限定です。Web版ではご利用いただけません。
+- **Mac App Store 版**ではターミナル機能はご利用いただけません。`node-pty` バイナリがバンドルから除外されているためです。ターミナル機能を使用するには直販版をご利用ください。
 - 複数のターミナルを開くことができますが、リソース保護のため同時起動数に上限があります。
