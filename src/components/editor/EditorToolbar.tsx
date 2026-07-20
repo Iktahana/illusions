@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type React from "react";
 import { Type, AlignLeft, Search, BookAudio, Pause } from "lucide-react";
 import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 import type { SpeechState } from "@/lib/hooks/use-speech";
 import ValuePicker from "./ValuePicker";
+import { isMacOS } from "@/lib/utils/runtime-env";
 
 export default function EditorToolbar({
   isVertical,
@@ -25,6 +27,15 @@ export default function EditorToolbar({
   onSpeakToggle: () => void;
   onOpenSpeechSettings?: () => void;
 }) {
+  const [writingModeShortcut, setWritingModeShortcut] = useState("Alt+V");
+  const [searchShortcut, setSearchShortcut] = useState("Ctrl+F");
+
+  useEffect(() => {
+    const isMac = isMacOS();
+    setWritingModeShortcut(isMac ? "⌥+V" : "Alt+V");
+    setSearchShortcut(isMac ? "⌘F" : "Ctrl+F");
+  }, []);
+
   const {
     fontScale,
     lineHeight,
@@ -49,9 +60,11 @@ export default function EditorToolbar({
           onClick={onToggleVertical}
           className="flex shrink-0 items-center gap-2 px-3 py-1.5 rounded font-medium bg-accent text-accent-foreground hover:bg-accent-hover transition-colors whitespace-nowrap"
           style={{ fontSize: "clamp(0.75rem, 1.5vw, 0.875rem)" }}
+          title={`縦書き／横書きを切り替え（${writingModeShortcut}）`}
         >
           <Type className="w-4 h-4 shrink-0" />
           <span className="overflow-hidden text-ellipsis">{isVertical ? "縦書き" : "横書き"}</span>
+          <span className="text-xs font-normal opacity-70">{writingModeShortcut}</span>
         </button>
 
         {/* 現在の設定 — 狭幅では本グループが先に縮む／横スクロールする */}
@@ -91,7 +104,7 @@ export default function EditorToolbar({
               e.preventDefault();
               onOpenSpeechSettings?.();
             }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
+            className="group relative flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
             title={speechState.isPlaying ? "読み上げを一時停止" : "読み上げ"}
           >
             {speechState.isPlaying ? (
@@ -99,6 +112,9 @@ export default function EditorToolbar({
             ) : (
               <BookAudio className="w-4 h-4" />
             )}
+            <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-background-elevated px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+              {speechState.isPlaying ? "読み上げを一時停止" : "読み上げ"}
+            </span>
           </button>
         )}
 
@@ -106,10 +122,13 @@ export default function EditorToolbar({
         <button
           ref={searchButtonRef}
           onClick={onSearchClick}
-          className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
-          title="検索 (⌘F)"
+          className="group relative flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-background-tertiary text-foreground-secondary hover:bg-hover transition-colors"
+          title={`検索（${searchShortcut}）`}
         >
           <Search className="w-4 h-4" />
+          <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 whitespace-nowrap rounded border border-border bg-background-elevated px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+            検索（{searchShortcut}）
+          </span>
         </button>
       </div>
     </div>

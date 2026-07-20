@@ -14,6 +14,7 @@ interface UseWebMenuHandlersProps {
   onOpenRecentProject?: (projectId: string) => void;
   onCloseWindow?: () => void;
   onToggleCompactMode?: () => void;
+  onToggleWritingMode?: () => void;
   onExport?: (format: "pdf" | "epub" | "docx" | "txt" | "txt-ruby") => void;
   onPrint?: () => void;
   editorView?: EditorView | null;
@@ -45,6 +46,7 @@ export function useWebMenuHandlers({
   onOpenRecentProject,
   onCloseWindow,
   onToggleCompactMode,
+  onToggleWritingMode,
   onExport,
   onPrint,
   editorView,
@@ -198,6 +200,9 @@ export function useWebMenuHandlers({
         case "toggle-compact-mode":
           onToggleCompactMode?.();
           break;
+        case "toggle-writing-mode":
+          if (isEditorTabActive) onToggleWritingMode?.();
+          break;
 
         // Theme menu
         case "theme-auto":
@@ -278,6 +283,7 @@ export function useWebMenuHandlers({
       onOpenRecentProject,
       onCloseWindow,
       onToggleCompactMode,
+      onToggleWritingMode,
       onExport,
       onPrint,
       editorView,

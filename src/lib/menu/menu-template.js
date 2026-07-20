@@ -79,6 +79,7 @@ const MENU_TEMPLATE = [
       {
         id: "save-file",
         label: "保存",
+        requiresActiveEditor: true,
         commandId: "file.save",
         nativeAccelerator: "CmdOrCtrl+S",
         webAccelerator: "Ctrl+S",
@@ -87,6 +88,7 @@ const MENU_TEMPLATE = [
       {
         id: "save-as",
         label: "別名で保存...",
+        requiresActiveEditor: true,
         commandId: "file.saveAs",
         nativeAccelerator: "CmdOrCtrl+Shift+S",
         webAccelerator: "Shift+Ctrl+S",
@@ -96,6 +98,7 @@ const MENU_TEMPLATE = [
       {
         id: "print",
         label: "印刷...",
+        requiresActiveEditor: true,
         // CmdOrCtrl+P は印刷の直感的な既定キー。他の File 操作と同様に Electron へ既定
         // accelerator を与える（user override も commandId 経由で解決される）。Web は
         // 静的な platform 文字列を表示する。
@@ -108,31 +111,37 @@ const MENU_TEMPLATE = [
       {
         id: "export",
         label: "エクスポート",
+        requiresActiveEditor: true,
         submenu: [
           {
             id: "export-txt",
             label: "テキスト（プレーン）としてエクスポート...",
+            requiresActiveEditor: true,
             electronChannel: "menu-export-txt",
           },
           {
             id: "export-txt-ruby",
             label: "テキスト（ルビ付き）としてエクスポート...",
+            requiresActiveEditor: true,
             electronChannel: "menu-export-txt-ruby",
           },
           SEPARATOR,
           {
             id: "export-pdf",
             label: "PDF としてエクスポート...",
+            requiresActiveEditor: true,
             electronChannel: "menu-export-pdf",
           },
           {
             id: "export-epub",
             label: "EPUB としてエクスポート...",
+            requiresActiveEditor: true,
             electronChannel: "menu-export-epub",
           },
           {
             id: "export-docx",
             label: "DOCX としてエクスポート...",
+            requiresActiveEditor: true,
             electronChannel: "menu-export-docx",
           },
         ],
@@ -149,6 +158,7 @@ const MENU_TEMPLATE = [
       {
         id: "close-tab",
         label: "タブを閉じる",
+        requiresActiveEditor: true,
         commandId: "file.closeTab",
         nativeAccelerator: "CmdOrCtrl+W",
         webAccelerator: "Ctrl+W",
@@ -330,6 +340,16 @@ const MENU_TEMPLATE = [
         commandId: "view.zoomOut",
         webAccelerator: "Ctrl+-",
         electronRole: "zoomOut",
+      },
+      SEPARATOR,
+      {
+        id: "toggle-writing-mode",
+        label: "縦書き／横書きを切り替え",
+        commandId: "view.toggleWritingMode",
+        nativeAccelerator: "Alt+V",
+        webAccelerator: "Alt+V",
+        requiresActiveEditor: true,
+        electronChannel: "menu-toggle-writing-mode",
       },
     ],
   },

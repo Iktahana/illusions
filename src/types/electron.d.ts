@@ -83,6 +83,7 @@ declare global {
       showParagraphNumbers?: boolean;
       themeMode?: string;
       autoCharsPerLine?: boolean;
+      hasActiveEditor?: boolean;
     }) => Promise<boolean>;
     updateKeymapOverrides?: (overrides: KeymapOverrides) => Promise<boolean>;
     showInFileManager?: (dirPath: string) => Promise<boolean>;
@@ -92,6 +93,7 @@ declare global {
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
     onPasteAsPlaintext?: (callback: () => void) => (() => void) | void;
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
+    onToggleWritingMode?: (callback: () => void) => (() => void) | void;
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
     onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
     // Export

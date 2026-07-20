@@ -218,6 +218,9 @@ interface EditorLayoutProps {
     switchTab: (tabId: string) => void;
     updateTab: (tabId: string, updates: Partial<EditorTabState>) => void;
     registerFlush: NonNullable<React.ComponentProps<typeof NovelEditor>["registerFlush"]>;
+    registerWritingModeToggle: NonNullable<
+      React.ComponentProps<typeof NovelEditor>["registerWritingModeToggle"]
+    >;
   };
   inspector: {
     isRightPanelCollapsed: boolean;
@@ -616,6 +619,9 @@ export default function EditorLayout({
                                     isActivePanel ? mainArea.setEditorViewInstance : undefined
                                   }
                                   registerFlush={isActivePanel ? mainArea.registerFlush : undefined}
+                                  registerWritingModeToggle={
+                                    isActivePanel ? mainArea.registerWritingModeToggle : undefined
+                                  }
                                   lintingRuleRunner={mainArea.ruleRunner}
                                   onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
                                   onNlpError={mainArea.handleNlpError}

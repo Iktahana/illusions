@@ -53,8 +53,11 @@ interface ActivityBarItem {
 
 /** Maps ActivityBarView IDs to their keyboard shortcut CommandId */
 const VIEW_TO_COMMAND_ID: Partial<Record<ActivityBarView, CommandId>> = {
+  files: "panel.files",
   explorer: "panel.explorer",
   search: "panel.search",
+  dictionary: "panel.dictionary",
+  wordfreq: "panel.wordfreq",
   // outline: "panel.outline", // TODO: Outline feature — planned for v1.3.0
   settings: "nav.settings",
 };
@@ -281,6 +284,10 @@ export default function ActivityBar({
   );
 
   const settingsWithTooltip = useMemo(() => withTooltip(SETTINGS_ITEM), [withTooltip]);
+  const terminalTooltip = useMemo(() => {
+    const shortcut = formatBinding(effectiveBindings["terminal.new"]);
+    return shortcut === "未設定" ? "新規ターミナル" : `新規ターミナル (${shortcut})`;
+  }, [effectiveBindings]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -381,11 +388,11 @@ export default function ActivityBar({
               "text-foreground-tertiary hover:text-foreground hover:bg-hover",
               "cursor-default active:cursor-pointer",
             )}
-            title="新規ターミナル"
+            title={terminalTooltip}
           >
             <Terminal className="w-5 h-5" />
             <span className="absolute left-full ml-2 px-2 py-1 bg-background-elevated border border-border text-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-              新規ターミナル
+              {terminalTooltip}
             </span>
           </button>
         )}
