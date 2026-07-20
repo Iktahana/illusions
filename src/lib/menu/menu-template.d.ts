@@ -5,7 +5,8 @@
 import type { CommandId } from "../keymap/command-ids";
 
 /** Renderer-reported UI state keys used for checkbox/radio menu items. */
-export type MenuStateKey = "compactMode" | "showParagraphNumbers" | "autoCharsPerLine";
+export type MenuStateKey =
+  "compactMode" | "showParagraphNumbers" | "autoCharsPerLine" | "hasActiveEditor";
 
 /** Mapping between a checkbox/radio item and the renderer UI state. */
 export interface MenuCheckedBinding {
@@ -51,6 +52,8 @@ export interface MenuTemplateItem {
   checkedState?: MenuCheckedBinding;
   /** Electron-only: item is enabled while state[key] is falsy */
   enabledWhenNotState?: MenuStateKey;
+  /** Electron-only: item is enabled only while an editor tab is active. */
+  requiresActiveEditor?: boolean;
   /** Static enabled flag (e.g. version info row) */
   enabled?: false;
   /** Marker for dynamically generated submenus */

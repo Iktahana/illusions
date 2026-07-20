@@ -92,6 +92,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateKeymapOverrides: invokeChannel(MENU_CHANNELS.invoke.updateKeymapOverrides, { arity: 1 }),
   onMenuShowInFileManager: eventChannel(MENU_CHANNELS.event.showInFileManager, { arity: 0 }),
   onToggleCompactMode: eventChannel(MENU_CHANNELS.event.toggleCompactMode, { arity: 0 }),
+  onToggleWritingMode: eventChannel(MENU_CHANNELS.event.toggleWritingMode, { arity: 0 }),
   onFormatChange: eventChannel(MENU_CHANNELS.event.format, { arity: 2 }),
   onThemeChange: eventChannel(MENU_CHANNELS.event.theme),
   // Export

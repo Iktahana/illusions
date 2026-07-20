@@ -13,6 +13,7 @@ interface UseElectronEventsParams {
 
   // Compact mode toggle
   handleToggleCompactMode: () => void;
+  handleToggleWritingMode: () => void;
 
   // Format change: direct setters for IPC-driven adjustments
   setLineHeight: Dispatch<SetStateAction<number>>;
@@ -31,6 +32,7 @@ interface UseElectronEventsParams {
   showParagraphNumbers: boolean;
   themeMode: string;
   autoCharsPerLine: boolean;
+  hasActiveEditor: boolean;
 
   // Open project from menu
   handleOpenProject: () => Promise<void>;
@@ -55,6 +57,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     isElectron,
     handlePasteAsPlaintext,
     handleToggleCompactMode,
+    handleToggleWritingMode,
     setLineHeight,
     setParagraphSpacing,
     setTextIndent,
@@ -67,6 +70,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     showParagraphNumbers,
     themeMode,
     autoCharsPerLine,
+    hasActiveEditor,
     handleOpenProject,
     handleOpenRecentProject,
     handleOpenAsProject,
@@ -97,6 +101,17 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
       cleanup?.();
     };
   }, [isElectron, handleToggleCompactMode]);
+
+  // Writing-mode toggle IPC listener
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onToggleWritingMode?.(() => {
+      handleToggleWritingMode();
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [isElectron, handleToggleWritingMode]);
 
   // Format change IPC listener (line height, paragraph spacing, text indent, chars per line, paragraph numbers)
   useEffect(() => {
@@ -198,8 +213,9 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
       showParagraphNumbers,
       themeMode,
       autoCharsPerLine,
+      hasActiveEditor,
     });
-  }, [isElectron, compactMode, showParagraphNumbers, themeMode, autoCharsPerLine]);
+  }, [isElectron, compactMode, showParagraphNumbers, themeMode, autoCharsPerLine, hasActiveEditor]);
 
   // Show project folder in file manager IPC listener
   useEffect(() => {

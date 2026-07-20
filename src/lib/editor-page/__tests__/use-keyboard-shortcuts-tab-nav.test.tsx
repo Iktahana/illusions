@@ -76,6 +76,7 @@ function HookHost({ spies, isElectron }: { spies: Spies; isElectron: boolean }):
     saveFile: async () => {},
     handlePasteAsPlaintext: async () => {},
     handleToggleCompactMode: () => {},
+    handleToggleWritingMode: () => {},
     handleOpenRubyDialog: () => {},
     handleToggleTcy: () => {},
     setShowSettingsModal: () => {},

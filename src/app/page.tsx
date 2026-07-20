@@ -1173,6 +1173,7 @@ function EditorPageContent() {
   const openRecentProjectRef = useRef<(projectId: string) => void>(() => {});
   const fontScaleChangeRef = useRef<(scale: number) => void>(() => {});
   const toggleCompactModeRef = useRef<() => void>(() => {});
+  const toggleWritingModeRef = useRef<() => void>(() => {});
 
   // Web menu handlers
   const { handleMenuAction } = useWebMenuHandlers({
@@ -1188,6 +1189,7 @@ function EditorPageContent() {
       setShowSettingsModal(true);
     },
     onToggleCompactMode: () => toggleCompactModeRef.current(),
+    onToggleWritingMode: () => toggleWritingModeRef.current(),
     onExport: (format) => void exportAs(format),
     onPrint: () => printDocument(),
     editorView: editorViewInstance,
@@ -1228,6 +1230,7 @@ function EditorPageContent() {
     isElectron,
     handlePasteAsPlaintext,
     handleToggleCompactMode,
+    handleToggleWritingMode: () => toggleWritingModeRef.current(),
     setLineHeight: settingsSetters.setLineHeight,
     setParagraphSpacing: settingsSetters.setParagraphSpacing,
     setTextIndent: settingsSetters.setTextIndent,
@@ -1240,6 +1243,7 @@ function EditorPageContent() {
     showParagraphNumbers,
     themeMode,
     autoCharsPerLine,
+    hasActiveEditor: Boolean(activeEditorTab),
     handleOpenProject,
     handleOpenRecentProject,
     handleOpenAsProject,
@@ -1370,6 +1374,7 @@ function EditorPageContent() {
     saveFile,
     handlePasteAsPlaintext,
     handleToggleCompactMode,
+    handleToggleWritingMode: () => toggleWritingModeRef.current(),
     handleOpenRubyDialog,
     handleToggleTcy,
     setShowSettingsModal,
@@ -1385,6 +1390,10 @@ function EditorPageContent() {
     isEditorTabActive: !!activeEditorTab,
     splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
     splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
+    toggleFiles: useCallback(
+      () => setTopView(topView === "files" ? "none" : "files"),
+      [setTopView, topView],
+    ),
     toggleExplorer: useCallback(
       () => setTopView(topView === "explorer" ? "none" : "explorer"),
       [setTopView, topView],
@@ -1393,6 +1402,15 @@ function EditorPageContent() {
       () => setTopView(topView === "search" ? "none" : "search"),
       [setTopView, topView],
     ),
+    toggleDictionary: useCallback(
+      () => setBottomView(bottomView === "dictionary" ? "none" : "dictionary"),
+      [bottomView, setBottomView],
+    ),
+    toggleWordfreq: useCallback(
+      () => setBottomView(bottomView === "wordfreq" ? "none" : "wordfreq"),
+      [bottomView, setBottomView],
+    ),
+    newTerminal: isTerminalAvailable ? handleNewTerminalTab : undefined,
     toggleOutline: useCallback(
       () => setTopView(topView === "outline" ? "none" : "outline"),
       [setTopView, topView],
@@ -1787,6 +1805,9 @@ function EditorPageContent() {
           switchTab,
           updateTab,
           registerFlush,
+          registerWritingModeToggle: (toggle) => {
+            toggleWritingModeRef.current = toggle ?? (() => {});
+          },
         }}
         inspector={{
           isRightPanelCollapsed,

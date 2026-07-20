@@ -283,6 +283,17 @@ describe("shared menu template drift prevention", () => {
     expect(decrease?.enabled).toBe(true);
   });
 
+  it("disables document actions when no editor tab is active", () => {
+    electronMenu.setMenuUiState({ hasActiveEditor: false }, 1);
+    electronMenu.setActiveWindowId(1);
+    const native = electronMenu.buildApplicationMenu([], "win32");
+    const fileSection = native.find((s) => s.label === "ファイル");
+
+    for (const label of ["保存", "別名で保存...", "印刷...", "エクスポート", "タブを閉じる"]) {
+      expect(fileSection?.submenu?.find((item) => item.label === label)?.enabled).toBe(false);
+    }
+  });
+
   // -------------------------------------------------------------------------
   // user keymap overrides affect the native accelerator
   // -------------------------------------------------------------------------
@@ -456,6 +467,12 @@ describe("WEB_MENU_STRUCTURE", () => {
           { label: "実際のサイズ", accelerator: "Ctrl+0", action: "reset-zoom" },
           { label: "拡大", accelerator: "Ctrl++", action: "zoom-in" },
           { label: "縮小", accelerator: "Ctrl+-", action: "zoom-out" },
+          { type: "separator" },
+          {
+            label: "縦書き／横書きを切り替え",
+            accelerator: "Alt+V",
+            action: "toggle-writing-mode",
+          },
         ],
       },
       {
@@ -502,6 +519,7 @@ describe("WEB_MENU_STRUCTURE", () => {
       "reset-zoom": "view.resetZoom",
       "zoom-in": "view.zoomIn",
       "zoom-out": "view.zoomOut",
+      "toggle-writing-mode": "view.toggleWritingMode",
       "toggle-compact-mode": "view.compactMode",
       settings: "nav.settings",
     });
