@@ -28,6 +28,7 @@
 
 // #1476: rehydration — begin
 const fs = require("fs/promises");
+const { writeUtf8FileAtomically } = require("./atomic-file");
 
 /**
  * In-memory cache so we don't re-read the JSON file on every approval check.
@@ -139,10 +140,9 @@ async function saveApprovals(filePath, projectId, paths, bookmarksByPath) {
     };
   });
   approvalsCache = [...others, ...fresh];
-  await fs.writeFile(
+  await writeUtf8FileAtomically(
     filePath,
     JSON.stringify({ version: 1, approvals: approvalsCache }, null, 2),
-    "utf-8",
   );
 }
 

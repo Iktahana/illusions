@@ -1,6 +1,11 @@
 const { ipcMain, shell, BrowserWindow, app } = require("electron");
 const crypto = require("crypto");
 const { AUTH_CHANNELS } = require("../lib/ipc-channels");
+const {
+  startMacOSAuthSession,
+  cancelMacOSAuthSession,
+  cancelAllMacOSAuthSessionsForShutdown,
+} = require("../lib/macos-auth-session");
 
 const PROVIDER_URL = "https://my.illusions.app";
 const OAUTH_CLIENT_ID = "illusions";
@@ -38,7 +43,40 @@ function registerAuthHandlers() {
     });
 
     const authUrl = `${PROVIDER_URL}/api/oauth/authorize?${params}`;
-    await shell.openExternal(authUrl);
+    if (process.platform === "darwin") {
+      // ASWebAuthenticationSession uses the system browser and returns the
+      // matching callback directly to this process. It avoids embedding any
+      // identity provider (especially Apple Account) in an Electron view.
+      void Promise.resolve()
+        .then(() => startMacOSAuthSession(authUrl, "illusions", state))
+        .then((callbackUrl) => handleAuthCallback(callbackUrl))
+        .catch(async (error) => {
+          if (error?.code === "ERR_AUTH_CANCELLED") {
+            pendingAuthByState.delete(state);
+            return;
+          }
+          console.warn(
+            "[auth] ASWebAuthenticationSession unavailable; opening system browser:",
+            error,
+          );
+          try {
+            await shell.openExternal(authUrl);
+          } catch (fallbackError) {
+            pendingAuthByState.delete(state);
+            console.error(
+              "[auth] Failed to open OAuth authorization page in browser:",
+              fallbackError,
+            );
+          }
+        });
+    } else {
+      try {
+        await shell.openExternal(authUrl);
+      } catch (error) {
+        pendingAuthByState.delete(state);
+        throw error;
+      }
+    }
     return { state };
   });
 
@@ -112,7 +150,10 @@ function registerAuthHandlers() {
     if (win) {
       const winId = win.id;
       for (const [state, entry] of pendingAuthByState) {
-        if (entry.windowId === winId) pendingAuthByState.delete(state);
+        if (entry.windowId === winId) {
+          pendingAuthByState.delete(state);
+          cancelMacOSAuthSession(state);
+        }
       }
     }
     return { success: true };
@@ -123,7 +164,10 @@ function registerAuthHandlers() {
     win.on("closed", () => {
       const winId = win.id;
       for (const [state, entry] of pendingAuthByState) {
-        if (entry.windowId === winId) pendingAuthByState.delete(state);
+        if (entry.windowId === winId) {
+          pendingAuthByState.delete(state);
+          cancelMacOSAuthSession(state);
+        }
       }
     });
   }
@@ -134,6 +178,12 @@ function registerAuthHandlers() {
   // Register for future windows
   app.on("browser-window-created", (_, win) => {
     attachAuthCleanup(win);
+  });
+  app.once("before-quit", () => {
+    // Do not let AuthenticationServices call back into a Node runtime that is
+    // being torn down. The native bridge suppresses completion callbacks after
+    // this explicit shutdown cancellation.
+    cancelAllMacOSAuthSessionsForShutdown();
   });
 }
 
@@ -151,19 +201,19 @@ function handleAuthCallback(url) {
 
     // Route callback to the specific window that initiated the login flow
     const entry = state ? pendingAuthByState.get(state) : null;
-    if (entry) {
-      const originWin = BrowserWindow.fromId(entry.windowId);
-      if (originWin && !originWin.isDestroyed()) {
-        targetWindow = originWin;
-      }
+    // Never deliver a callback for an unknown state to an arbitrary window.
+    // Apart from enforcing the OAuth CSRF invariant, this prevents a custom
+    // protocol URL from targeting the currently focused document.
+    if (!entry) {
+      console.warn("[auth] Ignored OAuth callback with missing or invalid state");
+      return;
     }
+    const originWin = BrowserWindow.fromId(entry.windowId);
+    if (originWin && !originWin.isDestroyed()) targetWindow = originWin;
 
-    // Fall back to the focused window or first non-destroyed window
-    if (!targetWindow) {
-      targetWindow =
-        BrowserWindow.getFocusedWindow() ||
-        BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
-    }
+    // An error callback does not result in exchangeCode(), so it must release
+    // its verifier here. Successful callbacks retain it for exchangeCode.
+    if (error) pendingAuthByState.delete(state);
 
     if (targetWindow) {
       if (targetWindow.isMinimized()) targetWindow.restore();
@@ -175,4 +225,7 @@ function handleAuthCallback(url) {
   }
 }
 
-module.exports = { registerAuthHandlers, handleAuthCallback };
+module.exports = {
+  registerAuthHandlers,
+  handleAuthCallback,
+};

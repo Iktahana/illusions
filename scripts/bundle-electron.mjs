@@ -15,6 +15,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, "..");
 
+// On Windows, npx is a .cmd shim; execFileSync (unlike execSync) doesn't
+// go through a shell, so it needs the literal .cmd extension to resolve it.
+const NPX_CMD = process.platform === "win32" ? "npx.cmd" : "npx";
+
 const targetArchIndex = process.argv.indexOf("--target-arch");
 const targetArch = targetArchIndex !== -1 ? process.argv[targetArchIndex + 1] : process.arch;
 console.log(`🏗️  Target architecture: ${targetArch}`);
@@ -44,6 +48,8 @@ await esbuild.build({
     "better-sqlite3",
     // node-pty is a native module for terminal support
     "node-pty",
+    // macOS-only native bridge for ASWebAuthenticationSession
+    "@illusions/as-web-authentication",
   ],
   define: {
     "process.env.APTABASE_APP_KEY": JSON.stringify(process.env.APTABASE_APP_KEY || ""),
@@ -132,8 +138,8 @@ function collectDepsRecursive(pkgName, collected) {
 // risk even when the code path is dead (docs/release/mac-app-store.md).
 const isMasBuild = process.env.MAS_BUILD === "1";
 const externalRoots = isMasBuild
-  ? ["kuromoji", "better-sqlite3"]
-  : ["kuromoji", "better-sqlite3", "node-pty"];
+  ? ["kuromoji", "better-sqlite3", "@illusions/as-web-authentication"]
+  : ["kuromoji", "better-sqlite3", "node-pty", "@illusions/as-web-authentication"];
 
 // Collect all transitive production dependencies
 const allDeps = new Set();
@@ -191,8 +197,51 @@ function getElectronVersion() {
 
 function rebuildBetterSqliteForArch(arch) {
   const electronVersion = getElectronVersion();
-  execSync(
-    `npx electron-rebuild --force --only better-sqlite3 --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
+  // execFileSync with an argv array (instead of execSync with an
+  // interpolated shell string) avoids shell parsing entirely, so
+  // projectRoot's absolute path can never be misinterpreted as shell
+  // syntax regardless of what characters it contains. Windows still
+  // needs shell:true here: npx.cmd is a batch script, and Win32's
+  // CreateProcess (which spawnSync/execFileSync call without a shell)
+  // can only launch real .exe binaries directly. With shell:true, Node
+  // does its own platform-correct argv escaping, so this doesn't
+  // reintroduce the string-interpolation injection this function used
+  // to have.
+  execFileSync(
+    NPX_CMD,
+    [
+      "electron-rebuild",
+      "--force",
+      "--only",
+      "better-sqlite3",
+      "--arch",
+      arch,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      projectRoot,
+    ],
+    { cwd: projectRoot, stdio: "inherit", shell: process.platform === "win32" },
+  );
+}
+
+function rebuildAsWebAuthenticationForArch(arch) {
+  if (process.platform !== "darwin") return;
+  const electronVersion = getElectronVersion();
+  execFileSync(
+    NPX_CMD,
+    [
+      "electron-rebuild",
+      "--force",
+      "--only",
+      "@illusions/as-web-authentication",
+      "--arch",
+      arch,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      projectRoot,
+    ],
     { cwd: projectRoot, stdio: "inherit" },
   );
 }
@@ -268,12 +317,18 @@ async function prepareNativeModulesForArch(arch) {
 
 await prepareNativeModulesForArch(targetArch);
 ensureHostBetterSqliteArch(targetArch);
+// Build against Electron's headers every time. This is quick and avoids
+// accidentally packaging a binary compiled against the developer's Node SDK.
+rebuildAsWebAuthenticationForArch(targetArch);
 
 for (const dep of runtimeDeps) {
   const src = resolvePackageDir(dep);
   const dest = join(nodeModulesDest, dep);
   if (src) {
-    fs.cpSync(src, dest, { recursive: true });
+    // Local file: dependencies are symlinked from node_modules. Package the
+    // target directory, not the symlink, because its absolute development
+    // path cannot exist inside an ASAR-unpacked application.
+    fs.cpSync(fs.realpathSync(src), dest, { recursive: true });
     // Remove .bin directories that contain symlinks breaking macOS code signing
     removeDotBinDirs(dest);
     console.log(`  ✅ ${dep}`);

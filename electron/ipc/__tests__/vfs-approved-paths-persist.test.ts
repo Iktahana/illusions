@@ -14,6 +14,7 @@ import os from "os";
 import fsSync from "fs";
 import path from "path";
 import { createRequire } from "module";
+import { fileURLToPath } from "url";
 
 const require = createRequire(import.meta.url);
 
@@ -397,5 +398,12 @@ describe("in-memory cache (NEW-3)", () => {
     const result = await loadApprovals(tmpFile, "proj_d");
     expect(result.has("/d/updated")).toBe(true);
     expect(result.has("/d/original")).toBe(false);
+  });
+
+  it("persists via the shared atomic writer (#2146)", () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const source = fsSync.readFileSync(path.resolve(here, "../../lib/vfs-approvals.js"), "utf-8");
+    expect(source).toContain("writeUtf8FileAtomically");
+    expect(source).not.toMatch(/fs\.writeFile\(/);
   });
 });

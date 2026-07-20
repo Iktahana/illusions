@@ -39,6 +39,12 @@ describe("auto-updater.js — opt-in wiring", () => {
     expect(autoUpdaterSrc).toMatch(/async function checkForUpdates\s*\(/);
   });
 
+  it("更新チェックの Promise rejection を捕捉し、process-level unhandledRejection に流さない", () => {
+    expect(autoUpdaterSrc).toMatch(
+      /try\s*\{[\s\S]*await\s+autoUpdater\.checkForUpdates\(\);[\s\S]*\}\s*catch\s*\(error\)/,
+    );
+  });
+
   it("#1785 回帰防止: autoUpdater.channel を代入しない（latest*.yml フォールバックに依存）", () => {
     expect(autoUpdaterSrc).not.toMatch(/autoUpdater\.channel\s*=/);
   });

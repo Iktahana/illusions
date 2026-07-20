@@ -20,6 +20,7 @@ const {
   startSecurityScopedAccess,
   stopSecurityScopedAccess,
 } = require("../lib/security-scoped-access");
+const { withTransientIoRetry } = require("../lib/transient-io-retry");
 // #1476: rehydration — begin
 const { loadApprovalEntries, saveApprovals } = require("../lib/vfs-approvals");
 const { createIndexLockManager } = require("../lib/index-lock");
@@ -369,9 +370,11 @@ function registerVFSHandlers() {
       const resolved = await validateVFSPath(event, targetPath);
       const stats = await fs.stat(resolved);
       if (stats.isDirectory()) {
-        await fs.rm(resolved, { recursive: options.recursive || false });
+        await withTransientIoRetry(() =>
+          fs.rm(resolved, { recursive: options.recursive || false }),
+        );
       } else {
-        await fs.unlink(resolved);
+        await withTransientIoRetry(() => fs.unlink(resolved));
       }
     } catch (error) {
       console.error("[VFS IPC] delete failed:", error);
@@ -384,7 +387,7 @@ function registerVFSHandlers() {
     try {
       const resolvedOld = await validateVFSPath(event, oldPath);
       const resolvedNew = await validateVFSPath(event, newPath);
-      await fs.rename(resolvedOld, resolvedNew);
+      await withTransientIoRetry(() => fs.rename(resolvedOld, resolvedNew));
     } catch (error) {
       console.error("[VFS IPC] rename failed:", error);
       throw error;

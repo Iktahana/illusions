@@ -4,8 +4,8 @@ name: Store Publish
 # ever produces signed installer artifacts, never uploads them anywhere. This
 # file owns every "ship it to a store" concern: Microsoft Store (stable +
 # beta flight) and Mac App Store (TestFlight). Submitting a MAS build for
-# App Store review itself stays a manual App Store Connect step — that's not
-# automated here.
+# App Store Connect version creation, localized metadata, build selection, and
+# review submission are automated for stable main builds.
 
 on:
   workflow_run:
@@ -21,14 +21,20 @@ on:
           - msstore-flight
           - msstore-stable
           - appstore-testflight
+          - appstore-release
       release_tag:
         description: "GitHub Release tag (msstore-flight/msstore-stable — defaults to latest matching release if omitted)"
         required: false
         type: string
       build_run_id:
-        description: "Desktop Build and Release run ID to pull the signed MAS .pkg from (appstore-testflight — defaults to latest successful build-mas run if omitted)"
+        description: "Desktop Build and Release run ID to pull the signed MAS .pkg from (App Store targets — defaults to latest successful build-mas run if omitted)"
         required: false
         type: string
+      skip_appstore_upload:
+        description: "Skip uploading the MAS package and only confirm an already-uploaded build is available to internal TestFlight testers"
+        required: false
+        type: boolean
+        default: false
       dry_run:
         description: "Dry run — log actions without mutating store state (Microsoft Store jobs only)"
         required: false
@@ -137,9 +143,14 @@ jobs:
 
   appstore-testflight:
     name: Publish (Mac App Store / TestFlight)
-    if: github.event_name == 'workflow_dispatch' && inputs.target == 'appstore-testflight'
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'beta' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'appstore-testflight')
     runs-on: macos-latest
     environment: Apple
+    concurrency:
+      group: "appstore-testflight-upload"
+      cancel-in-progress: false
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -156,12 +167,19 @@ jobs:
         run: |
           if [ -n "${{ inputs.build_run_id }}" ]; then
             RUN_ID="${{ inputs.build_run_id }}"
+            RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # Upload exactly the build that triggered this workflow. Do not
+            # resolve "latest" here: another beta build could finish first.
+            RUN_ID="${{ github.event.workflow_run.id }}"
+            RUN_ATTEMPT="${{ github.event.workflow_run.run_attempt }}"
           else
             RUN_ID=$(gh run list --repo "${{ github.repository }}" \
               --workflow "Desktop Build and Release" \
               --status success \
               --json databaseId,workflowName \
               --jq '[.[] | select(.workflowName == "Desktop Build and Release")][0].databaseId')
+            RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
           fi
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
             echo "::error::No successful Desktop Build and Release run found"
@@ -170,7 +188,6 @@ jobs:
           # build-mas sets --config.mas.bundleVersion=<run_id><run_attempt> —
           # need the exact attempt number of the resolved run to reconstruct
           # the same CFBundleVersion for the TestFlight lookup below.
-          RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
           echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
           echo "run_attempt=${RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
           echo "Using build run ${RUN_ID}, attempt ${RUN_ATTEMPT}"
@@ -202,6 +219,7 @@ jobs:
           chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 
       - name: Upload to App Store Connect
+        if: ${{ !inputs.skip_appstore_upload }}
         shell: bash
         run: |
           PKG_FILE=$(find dist-electron -name "*.pkg" -type f | head -n 1)
@@ -217,11 +235,11 @@ jobs:
             --apiIssuer "$ASC_ISSUER_ID"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
 
-      - name: Enable build for internal TestFlight testers
+      - name: Wait for build to become available to internal TestFlight testers
         # Apple takes a few minutes to finish processing an uploaded build
         # before it's visible via the API, hence the polling/retry loop
         # inside this script. build-mas set --config.mas.bundleVersion to
@@ -229,3 +247,92 @@ jobs:
         # value from the resolved build run instead of parsing it back out
         # of the .pkg.
         run: node scripts/asc-testflight-enable.mjs "${{ steps.resolve-run.outputs.run_id }}${{ steps.resolve-run.outputs.run_attempt }}"
+
+  # ---------------------------------------------------------------------------
+  # Mac App Store — stable release. Runs after a successful main build or can
+  # be re-run manually for a failed App Store Connect submission. The script
+  # is intentionally idempotent: it reuses a matching version/submission on
+  # retries instead of creating duplicates.
+  # ---------------------------------------------------------------------------
+
+  appstore-release:
+    name: Publish (Mac App Store)
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'appstore-release')
+    runs-on: macos-latest
+    environment: Apple
+    concurrency:
+      group: "appstore-stable-release"
+      cancel-in-progress: false
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY: ${{ secrets.ASC_API_KEY }}
+      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Resolve build run ID and attempt
+        id: resolve-run
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.build_run_id }}" ]; then
+            RUN_ID="${{ inputs.build_run_id }}"
+            RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            RUN_ID="${{ github.event.workflow_run.id }}"
+            RUN_ATTEMPT="${{ github.event.workflow_run.run_attempt }}"
+          else
+            RUN_ID=$(gh run list --repo "${{ github.repository }}" \
+              --workflow "Desktop Build and Release" --branch main --status success \
+              --json databaseId --jq '.[0].databaseId')
+            RUN_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.run_attempt')
+          fi
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ] || [ -z "$RUN_ATTEMPT" ] || [ "$RUN_ATTEMPT" = "null" ]; then
+            echo "::error::No successful main Desktop Build and Release run found"
+            exit 1
+          fi
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+          echo "run_attempt=${RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Download MAS package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: illusions-mas-pkg
+          path: dist-electron
+          run-id: ${{ steps.resolve-run.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare App Store Connect API key
+        shell: bash
+        run: |
+          missing=()
+          [ -z "$ASC_KEY_ID" ] && missing+=("ASC_KEY_ID")
+          [ -z "$ASC_ISSUER_ID" ] && missing+=("ASC_ISSUER_ID")
+          [ -z "$ASC_API_KEY" ] && missing+=("ASC_API_KEY")
+          [ -z "$ASC_APP_ID" ] && missing+=("ASC_APP_ID")
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing ASC credentials: ${missing[*]}"
+            exit 1
+          fi
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$ASC_API_KEY" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      - name: Upload to App Store Connect
+        shell: bash
+        run: |
+          PKG_FILE=$(find dist-electron -name "*.pkg" -type f | head -n 1)
+          if [ -z "$PKG_FILE" ]; then
+            echo "::error::MAS pkg artifact was not found"
+            exit 1
+          fi
+          xcrun altool --upload-app -f "$PKG_FILE" --type macos \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Submit stable version for App Review
+        run: node scripts/asc-submit-appstore-version.mjs "${{ steps.resolve-run.outputs.run_id }}${{ steps.resolve-run.outputs.run_attempt }}"

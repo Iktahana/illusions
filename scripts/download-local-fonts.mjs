@@ -83,7 +83,7 @@ async function downloadToFile(url, filePath) {
 
 async function main() {
   const publicFontsDir = path.join(repoRoot, "public", "fonts");
-  const appCssPath = path.join(repoRoot, "app", "local-fonts.css");
+  const appCssPath = path.join(repoRoot, "src", "app", "local-fonts.css");
 
   await mkdir(publicFontsDir, { recursive: true });
 

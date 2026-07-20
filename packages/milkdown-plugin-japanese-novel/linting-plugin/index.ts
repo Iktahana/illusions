@@ -11,7 +11,7 @@ import type { IgnoredCorrection } from "@/lib/project/project-types";
 import type { ConfigChangeReason } from "@/lib/linting/correction-config";
 import type { LintingSettingsUpdate, RuleRunnerLike } from "./types";
 import { createLintingPlugin, lintingKey } from "./decoration-plugin";
-import { dispatchIfEditorViewAlive } from "../../../shared/lib/editor-view-safety";
+import { dispatchIfEditorViewAlive } from "../../../src/shared/lib/editor-view-safety";
 
 // Export the plugin key for external use
 export { lintingKey } from "./decoration-plugin";

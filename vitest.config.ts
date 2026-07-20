@@ -10,7 +10,7 @@ export default defineConfig({
         url: "http://localhost/",
       },
     },
-    setupFiles: ["./test/setup-vitest.ts"],
+    setupFiles: ["./src/test/setup-vitest.ts"],
     include: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
     // stale worktree コピー（.claude/worktrees/agent-*）配下の __tests__ が
     // テスト探索に混入して false-RED を起こすのを防ぐ
@@ -24,21 +24,22 @@ export default defineConfig({
         branches: 10,
         statements: 15,
       },
-      include: ["lib/**/*.ts"],
+      include: ["src/lib/**/*.ts"],
       exclude: [
         "**/__tests__/**",
         "**/node_modules/**",
-        "lib/hooks/**",
-        "lib/menu/**",
-        "lib/nlp-backend/**",
-        "lib/editor-page/**",
-        "lib/dockview/**",
+        "src/lib/hooks/**",
+        "src/lib/menu/**",
+        "src/lib/nlp-backend/**",
+        "src/lib/editor-page/**",
+        "src/lib/dockview/**",
       ],
     },
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
+      "@/packages": path.resolve(__dirname, "packages"),
+      "@": path.resolve(__dirname, "src"),
     },
   },
 });

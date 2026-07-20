@@ -80,6 +80,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       loadSession: "storage:load-session",
       saveAppState: "storage:save-app-state",
       loadAppState: "storage:load-app-state",
+      updateAppState: "storage:update-app-state",
       addToRecent: "storage:add-to-recent",
       getRecentFiles: "storage:get-recent-files",
       removeFromRecent: "storage:remove-from-recent",
@@ -96,7 +97,9 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       removeItem: "storage:remove-item",
       getKeysByPrefix: "storage:get-keys-by-prefix",
     });
-    expect(STORAGE_CHANNELS.event).toEqual({});
+    expect(STORAGE_CHANNELS.event).toEqual({
+      appStateUpdated: "storage:app-state-updated",
+    });
   });
 
   it("dict invoke/event channels keep their historical string values", () => {
@@ -173,6 +176,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       rebuild: "menu:rebuild",
       syncUiState: "menu:sync-ui-state",
       updateKeymapOverrides: "menu:update-keymap-overrides",
+      openSettingsWindow: "menu:open-settings-window",
     });
     expect(MENU_CHANNELS.event).toEqual({
       newTriggered: "menu-new-triggered",
@@ -186,6 +190,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       openRecentProject: "menu-open-recent-project",
       showInFileManager: "menu-show-in-file-manager",
       toggleCompactMode: "menu-toggle-compact-mode",
+      toggleWritingMode: "menu-toggle-writing-mode",
       format: "menu-format",
       theme: "menu-theme",
       print: "menu-print",
@@ -196,6 +201,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       exportDocx: "menu-export-docx",
       reportBug: "menu-report-bug",
       reportAiInappropriate: "menu-report-ai-inappropriate",
+      openSettings: "menu-open-settings",
     });
   });
 
@@ -420,7 +426,7 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
   const SENDERLESS_MENU_EVENTS = ["menu-new-triggered", "menu-show-in-file-manager"];
 
   it("every menu event channel is subscribed in preload and (unless legacy sender-less) dispatched from menu-template.js", () => {
-    const menuTemplateSrc = readSource("../lib/menu/menu-template.js");
+    const menuTemplateSrc = readSource("../src/lib/menu/menu-template.js");
     for (const [key, value] of Object.entries(MENU_CHANNELS.event)) {
       expect(preloadSrc).toContain(`MENU_CHANNELS.event.${key}`);
       if (!SENDERLESS_MENU_EVENTS.includes(value)) {

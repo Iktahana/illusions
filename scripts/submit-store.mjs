@@ -52,7 +52,7 @@ const MSIX_DIR = resolve(process.env.MSIX_DIR ?? "msix-packages");
 const POLL_TIMEOUT_MS = Number(process.env.POLL_TIMEOUT_MS ?? 1_200_000);
 
 const API_BASE = "https://manage.devcenter.microsoft.com/v1.0/my";
-const STORE_METADATA_DIR = resolve(__dirname, "..", "store", "microsoft", "ja-JP");
+const STORE_METADATA_DIR = resolve(__dirname, "..", "assets", "store", "microsoft", "ja-JP");
 const TERMS_PATH = resolve(__dirname, "..", "TERMS.md");
 const TERMS_CANONICAL_URL = "https://github.com/Iktahana/illusions/blob/main/TERMS.md";
 

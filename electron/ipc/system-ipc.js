@@ -49,6 +49,14 @@ function registerSystemHandlers() {
     return true;
   });
 
+  // Dedicated system-level Settings window.  This is intentionally main-process
+  // owned so every editor window opens/focuses the same instance.
+  ipcMain.handle(MENU_CHANNELS.invoke.openSettingsWindow, async () => {
+    const { createSettingsWindow } = require("../window-manager");
+    const settingsWin = await createSettingsWindow();
+    return settingsWin ? true : false;
+  });
+
   // Sync UI state from renderer to update menu checked states (per-window)
   ipcMain.handle(MENU_CHANNELS.invoke.syncUiState, async (event, state) => {
     const { setMenuUiState, rebuildApplicationMenu } = require("../menu");

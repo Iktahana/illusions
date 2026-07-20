@@ -35,6 +35,24 @@ async function rememberStandalonePath(resolvedPath) {
   }
 }
 
+/**
+ * Write generated binary exports with the same flush/close discipline as the
+ * normal save path. This reduces false-success writes on Windows cloud/network
+ * folders where fs.writeFile can return before bytes are durably persisted.
+ *
+ * @param {string} target
+ * @param {Buffer | Uint8Array} buffer
+ */
+async function writeBufferDurably(target, buffer) {
+  const fileHandle = await fs.open(target, "w");
+  try {
+    await fileHandle.writeFile(buffer);
+    await fileHandle.sync();
+  } finally {
+    await fileHandle.close();
+  }
+}
+
 // --- save-file path security validation ---
 // Tracks file paths that have been approved via native dialog or system file association,
 // scoped per BrowserWindow (webContentsId) to prevent cross-window path reuse.
@@ -436,7 +454,7 @@ function registerFileHandlers() {
       return { success: false, error: "Invalid content" };
     }
     try {
-      const { generatePdf } = require("../../lib/export/pdf-exporter");
+      const { generatePdf } = require("../../src/lib/export/pdf-exporter");
       const pdfBuffer = await generatePdf(content, options || {});
       return { success: true, data: pdfBuffer.toString("base64") };
     } catch (error) {
@@ -457,7 +475,7 @@ function registerFileHandlers() {
       };
     }
     try {
-      const { generatePdf } = require("../../lib/export/pdf-exporter");
+      const { generatePdf } = require("../../src/lib/export/pdf-exporter");
       const pdfBuffer = await generatePdf(content, options || {});
 
       const { filePath } = await dialog.showSaveDialog({
@@ -467,7 +485,7 @@ function registerFileHandlers() {
       });
 
       if (!filePath) return null;
-      await fs.writeFile(filePath, pdfBuffer);
+      await writeBufferDurably(filePath, pdfBuffer);
       log.info(`Exported PDF: ${filePath}`);
       return filePath;
     } catch (error) {
@@ -485,9 +503,9 @@ function registerFileHandlers() {
     let printWin = null;
     try {
       const { BrowserWindow } = require("electron");
-      const { mdiToHtml } = require("../../lib/export/mdi-to-html");
-      const { calculateTypesetting } = require("../../lib/export/pdf-export-settings");
-      const { fullwidthIndentCount } = require("../../lib/export/fullwidth-indent");
+      const { mdiToHtml } = require("../../src/lib/export/mdi-to-html");
+      const { calculateTypesetting } = require("../../src/lib/export/pdf-export-settings");
+      const { fullwidthIndentCount } = require("../../src/lib/export/fullwidth-indent");
 
       const opts = options || {};
       const pageSize = opts.pageSize ?? "A5";
@@ -650,7 +668,7 @@ function registerFileHandlers() {
         }
       }
 
-      const { generateEpub } = require("../../lib/export/epub-exporter");
+      const { generateEpub } = require("../../src/lib/export/epub-exporter");
       const epubBuffer = await generateEpub(content, epubOptions);
 
       // Sanitize filename: remove characters invalid on Windows
@@ -664,7 +682,7 @@ function registerFileHandlers() {
       });
 
       if (!filePath) return null;
-      await fs.writeFile(filePath, epubBuffer);
+      await writeBufferDurably(filePath, epubBuffer);
       log.info(`Exported EPUB: ${filePath}`);
       return filePath;
     } catch (error) {
@@ -685,7 +703,7 @@ function registerFileHandlers() {
       };
     }
     try {
-      const { generateDocx } = require("../../lib/export/docx-exporter");
+      const { generateDocx } = require("../../src/lib/export/docx-exporter");
       const docxBuffer = await generateDocx(content, options || {});
 
       const { filePath } = await dialog.showSaveDialog({
@@ -695,7 +713,7 @@ function registerFileHandlers() {
       });
 
       if (!filePath) return null;
-      await fs.writeFile(filePath, docxBuffer);
+      await writeBufferDurably(filePath, docxBuffer);
       log.info(`Exported DOCX: ${filePath}`);
       return filePath;
     } catch (error) {

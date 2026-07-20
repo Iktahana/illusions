@@ -24,6 +24,7 @@
     "download:fonts": "node scripts/download-local-fonts.mjs",
     "bundle:electron": "node scripts/bundle-electron.mjs",
     "electron:dev": "node scripts/ensure-credits-stub.mjs && npm run bundle:electron && concurrently \"next dev -p 3020\" \"wait-on http://localhost:3020 && cross-env ELECTRON_DEV=1 electron .\"",
+    "dev:mas": "cross-env MAS_BUILD=1 npm run electron:dev",
     "electron:build": "npm run type-check && npm run generate:credits && cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron && electron-builder",
     "electron:build:mas": "npm run type-check && npm run generate:credits && cross-env ELECTRON_BUILD=1 MAS_BUILD=1 next build && cross-env MAS_BUILD=1 npm run bundle:electron && cross-env MAS_BUILD=1 electron-builder --mac mas --publish never $MAS_EXTRA_BUILDER_ARGS",
     "build:quicklook": "node -e \"if(process.platform==='darwin'){const {execSync}=require('child_process');execSync('bash scripts/build-quicklook.sh',{stdio:'inherit'});}else{console.log('build:quicklook skipped (macOS only)');}\" ",
@@ -41,7 +42,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@radix-ui/react-context-menu": "^2.3.3",
+    "@radix-ui/react-context-menu": "^2.3.4",
     "@sentry/electron": "^7.15.0",
     "@serwist/next": "^9.5.11",
     "@vercel/analytics": "^2.0.1",
@@ -65,12 +66,15 @@
     "markdown-it": "^14.3.0",
     "next": "^16.2.10",
     "node-pty": "^1.0.0",
-    "openai": "^6.46.0",
+    "openai": "^6.48.0",
     "pako": "^3.0.1",
     "path-browserify": "^1.0.1",
     "process": "^0.11.10",
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5"
+  },
+  "optionalDependencies": {
+    "@illusions/as-web-authentication": "file:native/as-web-authentication"
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
@@ -96,13 +100,13 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.1.10",
-    "autoprefixer": "^10.5.2",
+    "autoprefixer": "^10.5.4",
     "clsx": "^2.1.1",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
     "dexie": "^4.4.4",
     "diff": "^9.0.0",
-    "electron": "^41.4.0",
+    "electron": "^43.1.1",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.1",
     "eslint": "^9.39.5",
@@ -110,9 +114,9 @@
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "license-checker": "^25.0.1",
-    "lint-staged": "^17.0.8",
-    "lucide-react": "^1.24.0",
-    "postcss": "^8.5.18",
+    "lint-staged": "^17.1.0",
+    "lucide-react": "^1.25.0",
+    "postcss": "^8.5.20",
     "prettier": "^3.9.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -125,6 +129,14 @@
   },
   "overrides": {
     "node-abi": "^4.31.0"
+  },
+  "prettier": {
+    "semi": true,
+    "singleQuote": false,
+    "tabWidth": 2,
+    "trailingComma": "all",
+    "printWidth": 100,
+    "endOfLine": "lf"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

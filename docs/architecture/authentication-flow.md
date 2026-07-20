@@ -42,13 +42,15 @@ PKCE は以下の 3 つのステップで構成されます。
 ### Electron 版のフロー
 
 1. **ログイン開始**: レンダラーから IPC (`auth:login`) を通じてメインプロセスへ要求を送ります。
-2. **ブラウザ起動**: メインプロセスが PKCE パラメータを生成し、`shell.openExternal` でシステム標準のブラウザを開きます。
-3. **認可と返却**: ブラウザで認可が完了すると、カスタムプロトコル（`illusions://auth-callback`）を通じて認可コードが Electron アプリに返されます。
+2. **ブラウザ起動**: メインプロセスが PKCE パラメータを生成します。macOS ではネイティブ bridge 経由で `ASWebAuthenticationSession` を開始し、システムブラウザから `illusions://auth/callback` の結果を直接受け取ります。Windows／Linux では `shell.openExternal` でシステム標準ブラウザを開きます。macOS で session を開始できない場合だけ、同じ PKCE URL を `shell.openExternal` に fallback します。
+3. **認可と返却**: ブラウザで認可が完了すると、カスタムプロトコル（`illusions://auth/callback`）を通じて認可コードが Electron アプリに返されます。
 4. **トークン取得**: メインプロセスがトークン交換を行い、結果をレンダラーに通知します。
 
 ## セキュリティ上の考慮事項
 
 - **State パラメータ**: CSRF（クロスサイトリクエストフォージェリ）防止のため、ランダムな `state` 値を検証に使用します。
+- **macOS 認可セッション**: OAuth は Electron の `BrowserWindow` 内では表示しません。`ASWebAuthenticationSession` が callback scheme と一致する URL だけを main process に返すため、Apple／Google／GitHub のログインをシステムブラウザで一貫して処理できます。ユーザーのキャンセル時は保留中の state を破棄し、session を開始できない場合のみ外部ブラウザ fallback を試みます。
+- **アカウント削除**: 設定画面の「アカウントを削除」は、既定のブラウザで `https://my.illusions.app/delete-account` を直接開きます。
 - **セキュアな保存**: 取得した `access_token` および `refresh_token` は、環境に応じたセキュアなストレージ（ブラウザの HttpOnly Cookie、Electron の安全な暗号化ストア等）に保持されます。
 - **有効期限**: トークンには有効期限を設定し、必要に応じてリフレッシュトークンによる更新を行います。
 
