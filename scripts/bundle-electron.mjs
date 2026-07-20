@@ -15,6 +15,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, "..");
 
+// On Windows, npx is a .cmd shim; execFileSync (unlike execSync) doesn't
+// go through a shell, so it needs the literal .cmd extension to resolve it.
+const NPX_CMD = process.platform === "win32" ? "npx.cmd" : "npx";
+
 const targetArchIndex = process.argv.indexOf("--target-arch");
 const targetArch = targetArchIndex !== -1 ? process.argv[targetArchIndex + 1] : process.arch;
 console.log(`🏗️  Target architecture: ${targetArch}`);
@@ -198,7 +202,7 @@ function rebuildBetterSqliteForArch(arch) {
   // projectRoot's absolute path can never be misinterpreted as shell
   // syntax regardless of what characters it contains.
   execFileSync(
-    "npx",
+    NPX_CMD,
     [
       "electron-rebuild",
       "--force",
@@ -219,7 +223,7 @@ function rebuildAsWebAuthenticationForArch(arch) {
   if (process.platform !== "darwin") return;
   const electronVersion = getElectronVersion();
   execFileSync(
-    "npx",
+    NPX_CMD,
     [
       "electron-rebuild",
       "--force",
