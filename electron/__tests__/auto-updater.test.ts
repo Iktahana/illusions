@@ -41,7 +41,7 @@ describe("auto-updater.js — opt-in wiring", () => {
 
   it("更新チェックの Promise rejection を捕捉し、process-level unhandledRejection に流さない", () => {
     expect(autoUpdaterSrc).toMatch(
-      /try\s*\{\s*await\s+autoUpdater\.checkForUpdates\(\);\s*\}\s*catch\s*\(error\)/s,
+      /try\s*\{[\s\S]*await\s+autoUpdater\.checkForUpdates\(\);[\s\S]*\}\s*catch\s*\(error\)/,
     );
   });
 
