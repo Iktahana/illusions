@@ -71,7 +71,7 @@ jobs:
             exit 0
           fi
           RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases \
-            --jq '[.[] | select(.draft == false and .prerelease == true and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-beta\\.")))] | sort_by(.created_at) | last | .tag_name')
+            --jq '[.[] | select(.draft == false and .prerelease == true and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-beta\\.")))] | sort_by(.published_at) | last | .tag_name')
           if [ -z "$RELEASE_TAG" ] || [ "$RELEASE_TAG" = "null" ]; then
             echo "::error::No beta prerelease found"
             exit 1
@@ -115,7 +115,7 @@ jobs:
             exit 0
           fi
           RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases \
-            --jq '[.[] | select(.draft == false and .prerelease == false)] | sort_by(.created_at) | last | .tag_name')
+            --jq '[.[] | select(.draft == false and .prerelease == false)] | sort_by(.published_at) | last | .tag_name')
           if [ -z "$RELEASE_TAG" ] || [ "$RELEASE_TAG" = "null" ]; then
             echo "::error::No stable release found"
             exit 1
