@@ -3,8 +3,8 @@
 import type React from "react";
 import clsx from "clsx";
 
-import { FEATURED_JAPANESE_FONTS } from "@/lib/utils/fonts";
 import { useTypographySettings, useUISettings } from "@/contexts/EditorSettingsContext";
+import { FontSelector } from "@/components/explorer/FontSelector";
 import { SettingsField, SettingsSection, SettingsToggle, SliderField } from "./primitives";
 
 /**
@@ -37,18 +37,11 @@ export default function TypographySettingsTab(): React.ReactElement {
     <div className="space-y-6">
       <SettingsSection title="文字組み">
         <SettingsField label="フォント" htmlFor="typography-font-family">
-          <select
+          <FontSelector
             id="typography-font-family"
             value={fontFamily}
-            onChange={(e) => onFontFamilyChange(e.target.value)}
-            className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            {FEATURED_JAPANESE_FONTS.map((font) => (
-              <option key={font.family} value={font.family}>
-                {font.localizedName ? `${font.family} (${font.localizedName})` : font.family}
-              </option>
-            ))}
-          </select>
+            onChange={onFontFamilyChange}
+          />
         </SettingsField>
 
         <SliderField
