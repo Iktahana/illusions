@@ -101,8 +101,16 @@ async function marketingVersion(buildId) {
 
 async function storeText(path) {
   const source = await fs.readFile(path, "utf8");
-  const content = source.includes("\n---\n") ? source.split("\n---\n", 2)[1] : source;
-  return content.replace(/<!--[^]*?-->/g, "").trim();
+  let content = source.includes("\n---\n") ? source.split("\n---\n", 2)[1] : source;
+  // A single non-global-loop replace() only removes matches found in the
+  // original string; nested/overlapping comment markers can survive one
+  // pass. Loop to a fixed point so no "<!--...-->" fragment remains.
+  let previous;
+  do {
+    previous = content;
+    content = content.replace(/<!--[^]*?-->/g, "");
+  } while (content !== previous);
+  return content.trim();
 }
 
 async function releaseNotes(versionString, fallback) {
