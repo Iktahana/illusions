@@ -19,7 +19,7 @@ import { mdiToHtml, getMdiStylesheet } from "../mdi-to-html";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fileIpcSource = readFileSync(
-  path.resolve(here, "../../../electron/ipc/file-ipc.js"),
+  path.resolve(here, "../../../../electron/ipc/file-ipc.js"),
   "utf-8",
 );
 

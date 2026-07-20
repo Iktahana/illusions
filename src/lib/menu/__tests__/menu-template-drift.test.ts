@@ -61,7 +61,7 @@ interface ElectronMenuModule {
 }
 
 async function loadElectronMenu(): Promise<ElectronMenuModule> {
-  return (await import("../../../electron/menu.js")) as unknown as ElectronMenuModule;
+  return (await import("../../../../electron/menu.js")) as unknown as ElectronMenuModule;
 }
 
 // ---------------------------------------------------------------------------

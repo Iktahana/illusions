@@ -1,5 +1,5 @@
 /**
- * Dev-only safeguard: `generated/credits.json` is only produced by
+ * Dev-only safeguard: `src/generated/credits.json` is only produced by
  * `generate:credits` (run as part of `build`). Turbopack statically resolves
  * the dynamic import in AboutSection.tsx and hard-fails every request with a
  * 500 if the file is missing, instead of letting the runtime .catch() handle
@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { resolve } from "path";
 
-const outDir = resolve(import.meta.dirname, "..", "generated");
+const outDir = resolve(import.meta.dirname, "..", "src", "generated");
 const outPath = resolve(outDir, "credits.json");
 
 if (!existsSync(outPath)) {

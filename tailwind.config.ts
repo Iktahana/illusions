@@ -3,13 +3,12 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   darkMode: "class",
   content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     // shared/ のコンポーネント(ResizablePanel 等)も走査対象に含める。
     // ここに無いと shared/ でしか使われない dark: バリアント等が purge され、
     // 右インスペクタの境界線が消える等の再発を招く (#1956 の dark:border-* 退行根因)。
-    "./shared/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/shared/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {

@@ -86,7 +86,7 @@ reviews/
 .claude/*.lock
 
 # auto-generated files
-/generated/
+/src/generated/
 
 # claude-mem auto-generated memory context
 AGENTS.md

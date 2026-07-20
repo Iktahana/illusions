@@ -3,7 +3,7 @@ title: リポジトリ構造
 slug: repository-structure
 type: architecture
 status: active
-updated: 2026-07-08
+updated: 2026-07-20
 owner: maintainers
 ---
 
@@ -15,22 +15,30 @@ owner: maintainers
 
 ```text
 illusions/
-  app/
-  application/
-  features/
-  shared/
-  platform/
+  src/
+    app/
+    application/
+    features/
+    components/
+    contexts/
+    lib/
+    shared/
+    platform/
+    types/
+    test/
+    generated/
   electron/
+  native/
+    as-web-authentication/
+    quicklook/
   packages/
   public/
   assets/
+    branding/
+    store/
   build/
-  quicklook/
-  store/
   scripts/
   docs/
-  types/
-  generated/
 
   README.md
   LICENSE
@@ -48,7 +56,6 @@ illusions/
   .env.example
   .gitignore
   .nvmrc
-  .prettierrc
   .prettierignore
 ```
 
@@ -56,7 +63,7 @@ illusions/
 
 ## アプリケーション入口
 
-`app/` は Next.js App Router の入口です。route、layout、error boundary、offline page、global CSS、API route、service worker などに限定します。
+renderer 側の TypeScript source はすべて `src/` 配下に置きます。`src/app/` は Next.js App Router の入口です。route、layout、error boundary、offline page、global CSS、API route、service worker などに限定します。
 
 `app/page.tsx` は最終的に薄い render boundary にします。
 
@@ -186,18 +193,18 @@ Package code は application alias に依存しません。特に `@/components`
 
 `build/` は installer、signing、Electron Builder 用 assets です。`.icns`、`.ico`、entitlements、AppX tile assets などを置きます。
 
-`assets/source/` は編集可能な source asset です。`.psd`、`.ai`、branding source file など、runtime に直接読み込まない素材を置きます。
+`assets/branding/` は編集可能な source asset です。`.psd`、`.ai`、branding source file など、runtime に直接読み込まない素材を置きます。
 
-`generated/` は commit が必要な生成物だけを置きます。各ファイルは生成コマンドを documentation または script 名で追跡できる必要があります。
+`src/generated/` は生成物 (credits.json など) を置きます。各ファイルは生成コマンドを documentation または script 名で追跡できる必要があります。
 
 `.next/`、`dist-main/`、`dist-electron/`、`tsconfig.tsbuildinfo`、一時レポート、local worktree は source として扱いません。
 
 ## Store と release material
 
-`store/` は Apple / Microsoft Store の listing copy と store-specific metadata を置きます。これは engineering documentation ではありません。
+`assets/store/` は Apple / Microsoft Store の listing copy と store-specific metadata を置きます。これは engineering documentation ではありません。
 
 ```text
-store/
+assets/store/
   apple/
   microsoft/
   _shared/
@@ -238,7 +245,7 @@ docs/
 
 次の root file は compatibility または tooling requirement を確認してから薄い pointer 化または削除します。
 
-- `ARCHITECTURE.md`: `docs/architecture/` への pointer にするか、内容を docs に移します。
+- `ARCHITECTURE.md`: `docs/architecture/overview.md` へ移動済み。
 - `MDI.md`: `docs/MDI/spec.md` への pointer にするか、参照更新後に削除します。
 - `CLAUDE.md`: 現行 tooling が root から読む場合だけ保持します。
 - `.cursorrules`: 現行 Cursor workflow が必要とする場合だけ保持します。

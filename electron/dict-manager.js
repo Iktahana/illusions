@@ -327,7 +327,7 @@ class DictManager {
    * Query entries by headword (exact or prefix).
    * @param {string} term
    * @param {number} limit
-   * @returns {import("../lib/dict/dict-types").DictEntry[]}
+   * @returns {import("../src/lib/dict/dict-types").DictEntry[]}
    */
   query(term, limit = 20) {
     // Avoid opening the DB while a download/rename is in progress
@@ -369,7 +369,7 @@ class DictManager {
    * via the `variant_lookup` table (#1958). Best-effort — returns [] when the
    * table is absent (older DB) or the query fails.
    * @private
-   * @returns {import("../lib/dict/dict-types").DictEntry[]}
+   * @returns {import("../src/lib/dict/dict-types").DictEntry[]}
    */
   _resolveHeadwordByVariant(db, term, limit = 20) {
     try {
@@ -393,7 +393,7 @@ class DictManager {
    * Query entries by kana reading (homophone lookup).
    * @param {string} reading
    * @param {number} limit
-   * @returns {import("../lib/dict/dict-types").DictEntry[]}
+   * @returns {import("../src/lib/dict/dict-types").DictEntry[]}
    */
   queryByReading(reading, limit = 20) {
     // Avoid opening the DB while a download/rename is in progress
@@ -432,7 +432,7 @@ class DictManager {
    *
    * @param {string[]} terms
    * @param {boolean} [normalize=true] Enable the all-kana reading fallback.
-   * @returns {Array<{ entry: string } & import("../lib/dict/dict-types").DictLookup>}
+   * @returns {Array<{ entry: string } & import("../src/lib/dict/dict-types").DictLookup>}
    */
   lookupBatch(terms, normalize = true) {
     if (this._downloadMutex.locked) return [];

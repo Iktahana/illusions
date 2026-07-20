@@ -4,7 +4,7 @@ vi.mock("electron", () => ({
   ipcMain: { handle: vi.fn() },
   BrowserWindow: { fromWebContents: vi.fn(), getAllWindows: vi.fn(() => []) },
 }));
-vi.mock("../../../lib/storage/electron-storage-manager", () => ({
+vi.mock("../../../src/lib/storage/electron-storage-manager", () => ({
   ElectronStorageManager: vi.fn(),
 }));
 

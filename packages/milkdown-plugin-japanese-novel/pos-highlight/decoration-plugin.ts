@@ -17,7 +17,7 @@ import type { PosColorConfig } from "./types";
 import {
   dispatchIfEditorViewAlive,
   isEditorViewAlive,
-} from "../../../shared/lib/editor-view-safety";
+} from "../../../src/shared/lib/editor-view-safety";
 
 export const posHighlightKey = new PluginKey("posHighlight");
 
