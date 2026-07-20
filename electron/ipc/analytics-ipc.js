@@ -4,7 +4,7 @@
 
 const { ipcMain } = require("electron");
 const { ANALYTICS_CHANNELS } = require("../lib/ipc-channels");
-const usageEventContract = require("../../lib/analytics/usage-event-contract.json");
+const usageEventContract = require("../../src/lib/analytics/usage-event-contract.json");
 
 function isWhitelistedProps(eventName, props) {
   const eventContract = usageEventContract.events[eventName];

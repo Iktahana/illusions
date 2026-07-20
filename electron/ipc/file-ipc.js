@@ -454,7 +454,7 @@ function registerFileHandlers() {
       return { success: false, error: "Invalid content" };
     }
     try {
-      const { generatePdf } = require("../../lib/export/pdf-exporter");
+      const { generatePdf } = require("../../src/lib/export/pdf-exporter");
       const pdfBuffer = await generatePdf(content, options || {});
       return { success: true, data: pdfBuffer.toString("base64") };
     } catch (error) {
@@ -475,7 +475,7 @@ function registerFileHandlers() {
       };
     }
     try {
-      const { generatePdf } = require("../../lib/export/pdf-exporter");
+      const { generatePdf } = require("../../src/lib/export/pdf-exporter");
       const pdfBuffer = await generatePdf(content, options || {});
 
       const { filePath } = await dialog.showSaveDialog({
@@ -503,9 +503,9 @@ function registerFileHandlers() {
     let printWin = null;
     try {
       const { BrowserWindow } = require("electron");
-      const { mdiToHtml } = require("../../lib/export/mdi-to-html");
-      const { calculateTypesetting } = require("../../lib/export/pdf-export-settings");
-      const { fullwidthIndentCount } = require("../../lib/export/fullwidth-indent");
+      const { mdiToHtml } = require("../../src/lib/export/mdi-to-html");
+      const { calculateTypesetting } = require("../../src/lib/export/pdf-export-settings");
+      const { fullwidthIndentCount } = require("../../src/lib/export/fullwidth-indent");
 
       const opts = options || {};
       const pageSize = opts.pageSize ?? "A5";
@@ -668,7 +668,7 @@ function registerFileHandlers() {
         }
       }
 
-      const { generateEpub } = require("../../lib/export/epub-exporter");
+      const { generateEpub } = require("../../src/lib/export/epub-exporter");
       const epubBuffer = await generateEpub(content, epubOptions);
 
       // Sanitize filename: remove characters invalid on Windows
@@ -703,7 +703,7 @@ function registerFileHandlers() {
       };
     }
     try {
-      const { generateDocx } = require("../../lib/export/docx-exporter");
+      const { generateDocx } = require("../../src/lib/export/docx-exporter");
       const docxBuffer = await generateDocx(content, options || {});
 
       const { filePath } = await dialog.showSaveDialog({

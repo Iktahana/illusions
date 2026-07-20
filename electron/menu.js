@@ -12,7 +12,7 @@ const {
   SETTINGS_MENU_ITEM,
   formatVersionLabel,
   getNativeDefaultAccelerators,
-} = require("../lib/menu/menu-template");
+} = require("../src/lib/menu/menu-template");
 const { APP_NAME, isDev } = require("./app-constants");
 
 // Default UI state for menu checked states
@@ -132,7 +132,7 @@ function resolveAccelerator(commandId) {
 /**
  * Builds the click handler for a shared template item, or undefined for
  * items without click semantics (separators, containers).
- * @param {import("../lib/menu/menu-template").MenuTemplateItem} item
+ * @param {import("../src/lib/menu/menu-template").MenuTemplateItem} item
  * @param {(channel: string, ...args: unknown[]) => void} sendToFocused
  * @returns {(() => void) | undefined}
  */
@@ -168,7 +168,7 @@ function buildClickHandler(item, sendToFocused) {
 
 /**
  * Converts a shared template item into an Electron menu template item.
- * @param {import("../lib/menu/menu-template").MenuTemplateItem} item
+ * @param {import("../src/lib/menu/menu-template").MenuTemplateItem} item
  * @param {{
  *   sendToFocused: (channel: string, ...args: unknown[]) => void,
  *   menuUiState: typeof DEFAULT_MENU_UI_STATE,
@@ -254,7 +254,7 @@ function toNativeMenuItem(item, ctx) {
   return native;
 }
 
-/** @param {import("../lib/menu/menu-template").MenuTemplateItem} item @param {boolean} isMac */
+/** @param {import("../src/lib/menu/menu-template").MenuTemplateItem} item @param {boolean} isMac */
 function isNativeItemVisible(item, isMac) {
   return item.electronPlatform !== "non-mac" || !isMac;
 }

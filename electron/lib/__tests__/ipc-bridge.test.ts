@@ -425,7 +425,7 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
   const SENDERLESS_MENU_EVENTS = ["menu-new-triggered", "menu-show-in-file-manager"];
 
   it("every menu event channel is subscribed in preload and (unless legacy sender-less) dispatched from menu-template.js", () => {
-    const menuTemplateSrc = readSource("../lib/menu/menu-template.js");
+    const menuTemplateSrc = readSource("../src/lib/menu/menu-template.js");
     for (const [key, value] of Object.entries(MENU_CHANNELS.event)) {
       expect(preloadSrc).toContain(`MENU_CHANNELS.event.${key}`);
       if (!SENDERLESS_MENU_EVENTS.includes(value)) {

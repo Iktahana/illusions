@@ -134,14 +134,14 @@ jobs:
         run: |
           node scripts/generate-release-notes.mjs \
             --to "${{ inputs.release_tag }}" \
-            --out store/microsoft/ja-JP/release-notes.md
+            --out assets/store/microsoft/ja-JP/release-notes.md
           echo "--- Generated release notes ---"
-          cat store/microsoft/ja-JP/release-notes.md
+          cat assets/store/microsoft/ja-JP/release-notes.md
 
       - name: Write empty release notes stub (listing-only)
         if: inputs.mode != 'full-submission'
         shell: bash
-        run: echo "" > store/microsoft/ja-JP/release-notes.md
+        run: echo "" > assets/store/microsoft/ja-JP/release-notes.md
 
       - name: Download MSIX packages from GitHub Release
         if: inputs.mode != 'listing-only' && inputs.mode != 'inspect-flights'

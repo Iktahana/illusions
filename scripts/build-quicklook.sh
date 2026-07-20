@@ -10,7 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-SRC_DIR="${ROOT_DIR}/quicklook/MDIQuickLook"
+SRC_DIR="${ROOT_DIR}/native/quicklook/MDIQuickLook"
 APPEX_DIR="${ROOT_DIR}/build/quicklook/MDIQuickLook.appex"
 OUT_DIR="${APPEX_DIR}/Contents"
 

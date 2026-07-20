@@ -130,6 +130,14 @@
   "overrides": {
     "node-abi": "^4.31.0"
   },
+  "prettier": {
+    "semi": true,
+    "singleQuote": false,
+    "tabWidth": 2,
+    "trailingComma": "all",
+    "printWidth": 100,
+    "endOfLine": "lf"
+  },
   "lint-staged": {
     "*.{ts,tsx}": [
       "prettier --write",

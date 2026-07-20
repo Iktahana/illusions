@@ -35,7 +35,7 @@ import type { DictSnapshotPayload } from "./worker/protocol";
 import {
   dispatchIfEditorViewAlive,
   isEditorViewAlive,
-} from "../../../shared/lib/editor-view-safety";
+} from "../../../src/shared/lib/editor-view-safety";
 
 export const lintingKey = new PluginKey<LintingPluginState>("linting");
 

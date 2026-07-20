@@ -8,7 +8,7 @@ import { createPosHighlightPlugin, posHighlightKey } from "./decoration-plugin";
 import { DEFAULT_POS_COLORS } from "./pos-colors";
 import type { EditorView } from "@milkdown/prose/view";
 import type { PosColorConfig, PosHighlightSettings } from "./types";
-import { dispatchIfEditorViewAlive } from "../../../shared/lib/editor-view-safety";
+import { dispatchIfEditorViewAlive } from "../../../src/shared/lib/editor-view-safety";
 
 // 型定義と定数をエクスポート
 export type { PosColorConfig, PosHighlightSettings, Token } from "./types";
