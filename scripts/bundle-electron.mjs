@@ -193,8 +193,24 @@ function getElectronVersion() {
 
 function rebuildBetterSqliteForArch(arch) {
   const electronVersion = getElectronVersion();
-  execSync(
-    `npx electron-rebuild --force --only better-sqlite3 --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
+  // execFileSync with an argv array (instead of execSync with an
+  // interpolated shell string) avoids shell parsing entirely, so
+  // projectRoot's absolute path can never be misinterpreted as shell
+  // syntax regardless of what characters it contains.
+  execFileSync(
+    "npx",
+    [
+      "electron-rebuild",
+      "--force",
+      "--only",
+      "better-sqlite3",
+      "--arch",
+      arch,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      projectRoot,
+    ],
     { cwd: projectRoot, stdio: "inherit" },
   );
 }
@@ -202,8 +218,20 @@ function rebuildBetterSqliteForArch(arch) {
 function rebuildAsWebAuthenticationForArch(arch) {
   if (process.platform !== "darwin") return;
   const electronVersion = getElectronVersion();
-  execSync(
-    `npx electron-rebuild --force --only @illusions/as-web-authentication --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
+  execFileSync(
+    "npx",
+    [
+      "electron-rebuild",
+      "--force",
+      "--only",
+      "@illusions/as-web-authentication",
+      "--arch",
+      arch,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      projectRoot,
+    ],
     { cwd: projectRoot, stdio: "inherit" },
   );
 }
