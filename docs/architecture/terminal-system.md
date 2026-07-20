@@ -3,7 +3,7 @@ title: ターミナルサブシステム
 slug: terminal-system
 type: architecture
 status: active
-updated: 2026-04-06
+updated: 2026-07-20
 tags:
   - architecture
   - electron
@@ -74,6 +74,7 @@ macOS では、ブラウザのネイティブ `Cmd+C/V` パイプラインがそ
 ## 制限事項
 
 - **Electron 専用**: 本機能は `node-pty` に依存しているため、Web 版 (ブラウザ) では利用できません。
+- **App Store 版**: Mac App Store 版では `node-pty` バイナリがバンドルから除外されるため、ターミナル機能は無効化されます。設定画面（`TerminalSettingsTab`）にはその旨の案内メッセージと直販版へのリンクが表示され、すべてのターミナル設定コントロールは無効状態になります。配布形態の判定には `getAppRuntimeInfo().distributionProvider` を使用します。
 - **セッション制限**: システムリソース保護のため、ウィンドウあたり最大数、およびグローバルでの最大セッション数が設定されています。
 
 ## 関連ファイル
