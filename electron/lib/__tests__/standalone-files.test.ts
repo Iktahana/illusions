@@ -81,7 +81,8 @@ describe("standalone-files (#1965 persisted allowlist)", () => {
     // The 5 oldest should have been evicted; the newest must remain.
     expect(set.has("/abs/file-0.mdi")).toBe(false);
     expect(set.has(`/abs/file-${MAX_STANDALONE_PATHS + 4}.mdi`)).toBe(true);
-  });
+    // 505 sequential JSON writes exceed the 5s default on slow Windows CI disks.
+  }, 20000);
 
   it("tolerates a corrupt JSON file (treats as empty)", async () => {
     await fs.writeFile(file, "{ not valid json", "utf-8");
