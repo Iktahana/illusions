@@ -10,15 +10,15 @@ const apply = process.argv.includes("--apply");
 const generatedDirectories = [".next", "coverage", "dist-electron", "dist-main", "out", "reviews"];
 
 const sourceRoots = [
-  "app",
   "assets",
   "build",
-  "components",
   "docs",
   "electron",
-  "lib",
+  "native",
   "packages",
   "public",
+  "scripts",
+  "src",
 ];
 
 const candidates = generatedDirectories
