@@ -102,6 +102,15 @@ describe("repository structure integrity", () => {
     }
   });
 
+  it("script-internal path.join/resolve targets exist", () => {
+    // These are built from split arguments ("app", "local-fonts.css"), so the
+    // literal-path sweeps that catch "app/..." strings miss them — the exact
+    // gap that broke the first post-src/ beta build.
+    for (const target of ["src/app/local-fonts.css", "assets/store/microsoft/ja-JP"]) {
+      expect(exists(target), `script target missing: ${target}`).toBe(true);
+    }
+  });
+
   it("vitest setup file exists", () => {
     const source = fs.readFileSync(path.join(repoRoot, "vitest.config.ts"), "utf8");
     const match = source.match(/setupFiles:\s*\["([^"]+)"\]/);
