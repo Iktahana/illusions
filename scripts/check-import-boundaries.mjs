@@ -119,6 +119,15 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
   ],
 ]);
 
+/**
+ * Boundary rules are expressed against layout-agnostic prefixes (lib/, shared/,
+ * packages/, …). Only a leading "src/" is stripped: application code lives under
+ * src/ on disk, while packages/ stays at the repository root.
+ */
+export function normalizeSourcePath(filePath) {
+  return filePath.replace(/^src\//, "");
+}
+
 export function extractModuleSpecifiers(source) {
   const specifiers = [];
   const patterns = [
@@ -200,13 +209,9 @@ function collectSourceFiles() {
 export function checkRepositoryBoundaries() {
   const violations = [];
   for (const absolutePath of collectSourceFiles()) {
-    // Boundary rules are expressed against pre-src/ layout prefixes; strip "src/"
-    // so rule patterns and LEGACY_PACKAGE_IMPORTS keys stay layout-agnostic.
-    const filePath = path
-      .relative(projectRoot, absolutePath)
-      .split(path.sep)
-      .join("/")
-      .replace(/^src\//, "");
+    const filePath = normalizeSourcePath(
+      path.relative(projectRoot, absolutePath).split(path.sep).join("/"),
+    );
     const source = fs.readFileSync(absolutePath, "utf8");
     for (const specifier of extractModuleSpecifiers(source)) {
       const reason = validateImportBoundary(filePath, specifier);
