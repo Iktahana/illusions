@@ -2,8 +2,8 @@
  * Unified export settings for PDF, DOCX, and EPUB.
  *
  * Uses charsPerLine / linesPerPage as the canonical typesetting model
- * (more expressive than raw fontSize + lineSpacing). DOCX-specific values
- * are derived at export time via toDocxExportSettings().
+ * (more expressive than raw fontSize + lineSpacing). The same canonical
+ * settings are mapped directly to the upstream export profile for every format.
  *
  * Persisted via the unified StorageService (SQLite on Electron, IndexedDB on Web).
  * Migrates from legacy localStorage keys (unified + per-format) on first load,
@@ -12,12 +12,10 @@
 
 import { getStorageService } from "@/lib/storage/storage-service";
 import { ALL_JAPANESE_FONTS } from "@/lib/utils/fonts";
-import { calculateTypesetting } from "./pdf-export-settings";
 import { PAGE_DIMENSIONS, ALL_PAGE_SIZE_KEYS } from "./page-sizes";
 import { resolvePrintProfile } from "@illusions-lab/mdi-export-profile";
 
 import type { PdfExportSettings } from "./pdf-export-settings";
-import type { DocxExportSettings } from "./docx-export-settings";
 import type { ChapterSplitLevel, EpubExportOptions } from "./epub-shared";
 import type { ExportMetadata } from "./types";
 
@@ -196,33 +194,6 @@ export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings
     textIndent: s.textIndent,
     fullwidthSpaceIndent: s.fullwidthSpaceIndent,
     googleFontFamily: isGoogleFont ? s.fontFamily : undefined,
-  };
-}
-
-export function toDocxExportSettings(s: UnifiedExportSettings): DocxExportSettings {
-  const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
-    s.pageSize,
-    s.margins,
-    s.charsPerLine,
-    s.linesPerPage,
-    s.verticalWriting,
-    s.landscape,
-  );
-  const fontSizePt = fontSizeMm * (72 / 25.4);
-
-  return {
-    pageSize: s.pageSize,
-    landscape: s.landscape,
-    verticalWriting: s.verticalWriting,
-    fontFamily: fontKeyToDocx(s.fontFamily),
-    fontSize: Math.round(fontSizePt * 2) / 2, // nearest 0.5pt
-    lineSpacing: Math.round(lineHeightRatio * 10) / 10,
-    margins: { ...s.margins },
-    textIndent: s.textIndent,
-    fullwidthSpaceIndent: s.fullwidthSpaceIndent,
-    showPageNumbers: s.showPageNumbers,
-    pageNumberFormat: s.pageNumberFormat,
-    pageNumberPosition: s.pageNumberPosition,
   };
 }
 

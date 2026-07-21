@@ -32,7 +32,7 @@ import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
 import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-exporter";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
-import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
+import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
@@ -970,7 +970,7 @@ function EditorPageContent() {
     [printDialogState],
   );
 
-  const handleDocxExportConfirm = useCallback(async (settings: DocxExportSettings) => {
+  const handleDocxExportConfirm = useCallback(async (settings: UnifiedExportSettings) => {
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 

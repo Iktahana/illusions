@@ -8,7 +8,6 @@ import {
   loadExportSettings,
   saveExportSettings,
   toPdfExportSettings,
-  toDocxExportSettings,
   toEpubExportOptions,
 } from "@/lib/export/export-settings";
 import { FontSelector } from "@/components/explorer/FontSelector";
@@ -22,7 +21,6 @@ import type {
   PageNumberPosition,
 } from "@/lib/export/export-settings";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
-import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions, ChapterSplitLevel } from "@/lib/export/epub-shared";
 import type { ExportMetadata } from "@/lib/export/types";
 
@@ -42,7 +40,7 @@ interface ExportDialogProps {
   initialFormat: ExportDialogFormat;
   onClose: () => void;
   onExportPdf: (settings: PdfExportSettings) => void;
-  onExportDocx: (settings: DocxExportSettings) => void;
+  onExportDocx: (settings: UnifiedExportSettings) => void;
   onExportEpub?: (options: EpubExportOptions) => void;
   content: string;
   metadata: ExportMetadata;
@@ -278,7 +276,7 @@ function ExportDialogInner({
     if (mode === "print" || selectedFormat === "pdf") {
       onExportPdf(toPdfExportSettings(settings));
     } else {
-      onExportDocx(toDocxExportSettings(settings));
+      onExportDocx(settings);
     }
   }, [
     settings,

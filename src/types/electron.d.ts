@@ -119,17 +119,7 @@ declare global {
       content: string,
       options: {
         metadata: { title: string; author?: string; date?: string; language?: string };
-        settings?: {
-          pageSize?: string;
-          landscape?: boolean;
-          fontFamily?: string;
-          fontSize?: number;
-          lineSpacing?: number;
-          margins?: { top: number; bottom: number; left: number; right: number };
-          textIndent?: number;
-          fullwidthSpaceIndent?: boolean;
-          showPageNumbers?: boolean;
-        };
+        settings?: Partial<import("@/lib/export/export-settings").UnifiedExportSettings>;
         // Active tab's file type. The main-process generateDocx un-escapes MDI
         // macros only for ".mdi"; absent/unknown falls back to ".mdi".
         fileType?: import("@/lib/project/project-types").SupportedFileExtension;
