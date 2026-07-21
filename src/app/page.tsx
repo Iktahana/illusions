@@ -26,7 +26,6 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
-import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
@@ -919,26 +918,7 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: browser print preview (static import — no await before window.open)
-    try {
-      const opened = await openWebPrintPreview(
-        dialogState.content,
-        dialogState.metadata,
-        settings,
-        dialogState.fileType,
-      );
-      if (!opened) {
-        notificationManager.warning(
-          "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-        );
-        return;
-      }
-      // Close dialog — print preview is open. No success toast (browser print gives no result).
-      setExportDialogState(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
   }, []);
 
   const handlePrintConfirm = useCallback(
@@ -985,24 +965,7 @@ function EditorPageContent() {
         return;
       }
 
-      // Web path: browser print preview
-      try {
-        const opened = await openWebPrintPreview(
-          printDialogState.content,
-          printDialogState.metadata,
-          settings,
-        );
-        if (!opened) {
-          notificationManager.warning(
-            "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-          );
-          return;
-        }
-        setPrintDialogState(null);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "不明なエラー";
-        notificationManager.error(`印刷に失敗しました: ${message}`);
-      }
+      notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
     },
     [printDialogState],
   );
@@ -1050,37 +1013,7 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: generate DOCX blob and download
-    const progressId = notificationManager.showProgress("DOCXをエクスポート中...", {
-      type: "info",
-    });
-
-    try {
-      const { generateDocxBlob } = await import("@/lib/export/docx-exporter");
-      // Use the active tab's actual file type (snapshotted when the dialog
-      // opened) so macro un-escaping only applies to ".mdi" documents. Inferring
-      // from the title is wrong — the display title is extension-stripped, which
-      // would silently drop author-written \[\[blank]] literals in ".md"/".txt".
-      const blob = await generateDocxBlob(dialogState.content, {
-        metadata: dialogState.metadata,
-        settings,
-        fileType: dialogState.fileType,
-      });
-      const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
-      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(blob, `${baseName}.docx`, false);
-
-      notificationManager.dismiss(progressId);
-
-      if (saved) {
-        setExportDialogState(null);
-        notificationManager.success("DOCXをエクスポートしました");
-      }
-    } catch (error) {
-      notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
   }, []);
 
   const handleEpubExportConfirm = useCallback(async (options: EpubExportOptions) => {
@@ -1124,31 +1057,7 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: generate EPUB blob and download
-    const progressId = notificationManager.showProgress("EPUBをエクスポート中...", {
-      type: "info",
-    });
-
-    try {
-      const { generateEpubBlob } = await import("@/lib/export/epub-web");
-      const blob = await generateEpubBlob(dialogState.content, epubOptions);
-      const baseName = (options.metadata.title || "untitled")
-        .replace(/[<>:"/\\|?*]/g, "_")
-        .replace(/\.[^.]+$/, "");
-      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(blob, `${baseName}.epub`, false);
-
-      notificationManager.dismiss(progressId);
-
-      if (saved) {
-        setExportDialogState(null);
-        notificationManager.success("EPUBをエクスポートしました");
-      }
-    } catch (error) {
-      notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`EPUBのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
   }, []);
 
   const { exportAs, printDocument } = useExport({

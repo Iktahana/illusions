@@ -1,22 +1,21 @@
-import { renderTextFormat } from "@illusions-lab/mdi";
-import type { MdiTextFormat } from "@illusions-lab/mdi";
-
 import { fullwidthIndentPrefix } from "./fullwidth-indent";
 import { normalizeExportSource } from "./mdi-export";
 
-export type TxtExportFormat = MdiTextFormat;
+export type TxtExportFormat = "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora";
 
 export interface TxtIndentOptions {
   fullwidthSpaceIndent: boolean;
   indentCount: number;
 }
 
-export function exportMdiText(
+/** Node/Electron-only: mdi-core 2.0.9 is published as a nodejs WASM binding. */
+export async function exportMdiText(
   content: string,
   format: TxtExportFormat,
   fileType = ".mdi",
   indent?: TxtIndentOptions,
-): string {
+): Promise<string> {
+  const { renderTextFormat } = await import("@illusions-lab/mdi");
   const indentPrefix = indent?.fullwidthSpaceIndent
     ? fullwidthIndentPrefix(indent.indentCount)
     : "";
@@ -28,9 +27,15 @@ export function exportMdiText(
 }
 
 /** @deprecated Use exportMdiText with the upstream format name. */
-export const mdiToPlainText = (content: string, fileType = ".mdi", indent?: TxtIndentOptions) =>
-  exportMdiText(content, "txt", fileType, indent);
+export const mdiToPlainText = async (
+  content: string,
+  fileType = ".mdi",
+  indent?: TxtIndentOptions,
+) => exportMdiText(content, "txt", fileType, indent);
 
 /** @deprecated Use exportMdiText with the upstream format name. */
-export const mdiToRubyText = (content: string, fileType = ".mdi", indent?: TxtIndentOptions) =>
-  exportMdiText(content, "txt-ruby", fileType, indent);
+export const mdiToRubyText = async (
+  content: string,
+  fileType = ".mdi",
+  indent?: TxtIndentOptions,
+) => exportMdiText(content, "txt-ruby", fileType, indent);

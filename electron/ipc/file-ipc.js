@@ -449,6 +449,28 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.renderMdiText,
+    async (_event, content, format, fileType, indent) => {
+      if (
+        typeof content !== "string" ||
+        !["txt", "txt-ruby", "narou", "kakuyomu", "aozora"].includes(format)
+      ) {
+        throw new Error("Invalid text export request");
+      }
+      if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+        throw new Error("コンテンツが大きすぎてエクスポートできません（50 MB）");
+      }
+      const { renderTextFormat } = await import("@illusions-lab/mdi");
+      const { normalizeExportSource } = require("../../src/lib/export/mdi-export");
+      const { fullwidthIndentPrefix } = require("../../src/lib/export/fullwidth-indent");
+      const prefix = indent?.fullwidthSpaceIndent
+        ? fullwidthIndentPrefix(indent.indentCount)
+        : undefined;
+      return renderTextFormat(normalizeExportSource(content, fileType), format, prefix);
+    },
+  );
+
   ipcMain.handle(EXPORT_CHANNELS.invoke.generatePdfPreview, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
