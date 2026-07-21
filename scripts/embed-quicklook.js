@@ -27,6 +27,31 @@ const os = require("os");
 const { execFileSync } = require("child_process");
 
 const APPEX_NAME = "MDIQuickLook.appex";
+const MDI_WASM_RELATIVE_PATH = path.join(
+  "app.asar.unpacked",
+  "dist-main",
+  "node_modules",
+  "@illusions-lab",
+  "mdi-core",
+  "dist",
+  "mdi_core_bg.wasm",
+);
+
+function packagedResourcesDir(context) {
+  const { electronPlatformName, appOutDir, packager } = context;
+  return electronPlatformName === "darwin"
+    ? path.join(appOutDir, `${packager.appInfo.productFilename}.app`, "Contents", "Resources")
+    : path.join(appOutDir, "resources");
+}
+
+/** Fail packaging when the externalized Rust runtime was not unpacked. */
+function assertMdiWasmPackaged(context) {
+  const wasmPath = path.join(packagedResourcesDir(context), MDI_WASM_RELATIVE_PATH);
+  if (!fs.existsSync(wasmPath)) {
+    throw new Error(`[MDI] Packaged WASM runtime not found: ${wasmPath}`);
+  }
+  console.log(`[MDI] Verified packaged WASM runtime: ${wasmPath}`);
+}
 
 function run(cmd, args, opts = {}) {
   return execFileSync(cmd, args, { stdio: ["ignore", "pipe", "pipe"], ...opts })
@@ -154,6 +179,8 @@ function signAppex(appexPath) {
 exports.default = async function embedQuickLook(context) {
   const { electronPlatformName, appOutDir, packager } = context;
 
+  assertMdiWasmPackaged(context);
+
   if (electronPlatformName !== "darwin") {
     return;
   }
@@ -189,3 +216,6 @@ exports.default = async function embedQuickLook(context) {
   // electron-builder ignores Contents/PlugIns during signing, so sign here.
   signAppex(dest);
 };
+
+exports.packagedResourcesDir = packagedResourcesDir;
+exports.assertMdiWasmPackaged = assertMdiWasmPackaged;
