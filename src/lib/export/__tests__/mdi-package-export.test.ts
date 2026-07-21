@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { renderHtmlWithDiagnostics } from "@illusions-lab/mdi";
 import { resolvePrintProfile } from "@illusions-lab/mdi-export-profile";
+import { strFromU8, unzipSync } from "fflate";
 
+import { generateDocx } from "../docx-exporter";
+import { generateEpub } from "../epub-exporter";
 import { exportMdiText } from "../txt-exporter";
 import { normalizeExportSource, toExportProfile } from "../mdi-export";
 import { DEFAULT_EXPORT_SETTINGS } from "../export-settings";
@@ -46,5 +49,41 @@ describe("@illusions-lab/mdi export boundary", () => {
     const resolved = resolvePrintProfile(profile, "vertical");
     expect(resolved.layout.system).toBe("japanese-publisher");
     expect(resolved.pagination.pageSize).toBeDefined();
+  });
+
+  it("preserves blank paragraphs across the Rust DOCX and EPUB renderers", async () => {
+    const editorSource = String.raw`# 第一章
+
+A
+
+\[\[blank]]
+
+B`;
+    const metadata = { title: "空段落テスト", language: "ja" };
+
+    const [docx, epub] = await Promise.all([
+      generateDocx(editorSource, {
+        metadata,
+        fileType: ".mdi",
+        settings: DEFAULT_EXPORT_SETTINGS,
+      }),
+      generateEpub(editorSource, {
+        metadata,
+        fileType: ".mdi",
+        verticalWriting: true,
+        fontFamily: "serif",
+        textIndent: 1,
+        chapterSplitLevel: "h1",
+      }),
+    ]);
+
+    const documentXml = strFromU8(unzipSync(new Uint8Array(docx))["word/document.xml"]!);
+    const epubFiles = unzipSync(new Uint8Array(epub));
+    const chapterXml = strFromU8(epubFiles["OEBPS/chapter-1.xhtml"]!);
+
+    expect(documentXml).not.toContain("[[blank]]");
+    expect(documentXml).toMatch(/<w:p><w:r><w:t xml:space="preserve"><\/w:t><\/w:r><\/w:p>/);
+    expect(chapterXml).not.toContain("[[blank]]");
+    expect(chapterXml).toContain('<p class="mdi-blank"></p>');
   });
 });

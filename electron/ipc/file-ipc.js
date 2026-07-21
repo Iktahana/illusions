@@ -525,15 +525,14 @@ function registerFileHandlers() {
     let printWin = null;
     try {
       const { BrowserWindow } = require("electron");
-      const { preparePdfExport } = await import("@illusions-lab/mdi/node");
-      const { normalizeExportSource } = require("../../src/lib/export/mdi-export");
-      const { pdfExportProfile } = require("../../src/lib/export/pdf-exporter");
+      const {
+        electronSystemPrintOptions,
+        preparePdfPrintDocument,
+        waitForPrintFonts,
+      } = require("../../src/lib/export/pdf-exporter");
 
       const opts = options || {};
-      const { html } = preparePdfExport(
-        normalizeExportSource(content, opts.fileType),
-        pdfExportProfile(opts),
-      );
+      const prepared = preparePdfPrintDocument(content, opts);
 
       const partition = `print-${Date.now()}`;
       printWin = new BrowserWindow({
@@ -570,27 +569,27 @@ function registerFileHandlers() {
         printWin.webContents.once("did-finish-load", () => resolve());
       });
 
-      await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(prepared.html)}`);
       await loadPromise;
-
-      // Wait for fonts to load
-      const delay = hasGoogleFont ? 2000 : 100;
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await waitForPrintFonts(printWin.webContents);
 
       // Open system print dialog
       await new Promise((resolve, reject) => {
-        printWin.webContents.print({ silent: false }, (success, failureReason) => {
-          if (success) {
-            resolve();
-          } else {
-            // User cancelled is not an error
-            if (failureReason === "cancelled") {
+        printWin.webContents.print(
+          electronSystemPrintOptions(prepared),
+          (success, failureReason) => {
+            if (success) {
               resolve();
             } else {
-              reject(new Error(failureReason || "Print failed"));
+              // User cancelled is not an error
+              if (failureReason === "cancelled") {
+                resolve();
+              } else {
+                reject(new Error(failureReason || "Print failed"));
+              }
             }
-          }
-        });
+          },
+        );
       });
 
       return { success: true };

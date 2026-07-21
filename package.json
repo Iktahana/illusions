@@ -44,6 +44,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@illusions-lab/mdi": "^2.0.9",
     "@illusions-lab/mdi-export-profile": "^2.0.15",
+    "@illusions-lab/mdi-to-pdf": "^2.0.26",
     "@radix-ui/react-context-menu": "^2.3.4",
     "@sentry/electron": "^7.15.0",
     "@serwist/next": "^9.5.11",
