@@ -15,6 +15,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, "..");
 
+// On Windows, npx is a .cmd shim; execFileSync (unlike execSync) doesn't
+// go through a shell, so it needs the literal .cmd extension to resolve it.
+const NPX_CMD = process.platform === "win32" ? "npx.cmd" : "npx";
+
 const targetArchIndex = process.argv.indexOf("--target-arch");
 const targetArch = targetArchIndex !== -1 ? process.argv[targetArchIndex + 1] : process.arch;
 console.log(`🏗️  Target architecture: ${targetArch}`);
@@ -193,17 +197,51 @@ function getElectronVersion() {
 
 function rebuildBetterSqliteForArch(arch) {
   const electronVersion = getElectronVersion();
-  execSync(
-    `npx electron-rebuild --force --only better-sqlite3 --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
-    { cwd: projectRoot, stdio: "inherit" },
+  // execFileSync with an argv array (instead of execSync with an
+  // interpolated shell string) avoids shell parsing entirely, so
+  // projectRoot's absolute path can never be misinterpreted as shell
+  // syntax regardless of what characters it contains. Windows still
+  // needs shell:true here: npx.cmd is a batch script, and Win32's
+  // CreateProcess (which spawnSync/execFileSync call without a shell)
+  // can only launch real .exe binaries directly. With shell:true, Node
+  // does its own platform-correct argv escaping, so this doesn't
+  // reintroduce the string-interpolation injection this function used
+  // to have.
+  execFileSync(
+    NPX_CMD,
+    [
+      "electron-rebuild",
+      "--force",
+      "--only",
+      "better-sqlite3",
+      "--arch",
+      arch,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      projectRoot,
+    ],
+    { cwd: projectRoot, stdio: "inherit", shell: process.platform === "win32" },
   );
 }
 
 function rebuildAsWebAuthenticationForArch(arch) {
   if (process.platform !== "darwin") return;
   const electronVersion = getElectronVersion();
-  execSync(
-    `npx electron-rebuild --force --only @illusions/as-web-authentication --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
+  execFileSync(
+    NPX_CMD,
+    [
+      "electron-rebuild",
+      "--force",
+      "--only",
+      "@illusions/as-web-authentication",
+      "--arch",
+      arch,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      projectRoot,
+    ],
     { cwd: projectRoot, stdio: "inherit" },
   );
 }
