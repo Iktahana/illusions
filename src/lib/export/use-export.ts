@@ -4,7 +4,7 @@ import { useCallback, useEffect } from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { saveBlobFile } from "./save-blob-file";
-import type { TxtExportFormat, TxtIndentOptions } from "./txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "./txt-export-types";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { ExportFormat, ExportMetadata } from "./types";
 

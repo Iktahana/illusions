@@ -29,7 +29,7 @@ import { useExport } from "@/lib/export/use-export";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
-import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-export-types";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { UnifiedExportSettings } from "@/lib/export/export-settings";

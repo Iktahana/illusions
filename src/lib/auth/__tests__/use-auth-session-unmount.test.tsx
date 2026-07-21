@@ -33,6 +33,10 @@ const { trackUsageEventMock } = vi.hoisted(() => ({
   trackUsageEventMock: vi.fn(),
 }));
 
+const { isElectronDevelopmentMock } = vi.hoisted(() => ({
+  isElectronDevelopmentMock: vi.fn(() => false),
+}));
+
 vi.mock("../token-storage", () => ({
   loadTokens: loadTokensMock,
   saveTokens: saveTokensMock,
@@ -41,6 +45,7 @@ vi.mock("../token-storage", () => ({
 
 vi.mock("@/lib/utils/runtime-env", () => ({
   isElectronRenderer: () => true,
+  isElectronDevelopment: isElectronDevelopmentMock,
 }));
 
 vi.mock("@/lib/analytics/usage-events", async (importOriginal) => {
@@ -97,6 +102,7 @@ let container: HTMLDivElement;
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  isElectronDevelopmentMock.mockReturnValue(false);
   sessionRef.current = null;
   installElectronAuthApi();
   container = document.createElement("div");
@@ -125,6 +131,18 @@ function validTokens(): StoredTokens {
 // ---------------------------------------------------------------------------
 
 describe("#1567 — refresh timer lifecycle in useAuthSession", () => {
+  it("does not touch persisted safeStorage tokens during Electron development startup", async () => {
+    isElectronDevelopmentMock.mockReturnValue(true);
+
+    await act(async () => {
+      root.render(<Harness />);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(loadTokensMock).not.toHaveBeenCalled();
+    expect(sessionRef.current?.isLoading).toBe(false);
+  });
+
   it("does NOT schedule a refresh timer when restore resolves after unmount", async () => {
     // loadTokens stays pending until we resolve it manually.
     let resolveTokens: (tokens: StoredTokens) => void = () => undefined;

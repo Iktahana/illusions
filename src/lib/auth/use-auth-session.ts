@@ -19,7 +19,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { isElectronDevelopment, isElectronRenderer } from "@/lib/utils/runtime-env";
 import { classifyTelemetryError, trackUsageEvent } from "@/lib/analytics/usage-events";
 import {
   completeElectronOAuthCallback,
@@ -120,8 +120,13 @@ export function useAuthSession(): AuthSessionState {
       const epochAtStart = getSessionEpoch();
       try {
         if (electron) {
-          // Electron: restore session from safeStorage-backed token storage
-          const session = await restoreElectronSession(epochAtStart);
+          // The unsigned development host can block Electron's main thread in
+          // macOS Keychain while safeStorage decrypts a persisted production
+          // token. Skip only the automatic dev restore; explicit login still
+          // works, and packaged beta/stable builds keep persistent sessions.
+          const session = isElectronDevelopment()
+            ? null
+            : await restoreElectronSession(epochAtStart);
           if (cancelled || getSessionEpoch() !== epochAtStart) return;
           if (session) {
             setUser(session.user);
