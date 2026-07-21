@@ -15,7 +15,9 @@ interface UseWebMenuHandlersProps {
   onCloseWindow?: () => void;
   onToggleCompactMode?: () => void;
   onToggleWritingMode?: () => void;
-  onExport?: (format: "pdf" | "epub" | "docx" | "txt" | "txt-ruby") => void;
+  onExport?: (
+    format: "pdf" | "epub" | "docx" | "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora",
+  ) => void;
   onPrint?: () => void;
   editorView?: EditorView | null;
   fontScale?: number;
@@ -107,6 +109,15 @@ export function useWebMenuHandlers({
           break;
         case "export-txt-ruby":
           if (isEditorTabActive) onExport?.("txt-ruby");
+          break;
+        case "export-narou":
+          if (isEditorTabActive) onExport?.("narou");
+          break;
+        case "export-kakuyomu":
+          if (isEditorTabActive) onExport?.("kakuyomu");
+          break;
+        case "export-aozora":
+          if (isEditorTabActive) onExport?.("aozora");
           break;
         case "export-pdf":
           if (isEditorTabActive) onExport?.("pdf");

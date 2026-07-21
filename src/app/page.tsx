@@ -30,7 +30,7 @@ import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
-import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-exporter";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
@@ -829,11 +829,11 @@ function EditorPageContent() {
 
   // TXT export 字下げ dialog. The export hook awaits the user's choice via a
   // promise resolved when the dialog is confirmed (options) or cancelled (null).
-  const [txtDialogFormat, setTxtDialogFormat] = useState<"txt" | "txt-ruby" | null>(null);
+  const [txtDialogFormat, setTxtDialogFormat] = useState<TxtExportFormat | null>(null);
   const txtOptionsResolverRef = useRef<((options: TxtIndentOptions | null) => void) | null>(null);
 
   const handleRequestTxtExportOptions = useCallback(
-    (format: "txt" | "txt-ruby"): Promise<TxtIndentOptions | null> =>
+    (format: TxtExportFormat): Promise<TxtIndentOptions | null> =>
       new Promise<TxtIndentOptions | null>((resolve) => {
         // If a previous request is still pending (e.g. the dialog was re-opened
         // before being answered), cancel it so its awaiting export does not hang.

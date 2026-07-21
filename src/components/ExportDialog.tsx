@@ -186,7 +186,7 @@ function ExportDialogInner({
 
   // --- Cover image state ---
   const [coverImage, setCoverImage] = useState<Uint8Array | null>(null);
-  const [coverMediaType, setCoverMediaType] = useState<string | null>(null);
+  const [coverMediaType, setCoverMediaType] = useState<"image/jpeg" | "image/png" | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -224,7 +224,7 @@ function ExportDialogInner({
     reader.onload = () => {
       const buf = new Uint8Array(reader.result as ArrayBuffer);
       setCoverImage(buf);
-      setCoverMediaType(file.type);
+      setCoverMediaType(file.type as "image/jpeg" | "image/png");
       const blob = new Blob([buf], { type: file.type });
       const newUrl = URL.createObjectURL(blob);
       coverPreviewUrlRef.current = newUrl;

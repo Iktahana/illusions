@@ -41,7 +41,8 @@ export interface PdfGenerationOptions {
   fileType?: string;
 }
 
-export type ExportFormat = "pdf" | "epub" | "docx" | "txt" | "txt-ruby";
+export type ExportFormat =
+  "pdf" | "epub" | "docx" | "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora";
 
 export interface Chapter {
   title: string;
