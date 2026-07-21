@@ -90,6 +90,7 @@ const FILE_CHANNELS = Object.freeze({
 const EXPORT_CHANNELS = Object.freeze({
   invoke: Object.freeze({
     generatePdfPreview: "generate-pdf-preview",
+    renderMdiText: "render-mdi-text",
     exportPdf: "export-pdf",
     exportEpub: "export-epub",
     exportDocx: "export-docx",
@@ -159,6 +160,9 @@ const MENU_CHANNELS = Object.freeze({
     print: "menu-print",
     exportTxt: "menu-export-txt",
     exportTxtRuby: "menu-export-txt-ruby",
+    exportNarou: "menu-export-narou",
+    exportKakuyomu: "menu-export-kakuyomu",
+    exportAozora: "menu-export-aozora",
     exportPdf: "menu-export-pdf",
     exportEpub: "menu-export-epub",
     exportDocx: "menu-export-docx",

@@ -42,6 +42,8 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@illusions-lab/mdi": "^2.0.9",
+    "@illusions-lab/mdi-export-profile": "^2.0.15",
     "@radix-ui/react-context-menu": "^2.3.4",
     "@sentry/electron": "^7.15.0",
     "@serwist/next": "^9.5.11",

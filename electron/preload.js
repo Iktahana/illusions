@@ -97,6 +97,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onThemeChange: eventChannel(MENU_CHANNELS.event.theme),
   // Export
   generatePdfPreview: invokeChannel(EXPORT_CHANNELS.invoke.generatePdfPreview, { arity: 2 }),
+  renderMdiText: invokeChannel(EXPORT_CHANNELS.invoke.renderMdiText, { arity: 4 }),
   exportPDF: invokeChannel(EXPORT_CHANNELS.invoke.exportPdf, { arity: 2 }),
   exportEPUB: invokeChannel(EXPORT_CHANNELS.invoke.exportEpub, { arity: 2 }),
   exportDOCX: invokeChannel(EXPORT_CHANNELS.invoke.exportDocx, { arity: 2 }),
@@ -104,6 +105,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMenuPrint: eventChannel(MENU_CHANNELS.event.print, { arity: 0 }),
   onMenuExportTxt: eventChannel(MENU_CHANNELS.event.exportTxt, { arity: 0 }),
   onMenuExportTxtRuby: eventChannel(MENU_CHANNELS.event.exportTxtRuby, { arity: 0 }),
+  onMenuExportNarou: eventChannel(MENU_CHANNELS.event.exportNarou, { arity: 0 }),
+  onMenuExportKakuyomu: eventChannel(MENU_CHANNELS.event.exportKakuyomu, { arity: 0 }),
+  onMenuExportAozora: eventChannel(MENU_CHANNELS.event.exportAozora, { arity: 0 }),
   onMenuExportPDF: eventChannel(MENU_CHANNELS.event.exportPdf, { arity: 0 }),
   onMenuExportEPUB: eventChannel(MENU_CHANNELS.event.exportEpub, { arity: 0 }),
   onMenuExportDOCX: eventChannel(MENU_CHANNELS.event.exportDocx, { arity: 0 }),

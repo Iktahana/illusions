@@ -101,6 +101,12 @@ declare global {
       content: string,
       options: PdfGenerationOptions,
     ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
+    renderMdiText?: (
+      content: string,
+      format: import("@/lib/export/txt-exporter").TxtExportFormat,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      indent?: import("@/lib/export/txt-exporter").TxtIndentOptions,
+    ) => Promise<string>;
     exportPDF?: (
       content: string,
       options: PdfGenerationOptions,
@@ -136,6 +142,9 @@ declare global {
     onMenuPrint?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;
     onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
+    onMenuExportNarou?: (callback: () => void) => (() => void) | void;
+    onMenuExportKakuyomu?: (callback: () => void) => (() => void) | void;
+    onMenuExportAozora?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;

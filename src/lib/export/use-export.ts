@@ -4,10 +4,7 @@ import { useCallback, useEffect } from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { saveBlobFile } from "./save-blob-file";
-import { mdiToPlainText, mdiToRubyText } from "./txt-exporter";
-import type { TxtIndentOptions } from "./txt-exporter";
-import { openWebPrintPreview } from "./web-print-preview";
-import { loadExportSettings, toPdfExportSettings } from "./export-settings";
+import type { TxtExportFormat, TxtIndentOptions } from "./txt-exporter";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { ExportFormat, ExportMetadata } from "./types";
 
@@ -44,7 +41,7 @@ interface UseExportParams {
    * or `null` if the user cancelled (export is then aborted). When omitted,
    * TXT export runs directly with no indentation (legacy behavior).
    */
-  onRequestTxtExportOptions?: (format: "txt" | "txt-ruby") => Promise<TxtIndentOptions | null>;
+  onRequestTxtExportOptions?: (format: TxtExportFormat) => Promise<TxtIndentOptions | null>;
 }
 
 /**
@@ -91,16 +88,19 @@ export function useExport({
         docx: "DOCX",
         txt: "テキスト",
         "txt-ruby": "テキスト（ルビ付き）",
+        narou: "小説家になろう形式",
+        kakuyomu: "カクヨム形式",
+        aozora: "青空文庫形式",
       };
       const label = formatLabels[format];
 
       // TXT exports are client-side (no Electron IPC needed)
-      if (format === "txt" || format === "txt-ruby") {
+      if (["txt", "txt-ruby", "narou", "kakuyomu", "aozora"].includes(format)) {
         // Ask the user whether to apply full-width-space 字下げ. A null result
         // means the dialog was cancelled — abort the export silently.
         let indentOptions: TxtIndentOptions | undefined;
         if (onRequestTxtExportOptions) {
-          const chosen = await onRequestTxtExportOptions(format);
+          const chosen = await onRequestTxtExportOptions(format as TxtExportFormat);
           if (chosen === null) return;
           indentOptions = chosen;
         }
@@ -110,13 +110,18 @@ export function useExport({
         });
 
         try {
-          const converted =
-            format === "txt"
-              ? mdiToPlainText(content, fileType, indentOptions)
-              : mdiToRubyText(content, fileType, indentOptions);
+          if (!window.electronAPI?.renderMdiText) {
+            throw new Error("Web 版では Rust MDI エクスポートを利用できません");
+          }
+          const converted = await window.electronAPI.renderMdiText(
+            content,
+            format as TxtExportFormat,
+            fileType,
+            indentOptions,
+          );
 
           const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
-          const suffix = format === "txt-ruby" ? "_ruby" : "";
+          const suffix = format === "txt" ? "" : `_${format.replace("txt-", "")}`;
           const suggestedName = `${baseName}${suffix}.txt`;
 
           const blob = new Blob([converted], { type: "text/plain;charset=utf-8" });
@@ -230,6 +235,15 @@ export function useExport({
     if (window.electronAPI.onMenuExportTxtRuby) {
       cleanups.push(window.electronAPI.onMenuExportTxtRuby(() => void exportAs("txt-ruby")));
     }
+    if (window.electronAPI.onMenuExportNarou) {
+      cleanups.push(window.electronAPI.onMenuExportNarou(() => void exportAs("narou")));
+    }
+    if (window.electronAPI.onMenuExportKakuyomu) {
+      cleanups.push(window.electronAPI.onMenuExportKakuyomu(() => void exportAs("kakuyomu")));
+    }
+    if (window.electronAPI.onMenuExportAozora) {
+      cleanups.push(window.electronAPI.onMenuExportAozora(() => void exportAs("aozora")));
+    }
     if (window.electronAPI.onMenuExportPDF) {
       cleanups.push(window.electronAPI.onMenuExportPDF(() => void exportAs("pdf")));
     }
@@ -270,58 +284,11 @@ async function exportAsWeb(
   label: string,
   fileType: string = ".mdi",
 ): Promise<void> {
-  const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
-
-  if (format === "pdf") {
-    // Defensive fallback: normally PDF goes through dialog (line 103),
-    // but if no dialog callback is wired, use default export settings.
-    const defaults = toPdfExportSettings(await loadExportSettings());
-    const opened = await openWebPrintPreview(content, metadata, defaults, fileType);
-    if (!opened) {
-      notificationManager.warning(
-        "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-      );
-    } else {
-      notificationManager.info("印刷ダイアログからPDFとして保存できます");
-    }
-    return;
-  }
-
-  const progressId = notificationManager.showProgress(`${label}をエクスポート中...`, {
-    type: "info",
-  });
-
-  try {
-    let blob: Blob;
-    let suggestedName: string;
-
-    switch (format) {
-      case "docx": {
-        const { generateDocxBlob } = await import("./docx-exporter");
-        blob = await generateDocxBlob(content, { metadata, fileType });
-        suggestedName = `${baseName}.docx`;
-        break;
-      }
-      case "epub": {
-        const { generateEpubBlob } = await import("./epub-web");
-        blob = await generateEpubBlob(content, { metadata, fileType });
-        suggestedName = `${baseName}.epub`;
-        break;
-      }
-      default:
-        notificationManager.dismiss(progressId);
-        return;
-    }
-
-    const saved = await saveBlobFile(blob, suggestedName, false);
-    notificationManager.dismiss(progressId);
-
-    if (saved) {
-      notificationManager.success(`${label}をエクスポートしました`);
-    }
-  } catch (error) {
-    notificationManager.dismiss(progressId);
-    const message = error instanceof Error ? error.message : "不明なエラー";
-    notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
-  }
+  void format;
+  void content;
+  void title;
+  void metadata;
+  void label;
+  void fileType;
+  notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
 }

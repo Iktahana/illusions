@@ -14,6 +14,7 @@ import { getStorageService } from "@/lib/storage/storage-service";
 import { ALL_JAPANESE_FONTS } from "@/lib/utils/fonts";
 import { calculateTypesetting } from "./pdf-export-settings";
 import { PAGE_DIMENSIONS, ALL_PAGE_SIZE_KEYS } from "./page-sizes";
+import { resolvePrintProfile } from "@illusions-lab/mdi-export-profile";
 
 import type { PdfExportSettings } from "./pdf-export-settings";
 import type { DocxExportSettings } from "./docx-export-settings";
@@ -59,13 +60,18 @@ export interface UnifiedExportSettings {
   epubChapterSplitLevel: ChapterSplitLevel;
 }
 
+const UPSTREAM_DEFAULTS = resolvePrintProfile(
+  { layout: { system: "japanese-publisher" } },
+  "vertical",
+);
+
 export const DEFAULT_EXPORT_SETTINGS: UnifiedExportSettings = {
-  pageSize: "A4",
-  landscape: true,
-  verticalWriting: true,
-  charsPerLine: 40,
-  linesPerPage: 30,
-  margins: { top: 34, bottom: 28, left: 28, right: 45 },
+  pageSize: UPSTREAM_DEFAULTS.pagination.pageSize,
+  landscape: UPSTREAM_DEFAULTS.pagination.landscape,
+  verticalWriting: UPSTREAM_DEFAULTS.typesetting.writingMode === "vertical",
+  charsPerLine: UPSTREAM_DEFAULTS.pagination.charactersPerLine,
+  linesPerPage: UPSTREAM_DEFAULTS.pagination.linesPerPage,
+  margins: { ...UPSTREAM_DEFAULTS.pagination.margins },
   fontFamily: "serif",
   showPageNumbers: true,
   pageNumberFormat: "simple",
@@ -224,7 +230,7 @@ export function toEpubExportOptions(
   s: UnifiedExportSettings,
   metadata: ExportMetadata,
   coverImage?: Uint8Array,
-  coverMediaType?: string,
+  coverMediaType?: "image/jpeg" | "image/png",
 ): EpubExportOptions {
   return {
     metadata: {

@@ -12,6 +12,7 @@
 2. Update transition entrypoints only to keep links and minimal compatibility text.
 3. Avoid copying long policy sections into multiple files.
 4. Record important governance changes in `CHANGELOG.md`.
+5. For a resolved issue, include a closing keyword and issue reference in the PR body (for example, `Fixes #123`). Confirm that the PR is merged and that GitHub closed the issue; if the fix is delivered outside a PR, close the issue manually with a comment linking the delivered commit.
 
 ## Review Requirements
 
