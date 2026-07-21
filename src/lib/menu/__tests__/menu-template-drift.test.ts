@@ -392,6 +392,9 @@ describe("WEB_MENU_STRUCTURE", () => {
             submenu: [
               { label: "テキスト（プレーン）としてエクスポート...", action: "export-txt" },
               { label: "テキスト（ルビ付き）としてエクスポート...", action: "export-txt-ruby" },
+              { label: "小説家になろう形式としてエクスポート...", action: "export-narou" },
+              { label: "カクヨム形式としてエクスポート...", action: "export-kakuyomu" },
+              { label: "青空文庫形式としてエクスポート...", action: "export-aozora" },
               { type: "separator" },
               { label: "PDF としてエクスポート...", action: "export-pdf" },
               { label: "EPUB としてエクスポート...", action: "export-epub" },

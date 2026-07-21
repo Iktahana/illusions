@@ -9,12 +9,12 @@ import {
   DEFAULT_EXPORT_SETTINGS,
 } from "@/lib/export/export-settings";
 import type { UnifiedExportSettings } from "@/lib/export/export-settings";
-import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-exporter";
 
 interface TxtExportDialogProps {
   isOpen: boolean;
   /** Which TXT variant is being exported (affects only the heading). */
-  format: "txt" | "txt-ruby";
+  format: TxtExportFormat;
   /** Called with the chosen 字下げ options when the user confirms. */
   onConfirm: (options: TxtIndentOptions) => void;
   /** Called when the user cancels or dismisses the dialog. */
@@ -84,7 +84,15 @@ export default function TxtExportDialog({
       panelClassName="mx-4 w-full max-w-md p-6"
     >
       <h2 className="text-lg font-semibold text-foreground mb-1">
-        {format === "txt-ruby" ? "テキスト（ルビ付き）エクスポート" : "テキストエクスポート"}
+        {format === "txt-ruby"
+          ? "テキスト（ルビ付き）エクスポート"
+          : format === "narou"
+            ? "小説家になろう形式エクスポート"
+            : format === "kakuyomu"
+              ? "カクヨム形式エクスポート"
+              : format === "aozora"
+                ? "青空文庫形式エクスポート"
+                : "テキストエクスポート"}
       </h2>
       <p className="text-xs text-foreground-tertiary mb-4">字下げの方法を選択してください。</p>
 

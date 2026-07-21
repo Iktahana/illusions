@@ -136,6 +136,9 @@ declare global {
     onMenuPrint?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;
     onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
+    onMenuExportNarou?: (callback: () => void) => (() => void) | void;
+    onMenuExportKakuyomu?: (callback: () => void) => (() => void) | void;
+    onMenuExportAozora?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;
