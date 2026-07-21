@@ -101,6 +101,12 @@ declare global {
       content: string,
       options: PdfGenerationOptions,
     ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
+    renderMdiText?: (
+      content: string,
+      format: import("@/lib/export/txt-exporter").TxtExportFormat,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      indent?: import("@/lib/export/txt-exporter").TxtIndentOptions,
+    ) => Promise<string>;
     exportPDF?: (
       content: string,
       options: PdfGenerationOptions,

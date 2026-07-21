@@ -4,10 +4,7 @@ import { useCallback, useEffect } from "react";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { saveBlobFile } from "./save-blob-file";
-import { exportMdiText } from "./txt-exporter";
 import type { TxtExportFormat, TxtIndentOptions } from "./txt-exporter";
-import { openWebPrintPreview } from "./web-print-preview";
-import { loadExportSettings, toPdfExportSettings } from "./export-settings";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { ExportFormat, ExportMetadata } from "./types";
 
@@ -113,7 +110,10 @@ export function useExport({
         });
 
         try {
-          const converted = exportMdiText(
+          if (!window.electronAPI?.renderMdiText) {
+            throw new Error("Web 版では Rust MDI エクスポートを利用できません");
+          }
+          const converted = await window.electronAPI.renderMdiText(
             content,
             format as TxtExportFormat,
             fileType,
@@ -284,58 +284,11 @@ async function exportAsWeb(
   label: string,
   fileType: string = ".mdi",
 ): Promise<void> {
-  const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
-
-  if (format === "pdf") {
-    // Defensive fallback: normally PDF goes through dialog (line 103),
-    // but if no dialog callback is wired, use default export settings.
-    const defaults = toPdfExportSettings(await loadExportSettings());
-    const opened = await openWebPrintPreview(content, metadata, defaults, fileType);
-    if (!opened) {
-      notificationManager.warning(
-        "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-      );
-    } else {
-      notificationManager.info("印刷ダイアログからPDFとして保存できます");
-    }
-    return;
-  }
-
-  const progressId = notificationManager.showProgress(`${label}をエクスポート中...`, {
-    type: "info",
-  });
-
-  try {
-    let blob: Blob;
-    let suggestedName: string;
-
-    switch (format) {
-      case "docx": {
-        const { generateDocxBlob } = await import("./docx-exporter");
-        blob = await generateDocxBlob(content, { metadata, fileType });
-        suggestedName = `${baseName}.docx`;
-        break;
-      }
-      case "epub": {
-        const { generateEpubBlob } = await import("./epub-web");
-        blob = await generateEpubBlob(content, { metadata, fileType });
-        suggestedName = `${baseName}.epub`;
-        break;
-      }
-      default:
-        notificationManager.dismiss(progressId);
-        return;
-    }
-
-    const saved = await saveBlobFile(blob, suggestedName, false);
-    notificationManager.dismiss(progressId);
-
-    if (saved) {
-      notificationManager.success(`${label}をエクスポートしました`);
-    }
-  } catch (error) {
-    notificationManager.dismiss(progressId);
-    const message = error instanceof Error ? error.message : "不明なエラー";
-    notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
-  }
+  void format;
+  void content;
+  void title;
+  void metadata;
+  void label;
+  void fileType;
+  notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
 }

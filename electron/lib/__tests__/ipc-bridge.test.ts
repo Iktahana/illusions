@@ -134,6 +134,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
   it("export invoke channels keep their historical string values", () => {
     expect(EXPORT_CHANNELS.invoke).toEqual({
       generatePdfPreview: "generate-pdf-preview",
+      renderMdiText: "render-mdi-text",
       exportPdf: "export-pdf",
       exportEpub: "export-epub",
       exportDocx: "export-docx",
