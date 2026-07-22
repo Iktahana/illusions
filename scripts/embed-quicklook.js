@@ -55,6 +55,16 @@ function assertMdiWasmPackaged(context) {
   const wasmPaths = [
     path.join(resourcesDir, "app.asar.unpacked", MDI_WASM_RUNTIME_RELATIVE_PATH),
     path.join(resourcesDir, "app", MDI_WASM_RUNTIME_RELATIVE_PATH),
+    // MAS flattens `dist-main/node_modules` into the application root.
+    path.join(
+      resourcesDir,
+      "app",
+      "node_modules",
+      "@illusions-lab",
+      "mdi-core",
+      "dist",
+      "mdi_core_bg.wasm",
+    ),
   ];
   const wasmPath = wasmPaths.find((candidate) => fs.existsSync(candidate));
   if (!wasmPath) {
