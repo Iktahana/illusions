@@ -8,6 +8,7 @@ import EditorLayout from "@/components/EditorLayout";
 import SettingsModal from "@/components/SettingsModal";
 import SettingsWindow from "@/components/SettingsWindow";
 import WelcomeScreen from "@/components/WelcomeScreen";
+import StartupRestoreScreen from "@/components/StartupRestoreScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
@@ -1409,9 +1410,9 @@ function EditorPageContent() {
 
   // --- Routing: WelcomeScreen vs Editor ---
   if (editorMode === null) {
-    // Show blank screen while auto-restoring last project (avoid WelcomeScreen flash)
+    // Keep startup visibly responsive while auto-restoring the last project.
     if (isRestoring) {
-      return <div className="h-screen bg-background" />;
+      return <StartupRestoreScreen />;
     }
 
     return (
