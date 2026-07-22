@@ -36,9 +36,16 @@ const MDI_WASM_RUNTIME_RELATIVE_PATH = path.join(
   "mdi_core_bg.wasm",
 );
 
+function isMacPlatform(electronPlatformName) {
+  // electron-builder reports the Mac App Store target as "mas", not
+  // "darwin", even though its application bundle has the standard macOS
+  // layout.
+  return electronPlatformName === "darwin" || electronPlatformName === "mas";
+}
+
 function packagedResourcesDir(context) {
   const { electronPlatformName, appOutDir, packager } = context;
-  return electronPlatformName === "darwin"
+  return isMacPlatform(electronPlatformName)
     ? path.join(appOutDir, `${packager.appInfo.productFilename}.app`, "Contents", "Resources")
     : path.join(appOutDir, "resources");
 }
@@ -49,7 +56,7 @@ function packagedResourcesDir(context) {
  * mdi-core package into the runtime location before the app is signed.
  */
 function materializeMasMdiRuntime(context) {
-  if (context.electronPlatformName !== "darwin" || process.env.MAS_BUILD !== "1") return;
+  if (!isMacPlatform(context.electronPlatformName) || process.env.MAS_BUILD !== "1") return;
 
   const source = path.join(
     context.packager.projectDir,

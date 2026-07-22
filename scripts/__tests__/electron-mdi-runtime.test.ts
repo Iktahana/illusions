@@ -77,7 +77,7 @@ describe("packaged Electron MDI runtime", () => {
   });
 
   it("accepts the unpacked Resources/app layout used by MAS", () => {
-    const packagingContext = context("darwin");
+    const packagingContext = context("mas");
     const target = wasmPath(packagingContext, "directory");
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, Buffer.from("wasm"));
@@ -86,7 +86,7 @@ describe("packaged Electron MDI runtime", () => {
   });
 
   it("accepts the flattened Resources/app/node_modules layout used by MAS", () => {
-    const packagingContext = context("darwin");
+    const packagingContext = context("mas");
     const target = wasmPath(packagingContext, "flattened-directory");
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, Buffer.from("wasm"));
@@ -95,7 +95,7 @@ describe("packaged Electron MDI runtime", () => {
   });
 
   it("materializes the bundled MDI runtime into the MAS application", () => {
-    const packagingContext = context("darwin");
+    const packagingContext = context("mas");
     const source = path.join(
       packagingContext.packager.projectDir,
       "dist-main",
