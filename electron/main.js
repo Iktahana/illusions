@@ -84,7 +84,6 @@ initializeErrorReporting({
   dsn: process.env.ERROR_REPORT_DSN || "",
   getStorageManager,
   getRelease: () => app.getVersion(),
-  environment: app.isPackaged ? "production" : "development",
 });
 
 process.on("uncaughtException", (err) => {

@@ -1,4 +1,5 @@
 import { detectOSPlatform } from "@/lib/utils/runtime-env";
+import { deriveReleaseEnvironment } from "@/lib/error-reporting/release-environment";
 import type { BugReportCategory, BugReportDiagnostics, BugReportInput } from "./bug-report-types";
 
 /**
@@ -80,6 +81,7 @@ export async function submitBugReport(input: BugReportInput): Promise<SubmitBugR
     level: CATEGORY_LEVEL[input.category],
     message: title,
     release: diagnostics.appVersion,
+    environment: deriveReleaseEnvironment(diagnostics.appVersion),
     tags: {
       source: "bug-report-form",
       category: input.category,
