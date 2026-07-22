@@ -33,10 +33,13 @@ function context(platform: string): PackagingContext {
   };
 }
 
-function wasmPath(packagingContext: PackagingContext): string {
+function wasmPath(
+  packagingContext: PackagingContext,
+  packaging: "asar" | "directory" = "asar",
+): string {
   return path.join(
     packagedResourcesDir(packagingContext),
-    "app.asar.unpacked",
+    packaging === "asar" ? "app.asar.unpacked" : "app",
     "dist-main",
     "node_modules",
     "@illusions-lab",
@@ -63,6 +66,15 @@ describe("packaged Electron MDI runtime", () => {
   it.each(["darwin", "win32", "linux"])("accepts the unpacked WASM asset on %s", (platform) => {
     const packagingContext = context(platform);
     const target = wasmPath(packagingContext);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, Buffer.from("wasm"));
+
+    expect(() => assertMdiWasmPackaged(packagingContext)).not.toThrow();
+  });
+
+  it("accepts the unpacked Resources/app layout used by MAS", () => {
+    const packagingContext = context("darwin");
+    const target = wasmPath(packagingContext, "directory");
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, Buffer.from("wasm"));
 
