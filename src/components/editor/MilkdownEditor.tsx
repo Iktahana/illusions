@@ -60,6 +60,7 @@ import {
 import { usePosHighlightActivation } from "@/lib/editor-page/use-pos-highlight-activation";
 import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
+import { createMacOptionInputGuardPlugin } from "@/lib/editor-page/mac-option-input-guard";
 
 interface MilkdownEditorProps {
   initialContent: string;
@@ -287,6 +288,9 @@ export default function MilkdownEditor({
         .use(history)
         .use(clipboard)
         .use(cursor)
+        // Prevent macOS Option-generated characters (for example ⌥V → √)
+        // without stopping propagation to the global shortcut listener.
+        .use($prose(() => createMacOptionInputGuardPlugin()))
         .use(verticalScrollPlugin)
         .use($prose(() => searchHighlightPlugin))
         .use($prose(() => speechHighlightPlugin))

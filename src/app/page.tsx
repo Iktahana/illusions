@@ -26,14 +26,13 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
-import { openWebPrintPreview } from "@/lib/export/web-print-preview";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
-import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-exporter";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
-import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
+import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
@@ -67,6 +66,7 @@ import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
 import { findSearchMatches, type SearchRange } from "@/lib/editor-page/find-search-matches";
 import { useSearchHighlight, isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
+import { takeEditorSelectionForSearch } from "@/lib/editor-page/search-selection";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
@@ -557,6 +557,14 @@ function EditorPageContent() {
     setEditorViewInstanceRaw(view);
   }, []);
 
+  // Snapshot selection before SearchDialog moves focus to its input, then keep
+  // a collapsed editor caret while the dialog owns DOM focus.
+  const handleOpenSearchFromShortcut = useCallback(() => {
+    const selectedText = takeEditorSelectionForSearch(editorViewRef.current);
+    if (selectedText !== undefined) setSearchTerm(selectedText);
+    setSearchOpenTrigger((prev) => prev + 1);
+  }, [setSearchTerm]);
+
   // --- 検索ハイライトの単一ソース ---
   // いずれかの検索 UI が表示中か。両方非表示ならハイライトを消す（要求2）。
   const isSearchVisible = isSearchDialogOpen || topView === "search";
@@ -829,11 +837,11 @@ function EditorPageContent() {
 
   // TXT export 字下げ dialog. The export hook awaits the user's choice via a
   // promise resolved when the dialog is confirmed (options) or cancelled (null).
-  const [txtDialogFormat, setTxtDialogFormat] = useState<"txt" | "txt-ruby" | null>(null);
+  const [txtDialogFormat, setTxtDialogFormat] = useState<TxtExportFormat | null>(null);
   const txtOptionsResolverRef = useRef<((options: TxtIndentOptions | null) => void) | null>(null);
 
   const handleRequestTxtExportOptions = useCallback(
-    (format: "txt" | "txt-ruby"): Promise<TxtIndentOptions | null> =>
+    (format: TxtExportFormat): Promise<TxtIndentOptions | null> =>
       new Promise<TxtIndentOptions | null>((resolve) => {
         // If a previous request is still pending (e.g. the dialog was re-opened
         // before being answered), cancel it so its awaiting export does not hang.
@@ -919,26 +927,7 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: browser print preview (static import — no await before window.open)
-    try {
-      const opened = await openWebPrintPreview(
-        dialogState.content,
-        dialogState.metadata,
-        settings,
-        dialogState.fileType,
-      );
-      if (!opened) {
-        notificationManager.warning(
-          "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-        );
-        return;
-      }
-      // Close dialog — print preview is open. No success toast (browser print gives no result).
-      setExportDialogState(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
   }, []);
 
   const handlePrintConfirm = useCallback(
@@ -985,29 +974,12 @@ function EditorPageContent() {
         return;
       }
 
-      // Web path: browser print preview
-      try {
-        const opened = await openWebPrintPreview(
-          printDialogState.content,
-          printDialogState.metadata,
-          settings,
-        );
-        if (!opened) {
-          notificationManager.warning(
-            "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-          );
-          return;
-        }
-        setPrintDialogState(null);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "不明なエラー";
-        notificationManager.error(`印刷に失敗しました: ${message}`);
-      }
+      notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
     },
     [printDialogState],
   );
 
-  const handleDocxExportConfirm = useCallback(async (settings: DocxExportSettings) => {
+  const handleDocxExportConfirm = useCallback(async (settings: UnifiedExportSettings) => {
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 
@@ -1050,37 +1022,7 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: generate DOCX blob and download
-    const progressId = notificationManager.showProgress("DOCXをエクスポート中...", {
-      type: "info",
-    });
-
-    try {
-      const { generateDocxBlob } = await import("@/lib/export/docx-exporter");
-      // Use the active tab's actual file type (snapshotted when the dialog
-      // opened) so macro un-escaping only applies to ".mdi" documents. Inferring
-      // from the title is wrong — the display title is extension-stripped, which
-      // would silently drop author-written \[\[blank]] literals in ".md"/".txt".
-      const blob = await generateDocxBlob(dialogState.content, {
-        metadata: dialogState.metadata,
-        settings,
-        fileType: dialogState.fileType,
-      });
-      const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
-      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(blob, `${baseName}.docx`, false);
-
-      notificationManager.dismiss(progressId);
-
-      if (saved) {
-        setExportDialogState(null);
-        notificationManager.success("DOCXをエクスポートしました");
-      }
-    } catch (error) {
-      notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
   }, []);
 
   const handleEpubExportConfirm = useCallback(async (options: EpubExportOptions) => {
@@ -1124,31 +1066,7 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: generate EPUB blob and download
-    const progressId = notificationManager.showProgress("EPUBをエクスポート中...", {
-      type: "info",
-    });
-
-    try {
-      const { generateEpubBlob } = await import("@/lib/export/epub-web");
-      const blob = await generateEpubBlob(dialogState.content, epubOptions);
-      const baseName = (options.metadata.title || "untitled")
-        .replace(/[<>:"/\\|?*]/g, "_")
-        .replace(/\.[^.]+$/, "");
-      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(blob, `${baseName}.epub`, false);
-
-      notificationManager.dismiss(progressId);
-
-      if (saved) {
-        setExportDialogState(null);
-        notificationManager.success("EPUBをエクスポートしました");
-      }
-    } catch (error) {
-      notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`EPUBのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
   }, []);
 
   const { exportAs, printDocument } = useExport({
@@ -1379,6 +1297,7 @@ function EditorPageContent() {
     handleToggleTcy,
     setShowSettingsModal,
     setSearchOpenTrigger,
+    openSearchFromShortcut: handleOpenSearchFromShortcut,
     incrementEditorKey,
     nextTab,
     prevTab,

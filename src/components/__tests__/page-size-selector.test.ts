@@ -34,8 +34,8 @@ describe("filterPageSizes", () => {
       }
     }
     expect(a4Count).toBe(1);
-    // A4 should be in the first category (おすすめ), not ISO A
-    expect(a4Category).toBe("おすすめ");
+    // The upstream MDI catalogue is the single source of truth.
+    expect(a4Category).toBe("MDI 標準用紙サイズ");
   });
 
   it("deduplicates during search", () => {
@@ -44,11 +44,11 @@ describe("filterPageSizes", () => {
     expect(a4Entries.length).toBe(1);
   });
 
-  it("finds Japanese labels (文庫)", () => {
-    const results = filterPageSizes(PAGE_SIZE_CATEGORIES, "文庫");
+  it("finds upstream publication sizes by key", () => {
+    const results = filterPageSizes(PAGE_SIZE_CATEGORIES, "Shiroku");
     const allKeys = results.flatMap((cat) => cat.sizes.map((s) => s.key));
     expect(allKeys.length).toBeGreaterThan(0);
-    expect(allKeys.some((k) => k.toLowerCase().includes("bunko") || k.includes("文庫"))).toBe(true);
+    expect(allKeys.some((k) => k.toLowerCase().includes("shiro"))).toBe(true);
   });
 
   it("returns empty for non-matching search", () => {

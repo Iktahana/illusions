@@ -125,6 +125,24 @@ const MENU_TEMPLATE = [
             requiresActiveEditor: true,
             electronChannel: "menu-export-txt-ruby",
           },
+          {
+            id: "export-narou",
+            label: "小説家になろう形式としてエクスポート...",
+            requiresActiveEditor: true,
+            electronChannel: "menu-export-narou",
+          },
+          {
+            id: "export-kakuyomu",
+            label: "カクヨム形式としてエクスポート...",
+            requiresActiveEditor: true,
+            electronChannel: "menu-export-kakuyomu",
+          },
+          {
+            id: "export-aozora",
+            label: "青空文庫形式としてエクスポート...",
+            requiresActiveEditor: true,
+            electronChannel: "menu-export-aozora",
+          },
           SEPARATOR,
           {
             id: "export-pdf",

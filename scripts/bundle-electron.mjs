@@ -6,7 +6,7 @@
  */
 
 import * as esbuild from "esbuild";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
 import fs from "fs";
 import { execFileSync, execSync } from "child_process";
@@ -14,6 +14,10 @@ import { execFileSync, execSync } from "child_process";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, "..");
+
+// On Windows, npx is a .cmd shim; execFileSync (unlike execSync) doesn't
+// go through a shell, so it needs the literal .cmd extension to resolve it.
+const NPX_CMD = process.platform === "win32" ? "npx.cmd" : "npx";
 
 const targetArchIndex = process.argv.indexOf("--target-arch");
 const targetArch = targetArchIndex !== -1 ? process.argv[targetArchIndex + 1] : process.arch;
@@ -46,6 +50,10 @@ await esbuild.build({
     "node-pty",
     // macOS-only native bridge for ASWebAuthenticationSession
     "@illusions/as-web-authentication",
+    // wasm-pack's Node loader resolves mdi_core_bg.wasm relative to its own
+    // package directory. Keep that loader external so esbuild does not flatten
+    // __dirname to dist-main/ and separate it from the WASM asset.
+    "@illusions-lab/mdi-core",
   ],
   define: {
     "process.env.APTABASE_APP_KEY": JSON.stringify(process.env.APTABASE_APP_KEY || ""),
@@ -59,6 +67,16 @@ await esbuild.build({
 });
 
 console.log("✅ Main process bundled to dist-main/main.js");
+
+// Guard the asset boundary itself: if mdi-core is accidentally bundled again,
+// wasm-pack will resolve its WASM relative to dist-main/main.js in packaged apps.
+const mainBundleSource = fs.readFileSync(join(outDir, "main.js"), "utf-8");
+if (!mainBundleSource.includes('require("@illusions-lab/mdi-core")')) {
+  throw new Error("Electron main bundle did not preserve @illusions-lab/mdi-core as external");
+}
+if (mainBundleSource.includes("/mdi_core_bg.wasm")) {
+  throw new Error("Electron main bundle flattened the mdi-core WASM loader");
+}
 
 console.log("📦 Bundling Electron preload script...");
 
@@ -134,8 +152,14 @@ function collectDepsRecursive(pkgName, collected) {
 // risk even when the code path is dead (docs/release/mac-app-store.md).
 const isMasBuild = process.env.MAS_BUILD === "1";
 const externalRoots = isMasBuild
-  ? ["kuromoji", "better-sqlite3", "@illusions/as-web-authentication"]
-  : ["kuromoji", "better-sqlite3", "node-pty", "@illusions/as-web-authentication"];
+  ? ["kuromoji", "better-sqlite3", "@illusions/as-web-authentication", "@illusions-lab/mdi-core"]
+  : [
+      "kuromoji",
+      "better-sqlite3",
+      "node-pty",
+      "@illusions/as-web-authentication",
+      "@illusions-lab/mdi-core",
+    ];
 
 // Collect all transitive production dependencies
 const allDeps = new Set();
@@ -193,17 +217,51 @@ function getElectronVersion() {
 
 function rebuildBetterSqliteForArch(arch) {
   const electronVersion = getElectronVersion();
-  execSync(
-    `npx electron-rebuild --force --only better-sqlite3 --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
-    { cwd: projectRoot, stdio: "inherit" },
+  // execFileSync with an argv array (instead of execSync with an
+  // interpolated shell string) avoids shell parsing entirely, so
+  // projectRoot's absolute path can never be misinterpreted as shell
+  // syntax regardless of what characters it contains. Windows still
+  // needs shell:true here: npx.cmd is a batch script, and Win32's
+  // CreateProcess (which spawnSync/execFileSync call without a shell)
+  // can only launch real .exe binaries directly. With shell:true, Node
+  // does its own platform-correct argv escaping, so this doesn't
+  // reintroduce the string-interpolation injection this function used
+  // to have.
+  execFileSync(
+    NPX_CMD,
+    [
+      "electron-rebuild",
+      "--force",
+      "--only",
+      "better-sqlite3",
+      "--arch",
+      arch,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      projectRoot,
+    ],
+    { cwd: projectRoot, stdio: "inherit", shell: process.platform === "win32" },
   );
 }
 
 function rebuildAsWebAuthenticationForArch(arch) {
   if (process.platform !== "darwin") return;
   const electronVersion = getElectronVersion();
-  execSync(
-    `npx electron-rebuild --force --only @illusions/as-web-authentication --arch ${arch} --version ${electronVersion} --module-dir ${projectRoot}`,
+  execFileSync(
+    NPX_CMD,
+    [
+      "electron-rebuild",
+      "--force",
+      "--only",
+      "@illusions/as-web-authentication",
+      "--arch",
+      arch,
+      "--version",
+      electronVersion,
+      "--module-dir",
+      projectRoot,
+    ],
     { cwd: projectRoot, stdio: "inherit" },
   );
 }
@@ -298,6 +356,22 @@ for (const dep of runtimeDeps) {
     console.warn(`  ⚠️  Warning: ${dep} not found in node_modules`);
   }
 }
+
+// Fail the bundle before electron-builder if the Rust runtime is incomplete.
+// Loading the copied package (rather than the workspace package) verifies both
+// the loader's relative path and the WASM binary itself.
+const bundledMdiCoreDir = join(nodeModulesDest, "@illusions-lab", "mdi-core");
+const bundledMdiWasm = join(bundledMdiCoreDir, "dist", "mdi_core_bg.wasm");
+if (!fs.existsSync(bundledMdiWasm)) {
+  throw new Error(`MDI core WASM was not copied to the Electron runtime: ${bundledMdiWasm}`);
+}
+const bundledMdiCore = await import(
+  pathToFileURL(join(bundledMdiCoreDir, "dist", "mdi_core.js")).href
+);
+if (bundledMdiCore.renderText("# MDI runtime smoke test") !== "MDI runtime smoke test\n") {
+  throw new Error("Bundled MDI core failed its runtime smoke test");
+}
+console.log("  ✅ @illusions-lab/mdi-core WASM runtime smoke test");
 
 console.log("");
 console.log("🎉 Bundling complete!");

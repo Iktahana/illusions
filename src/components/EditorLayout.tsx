@@ -49,7 +49,7 @@ import { isEditorTab, type EditorTabState, type TabState } from "@/lib/tab-manag
 import type { ContextMenuState } from "@/lib/hooks/use-context-menu";
 import type { LintIssue } from "@/lib/linting/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
-import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
+import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
@@ -110,7 +110,7 @@ interface EditorLayoutProps {
       state: { format: "pdf" | "docx" | "epub"; content: string; metadata: ExportMetadata } | null;
       onClose: () => void;
       onPdfExport: (settings: PdfExportSettings) => void;
-      onDocxExport: (settings: DocxExportSettings) => void;
+      onDocxExport: (settings: UnifiedExportSettings) => void;
       onEpubExport: (options: EpubExportOptions) => void;
       content: string;
       metadata: ExportMetadata;

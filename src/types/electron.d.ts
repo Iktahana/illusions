@@ -101,6 +101,12 @@ declare global {
       content: string,
       options: PdfGenerationOptions,
     ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
+    renderMdiText?: (
+      content: string,
+      format: import("@/lib/export/txt-exporter").TxtExportFormat,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      indent?: import("@/lib/export/txt-exporter").TxtIndentOptions,
+    ) => Promise<string>;
     exportPDF?: (
       content: string,
       options: PdfGenerationOptions,
@@ -113,17 +119,7 @@ declare global {
       content: string,
       options: {
         metadata: { title: string; author?: string; date?: string; language?: string };
-        settings?: {
-          pageSize?: string;
-          landscape?: boolean;
-          fontFamily?: string;
-          fontSize?: number;
-          lineSpacing?: number;
-          margins?: { top: number; bottom: number; left: number; right: number };
-          textIndent?: number;
-          fullwidthSpaceIndent?: boolean;
-          showPageNumbers?: boolean;
-        };
+        settings?: Partial<import("@/lib/export/export-settings").UnifiedExportSettings>;
         // Active tab's file type. The main-process generateDocx un-escapes MDI
         // macros only for ".mdi"; absent/unknown falls back to ".mdi".
         fileType?: import("@/lib/project/project-types").SupportedFileExtension;
@@ -136,6 +132,9 @@ declare global {
     onMenuPrint?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;
     onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
+    onMenuExportNarou?: (callback: () => void) => (() => void) | void;
+    onMenuExportKakuyomu?: (callback: () => void) => (() => void) | void;
+    onMenuExportAozora?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;

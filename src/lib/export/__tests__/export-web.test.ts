@@ -35,6 +35,49 @@ describe("generateDocxBlob", () => {
     expect(bytes[0]).toBe(0x50);
     expect(bytes[1]).toBe(0x4b);
   });
+
+  it("preserves blank paragraphs in the generated Word document", async () => {
+    const { generateDocxBlob } = await import("../docx-exporter");
+    const { unzipSync, strFromU8 } = await import("fflate");
+    const blob = await generateDocxBlob("前。\n\n[[blank]]\n\n後。", {
+      metadata: { title: "空段落" },
+    });
+    const entries = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+    const documentXml = strFromU8(entries["word/document.xml"]);
+
+    expect(documentXml).toContain('<w:p><w:r><w:t xml:space="preserve"></w:t></w:r></w:p>');
+  });
+
+  it("applies the unified grid and full-width indentation settings to DOCX", async () => {
+    const { generateDocxBlob } = await import("../docx-exporter");
+    const { DEFAULT_EXPORT_SETTINGS } = await import("../export-settings");
+    const { unzipSync, strFromU8 } = await import("fflate");
+
+    async function documentXml(charsPerLine: number, linesPerPage: number): Promise<string> {
+      const blob = await generateDocxBlob("本文。", {
+        metadata: { title: "組版" },
+        settings: {
+          ...DEFAULT_EXPORT_SETTINGS,
+          charsPerLine,
+          linesPerPage,
+          textIndent: 2,
+          fullwidthSpaceIndent: true,
+        },
+      });
+      const entries = unzipSync(new Uint8Array(await blob.arrayBuffer()));
+      return strFromU8(entries["word/document.xml"]);
+    }
+
+    const defaults = await documentXml(40, 30);
+    const customized = await documentXml(33, 22);
+    const defaultGrid = defaults.match(/<w:docGrid\b[^>]*>/)?.[0];
+    const customizedGrid = customized.match(/<w:docGrid\b[^>]*>/)?.[0];
+
+    expect(defaultGrid).toBeDefined();
+    expect(customizedGrid).toBeDefined();
+    expect(customizedGrid).not.toBe(defaultGrid);
+    expect(customized).toContain('<w:t xml:space="preserve">　　</w:t>');
+  });
 });
 
 // --- generateEpubBlob ---

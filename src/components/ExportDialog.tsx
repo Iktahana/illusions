@@ -8,7 +8,6 @@ import {
   loadExportSettings,
   saveExportSettings,
   toPdfExportSettings,
-  toDocxExportSettings,
   toEpubExportOptions,
 } from "@/lib/export/export-settings";
 import { FontSelector } from "@/components/explorer/FontSelector";
@@ -22,7 +21,6 @@ import type {
   PageNumberPosition,
 } from "@/lib/export/export-settings";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
-import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions, ChapterSplitLevel } from "@/lib/export/epub-shared";
 import type { ExportMetadata } from "@/lib/export/types";
 
@@ -42,7 +40,7 @@ interface ExportDialogProps {
   initialFormat: ExportDialogFormat;
   onClose: () => void;
   onExportPdf: (settings: PdfExportSettings) => void;
-  onExportDocx: (settings: DocxExportSettings) => void;
+  onExportDocx: (settings: UnifiedExportSettings) => void;
   onExportEpub?: (options: EpubExportOptions) => void;
   content: string;
   metadata: ExportMetadata;
@@ -186,7 +184,7 @@ function ExportDialogInner({
 
   // --- Cover image state ---
   const [coverImage, setCoverImage] = useState<Uint8Array | null>(null);
-  const [coverMediaType, setCoverMediaType] = useState<string | null>(null);
+  const [coverMediaType, setCoverMediaType] = useState<"image/jpeg" | "image/png" | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -224,7 +222,7 @@ function ExportDialogInner({
     reader.onload = () => {
       const buf = new Uint8Array(reader.result as ArrayBuffer);
       setCoverImage(buf);
-      setCoverMediaType(file.type);
+      setCoverMediaType(file.type as "image/jpeg" | "image/png");
       const blob = new Blob([buf], { type: file.type });
       const newUrl = URL.createObjectURL(blob);
       coverPreviewUrlRef.current = newUrl;
@@ -278,7 +276,7 @@ function ExportDialogInner({
     if (mode === "print" || selectedFormat === "pdf") {
       onExportPdf(toPdfExportSettings(settings));
     } else {
-      onExportDocx(toDocxExportSettings(settings));
+      onExportDocx(settings);
     }
   }, [
     settings,

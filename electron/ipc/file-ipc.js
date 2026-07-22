@@ -449,6 +449,28 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.renderMdiText,
+    async (_event, content, format, fileType, indent) => {
+      if (
+        typeof content !== "string" ||
+        !["txt", "txt-ruby", "narou", "kakuyomu", "aozora"].includes(format)
+      ) {
+        throw new Error("Invalid text export request");
+      }
+      if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+        throw new Error("コンテンツが大きすぎてエクスポートできません（50 MB）");
+      }
+      const { renderTextFormat } = await import("@illusions-lab/mdi");
+      const { normalizeExportSource } = require("../../src/lib/export/mdi-export");
+      const { fullwidthIndentPrefix } = require("../../src/lib/export/fullwidth-indent");
+      const prefix = indent?.fullwidthSpaceIndent
+        ? fullwidthIndentPrefix(indent.indentCount)
+        : undefined;
+      return renderTextFormat(normalizeExportSource(content, fileType), format, prefix);
+    },
+  );
+
   ipcMain.handle(EXPORT_CHANNELS.invoke.generatePdfPreview, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
@@ -503,66 +525,15 @@ function registerFileHandlers() {
     let printWin = null;
     try {
       const { BrowserWindow } = require("electron");
-      const { mdiToHtml } = require("../../src/lib/export/mdi-to-html");
-      const { calculateTypesetting } = require("../../src/lib/export/pdf-export-settings");
-      const { fullwidthIndentCount } = require("../../src/lib/export/fullwidth-indent");
+      const { preparePdfExport } = await import("@illusions-lab/mdi/node");
+      const { normalizeExportSource } = require("../../src/lib/export/mdi-export");
+      const { pdfExportProfile } = require("../../src/lib/export/pdf-exporter");
 
       const opts = options || {};
-      const pageSize = opts.pageSize ?? "A5";
-      const margins = opts.margins ?? { top: 20, bottom: 20, left: 15, right: 15 };
-      const verticalWriting = opts.verticalWriting ?? false;
-      const landscape = opts.landscape ?? false;
-
-      // Full-width-space 字下げ: literal U+3000 characters replace CSS text-indent.
-      // When the toggle is on, suppress textIndentEm to avoid double indentation
-      // (same logic as pdf-exporter.ts).
-      const fullwidthSpaceCount = opts.fullwidthSpaceIndent
-        ? fullwidthIndentCount(opts.textIndent ?? 0)
-        : 0;
-      const effectiveTextIndentEm = opts.fullwidthSpaceIndent ? 0 : opts.textIndent;
-
-      // Build typesetting when chars/lines specified
-      let typesetting;
-      if (opts.charsPerLine != null && opts.linesPerPage != null) {
-        const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
-          pageSize,
-          margins,
-          opts.charsPerLine,
-          opts.linesPerPage,
-          verticalWriting,
-          landscape,
-        );
-        typesetting = {
-          fontFamily: opts.fontFamily,
-          fontSizeMm,
-          lineHeightRatio,
-          textIndentEm: effectiveTextIndentEm,
-          margins,
-          pageSize,
-          landscape,
-        };
-      } else {
-        typesetting = { pageSize, landscape, margins };
-      }
-
-      const html = mdiToHtml(content, {
-        metadata: opts.metadata,
-        verticalWriting,
-        typesetting,
-        googleFontFamily: opts.googleFontFamily,
-        fileType: opts.fileType,
-        fullwidthSpaceIndentCount: fullwidthSpaceCount,
-        // Embed page numbers via CSS @page margin boxes so they appear in the
-        // actual print output (webContents.print does not support
-        // headerTemplate/footerTemplate unlike printToPDF).
-        pageNumbers: opts.showPageNumbers
-          ? {
-              show: true,
-              format: opts.pageNumberFormat,
-              position: opts.pageNumberPosition,
-            }
-          : undefined,
-      });
+      const { html } = preparePdfExport(
+        normalizeExportSource(content, opts.fileType),
+        pdfExportProfile(opts),
+      );
 
       const partition = `print-${Date.now()}`;
       printWin = new BrowserWindow({
