@@ -66,6 +66,7 @@ import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
 import { findSearchMatches, type SearchRange } from "@/lib/editor-page/find-search-matches";
 import { useSearchHighlight, isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
+import { takeEditorSelectionForSearch } from "@/lib/editor-page/search-selection";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
@@ -555,6 +556,14 @@ function EditorPageContent() {
     editorViewRef.current = view; // ref FIRST so sync consumers see fresh value
     setEditorViewInstanceRaw(view);
   }, []);
+
+  // Snapshot selection before SearchDialog moves focus to its input, then keep
+  // a collapsed editor caret while the dialog owns DOM focus.
+  const handleOpenSearchFromShortcut = useCallback(() => {
+    const selectedText = takeEditorSelectionForSearch(editorViewRef.current);
+    if (selectedText !== undefined) setSearchTerm(selectedText);
+    setSearchOpenTrigger((prev) => prev + 1);
+  }, [setSearchTerm]);
 
   // --- 検索ハイライトの単一ソース ---
   // いずれかの検索 UI が表示中か。両方非表示ならハイライトを消す（要求2）。
@@ -1288,6 +1297,7 @@ function EditorPageContent() {
     handleToggleTcy,
     setShowSettingsModal,
     setSearchOpenTrigger,
+    openSearchFromShortcut: handleOpenSearchFromShortcut,
     incrementEditorKey,
     nextTab,
     prevTab,
