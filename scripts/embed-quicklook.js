@@ -44,6 +44,39 @@ function packagedResourcesDir(context) {
 }
 
 /**
+ * MAS flattens Electron's application tree and may omit the WASM payload from
+ * the generated node_modules entry. Copy the already bundled, smoke-tested
+ * mdi-core package into the runtime location before the app is signed.
+ */
+function materializeMasMdiRuntime(context) {
+  if (context.electronPlatformName !== "darwin" || process.env.MAS_BUILD !== "1") return;
+
+  const source = path.join(
+    context.packager.projectDir,
+    "dist-main",
+    "node_modules",
+    "@illusions-lab",
+    "mdi-core",
+  );
+  const destination = path.join(
+    packagedResourcesDir(context),
+    "app",
+    "node_modules",
+    "@illusions-lab",
+    "mdi-core",
+  );
+
+  if (!fs.existsSync(source)) {
+    throw new Error(`[MDI] Bundled WASM runtime not found: ${source}`);
+  }
+
+  fs.rmSync(destination, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.cpSync(source, destination, { recursive: true });
+  console.log(`[MDI] Materialized MAS runtime: ${destination}`);
+}
+
+/**
  * Fail packaging when the externalized Rust runtime is absent.
  *
  * Regular desktop targets store external main-process dependencies in
@@ -199,6 +232,7 @@ function signAppex(appexPath) {
 exports.default = async function embedQuickLook(context) {
   const { electronPlatformName, appOutDir, packager } = context;
 
+  materializeMasMdiRuntime(context);
   assertMdiWasmPackaged(context);
 
   if (electronPlatformName !== "darwin") {
@@ -239,3 +273,4 @@ exports.default = async function embedQuickLook(context) {
 
 exports.packagedResourcesDir = packagedResourcesDir;
 exports.assertMdiWasmPackaged = assertMdiWasmPackaged;
+exports.materializeMasMdiRuntime = materializeMasMdiRuntime;
