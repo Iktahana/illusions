@@ -35,13 +35,15 @@ function context(platform: string): PackagingContext {
 
 function wasmPath(
   packagingContext: PackagingContext,
-  packaging: "asar" | "directory" = "asar",
+  packaging: "asar" | "directory" | "flattened-directory" = "asar",
 ): string {
+  const runtimePath =
+    packaging === "flattened-directory"
+      ? ["app", "node_modules"]
+      : [packaging === "asar" ? "app.asar.unpacked" : "app", "dist-main", "node_modules"];
   return path.join(
     packagedResourcesDir(packagingContext),
-    packaging === "asar" ? "app.asar.unpacked" : "app",
-    "dist-main",
-    "node_modules",
+    ...runtimePath,
     "@illusions-lab",
     "mdi-core",
     "dist",
@@ -75,6 +77,15 @@ describe("packaged Electron MDI runtime", () => {
   it("accepts the unpacked Resources/app layout used by MAS", () => {
     const packagingContext = context("darwin");
     const target = wasmPath(packagingContext, "directory");
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, Buffer.from("wasm"));
+
+    expect(() => assertMdiWasmPackaged(packagingContext)).not.toThrow();
+  });
+
+  it("accepts the flattened Resources/app/node_modules layout used by MAS", () => {
+    const packagingContext = context("darwin");
+    const target = wasmPath(packagingContext, "flattened-directory");
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, Buffer.from("wasm"));
 
