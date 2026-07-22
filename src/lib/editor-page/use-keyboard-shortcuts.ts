@@ -18,6 +18,8 @@ interface UseKeyboardShortcutsParams {
   handleToggleTcy: () => void;
   setShowSettingsModal: (value: boolean) => void;
   setSearchOpenTrigger: Dispatch<SetStateAction<number>>;
+  /** Opens search from its keyboard binding, preserving selected editor text when present. */
+  openSearchFromShortcut?: () => void;
   /**
    * エディタ強制再マウント用キーのインクリメント。
    * NOTE: タブナビゲーションでは呼ばない（#1878: タブ往復で Undo/Redo が消える退行）。
@@ -67,6 +69,7 @@ export function useKeyboardShortcuts({
   handleToggleTcy,
   setShowSettingsModal,
   setSearchOpenTrigger,
+  openSearchFromShortcut,
   nextTab,
   prevTab,
   newTab,
@@ -155,7 +158,15 @@ export function useKeyboardShortcuts({
           setShowSettingsModal(true);
         }
       },
-      "nav.search": isEditorTabActive ? () => setSearchOpenTrigger((prev) => prev + 1) : undefined,
+      "nav.search": isEditorTabActive
+        ? () => {
+            if (openSearchFromShortcut) {
+              openSearchFromShortcut();
+            } else {
+              setSearchOpenTrigger((prev) => prev + 1);
+            }
+          }
+        : undefined,
       // タブ往復で history を保つため remount しない (#1878)。
       "nav.nextTab": () => nextTab(),
       "nav.prevTab": () => prevTab(),
@@ -186,6 +197,7 @@ export function useKeyboardShortcuts({
     handleToggleTcy,
     setShowSettingsModal,
     setSearchOpenTrigger,
+    openSearchFromShortcut,
     nextTab,
     prevTab,
     newTab,
