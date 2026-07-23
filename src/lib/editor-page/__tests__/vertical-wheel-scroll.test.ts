@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveVerticalWheelScrollDelta } from "../vertical-wheel-scroll";
+import {
+  applyVerticalWheelScroll,
+  resolveVerticalWheelScrollDelta,
+} from "../vertical-wheel-scroll";
 
 const trackpad = {
   deltaY: 0,
@@ -101,5 +104,44 @@ describe("resolveVerticalWheelScrollDelta", () => {
         deltaX: 0,
       }),
     ).toBeNull();
+  });
+
+  it.each([
+    [-24, 176],
+    [24, 224],
+  ])(
+    "applies the OS-adjusted horizontal gesture to the real scrollLeft value (%s)",
+    (deltaX, expectedScrollLeft) => {
+      const container = document.createElement("div");
+      container.scrollLeft = 200;
+      const event = new WheelEvent("wheel", {
+        deltaX,
+        cancelable: true,
+      });
+
+      expect(
+        applyVerticalWheelScroll(container, event, {
+          behavior: "trackpad",
+          sensitivity: 1,
+        }),
+      ).toBe(true);
+      expect(container.scrollLeft).toBe(expectedScrollLeft);
+      expect(event.defaultPrevented).toBe(true);
+    },
+  );
+
+  it("leaves the DOM and browser default untouched for an empty wheel event", () => {
+    const container = document.createElement("div");
+    container.scrollLeft = 200;
+    const event = new WheelEvent("wheel", { cancelable: true });
+
+    expect(
+      applyVerticalWheelScroll(container, event, {
+        behavior: "auto",
+        sensitivity: 1,
+      }),
+    ).toBe(false);
+    expect(container.scrollLeft).toBe(200);
+    expect(event.defaultPrevented).toBe(false);
   });
 });

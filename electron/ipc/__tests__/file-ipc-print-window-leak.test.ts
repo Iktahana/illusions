@@ -74,8 +74,9 @@ describe("file-ipc.js printDocument handler — BrowserWindow leak fix (#1919)",
 
   it("uses the shared MDI Chromium profile adapter for system print", () => {
     expect(printHandler).toContain("preparePdfPrintDocument(content, opts)");
+    expect(printHandler).toContain("electronSystemPrintHtml(prepared)");
     expect(printHandler).toContain("electronSystemPrintOptions(prepared)");
-    expect(printHandler).toContain("loadPrintDocumentHtml(printWin, prepared.html)");
+    expect(printHandler).toContain("loadPrintDocumentHtml(printWin, printHtml)");
     expect(printHandler).toContain("waitForPrintFonts(printWin.webContents)");
     expect(printHandler).not.toContain("data:text/html");
   });

@@ -50,6 +50,7 @@ export interface PdfExportOptions {
 const EMPTY_PRINT_TEMPLATE = "<span></span>";
 const MICRONS_PER_MM = 1000;
 const PRINT_DOCUMENT_SCHEME_PREFIX = "illusions-print";
+const SYSTEM_PRINT_PAGE_NUMBER_STYLE_ID = "mdi-system-print-page-numbers";
 const PDF_FILE_WRITE_CHUNK_BYTES = 1024 * 1024;
 const DEFAULT_CHARACTERS_PER_LINE = 40;
 const DEFAULT_LINES_PER_PAGE = 30;
@@ -209,6 +210,47 @@ export function electronPdfOptions(
     footerTemplate: prepared.pageNumbers.footerTemplate ?? EMPTY_PRINT_TEMPLATE,
     ...(pageRanges ? { pageRanges } : {}),
   };
+}
+
+function systemPrintPageNumberContent(
+  format: ChromiumPrintProfile["pageNumbers"]["format"],
+): string {
+  switch (format) {
+    case "dash":
+      return String.raw`"\2014 " counter(page) " \2014"`;
+    case "fraction":
+      return 'counter(page) " / " counter(pages)';
+    default:
+      return "counter(page)";
+  }
+}
+
+/**
+ * Add Chromium page-margin counters for native/system print.
+ *
+ * printToPDF accepts the upstream header/footer HTML templates directly, but
+ * webContents.print() does not. Modern Chromium prints CSS @page margin boxes,
+ * so system print can preserve the same resolved page-number semantics without
+ * reimplementing pagination or typesetting.
+ */
+export function electronSystemPrintHtml(prepared: ChromiumPrintProfile): string {
+  if (!prepared.pageNumbers.enabled) return prepared.html;
+
+  const marginBox = `@${prepared.pageNumbers.position}`;
+  const content = systemPrintPageNumberContent(prepared.pageNumbers.format);
+  const style =
+    `<style id="${SYSTEM_PRINT_PAGE_NUMBER_STYLE_ID}">` +
+    `@page{${marginBox}{content:${content};font-family:sans-serif;font-size:8pt;` +
+    "font-weight:normal;color:#000;writing-mode:horizontal-tb;text-orientation:mixed}}" +
+    "</style>";
+
+  if (/<\/head\s*>/i.test(prepared.html)) {
+    return prepared.html.replace(/<\/head\s*>/i, `${style}</head>`);
+  }
+  if (/<html(?:\s[^>]*)?>/i.test(prepared.html)) {
+    return prepared.html.replace(/<html(?:\s[^>]*)?>/i, `$&<head>${style}</head>`);
+  }
+  return `${style}${prepared.html}`;
 }
 
 /** Convert physical profile metadata to webContents.print() host options. */

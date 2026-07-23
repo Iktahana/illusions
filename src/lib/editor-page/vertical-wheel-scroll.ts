@@ -8,6 +8,11 @@ export interface VerticalWheelScrollInput {
   sensitivity: number;
 }
 
+export type VerticalWheelEvent = Pick<
+  WheelEvent,
+  "ctrlKey" | "deltaX" | "deltaY" | "preventDefault"
+>;
+
 /**
  * Convert a wheel gesture to the scrollLeft delta used by vertical-rl.
  *
@@ -43,4 +48,23 @@ export function resolveVerticalWheelScrollDelta({
   }
 
   return deltaX * sensitivity;
+}
+
+/** Apply the resolved delta to the real vertical-writing scroll container. */
+export function applyVerticalWheelScroll(
+  container: Pick<HTMLElement, "scrollLeft">,
+  event: VerticalWheelEvent,
+  settings: Pick<VerticalWheelScrollInput, "behavior" | "sensitivity">,
+): boolean {
+  const scrollDelta = resolveVerticalWheelScrollDelta({
+    deltaX: event.deltaX,
+    deltaY: event.deltaY,
+    ctrlKey: event.ctrlKey,
+    ...settings,
+  });
+  if (scrollDelta === null) return false;
+
+  container.scrollLeft += scrollDelta;
+  event.preventDefault();
+  return true;
 }
