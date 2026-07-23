@@ -1,12 +1,8 @@
 import { fullwidthIndentPrefix } from "./fullwidth-indent";
 import { normalizeExportSource } from "./mdi-export";
+import type { TxtExportFormat, TxtIndentOptions } from "./txt-export-types";
 
-export type TxtExportFormat = "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora";
-
-export interface TxtIndentOptions {
-  fullwidthSpaceIndent: boolean;
-  indentCount: number;
-}
+export type { TxtExportFormat, TxtIndentOptions } from "./txt-export-types";
 
 /** Node/Electron-only: mdi-core 2.0.9 is published as a nodejs WASM binding. */
 export async function exportMdiText(

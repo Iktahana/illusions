@@ -48,6 +48,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   appRuntime: {
     distributionProvider: detectDistributionProvider(),
     releaseChannel: detectReleaseChannel(process.env.npm_package_version || "0.0.0"),
+    // Development uses an unsigned Electron host. Restoring safeStorage tokens
+    // there can synchronously block the main thread in macOS Keychain before
+    // the editor finishes booting, so the renderer skips startup auth restore.
+    isDevelopment: process.env.ELECTRON_DEV === "1",
   },
   openFile: invokeChannel(FILE_CHANNELS.invoke.openFile, { arity: 0 }),
   saveFile: invokeChannel(FILE_CHANNELS.invoke.saveFile, { arity: 3 }),

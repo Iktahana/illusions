@@ -9,7 +9,7 @@ import {
   DEFAULT_EXPORT_SETTINGS,
 } from "@/lib/export/export-settings";
 import type { UnifiedExportSettings } from "@/lib/export/export-settings";
-import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-export-types";
 
 interface TxtExportDialogProps {
   isOpen: boolean;

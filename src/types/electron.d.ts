@@ -18,7 +18,7 @@ export {};
 declare global {
   interface ElectronAPI {
     isElectron: boolean;
-    appRuntime?: AppRuntimeInfo;
+    appRuntime?: AppRuntimeInfo & { isDevelopment?: boolean };
     openFile: () => Promise<{ path: string; content: string } | null>;
     saveFile: (
       filePath: string | null,
@@ -103,9 +103,9 @@ declare global {
     ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
     renderMdiText?: (
       content: string,
-      format: import("@/lib/export/txt-exporter").TxtExportFormat,
+      format: import("@/lib/export/txt-export-types").TxtExportFormat,
       fileType?: import("@/lib/project/project-types").SupportedFileExtension,
-      indent?: import("@/lib/export/txt-exporter").TxtIndentOptions,
+      indent?: import("@/lib/export/txt-export-types").TxtIndentOptions,
     ) => Promise<string>;
     exportPDF?: (
       content: string,

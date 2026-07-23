@@ -72,6 +72,12 @@ describe("file-ipc.js printDocument handler — BrowserWindow leak fix (#1919)",
     expect(tryBody).not.toMatch(/printWin\.destroy\(\)/);
   });
 
+  it("uses the shared MDI Chromium profile adapter for system print", () => {
+    expect(printHandler).toContain("preparePdfPrintDocument(content, opts)");
+    expect(printHandler).toContain("electronSystemPrintOptions(prepared)");
+    expect(printHandler).toContain("waitForPrintFonts(printWin.webContents)");
+  });
+
   it("catch block does NOT call printWin.destroy() (finally handles it)", () => {
     const catchBodyMatch = printHandler.match(
       /\bcatch\s*\([^)]+\)\s*\{([\s\S]*?)\}\s*finally\s*\{/,
