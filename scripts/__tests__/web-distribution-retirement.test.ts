@@ -18,6 +18,7 @@ describe("retired Web distribution contract", () => {
       "vercel.json",
       "src/app/sw.ts",
       "src/app/~offline",
+      "src/app/auth/callback",
       "src/components/AnalyticsLoader.tsx",
       "public/robots.txt",
       "public/site.webmanifest",
