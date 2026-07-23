@@ -13,6 +13,7 @@ import {
   loadExportSettings,
   saveExportSettings,
   toPdfExportSettings,
+  toPdfGenerationOptions,
 } from "@/lib/export/export-settings";
 
 // インメモリ KV で StorageService をモックする
@@ -69,6 +70,46 @@ describe("toPdfExportSettings", () => {
 
     expect(converted.fontFamily).toBe('"Shippori Mincho", serif');
     expect(converted.googleFontFamily).toBe("Shippori Mincho");
+  });
+});
+
+describe("toPdfGenerationOptions", () => {
+  it("forwards the complete UI profile unchanged to preview, PDF, and system print IPCs", () => {
+    const settings = toPdfExportSettings({
+      ...DEFAULT_EXPORT_SETTINGS,
+      pageSize: "Bunko",
+      landscape: false,
+      verticalWriting: false,
+      charsPerLine: 33,
+      linesPerPage: 22,
+      margins: { top: 11, right: 12, bottom: 13, left: 14 },
+      fontFamily: "Shippori Mincho",
+      showPageNumbers: true,
+      pageNumberFormat: "fraction",
+      pageNumberPosition: "top-right",
+      textIndent: 2,
+      fullwidthSpaceIndent: true,
+    });
+
+    expect(
+      toPdfGenerationOptions(settings, { title: "組版テスト", author: "著者" }, ".mdi"),
+    ).toEqual({
+      metadata: { title: "組版テスト", author: "著者" },
+      fileType: ".mdi",
+      pageSize: "Bunko",
+      landscape: false,
+      verticalWriting: false,
+      charsPerLine: 33,
+      linesPerPage: 22,
+      margins: { top: 11, right: 12, bottom: 13, left: 14 },
+      fontFamily: '"Shippori Mincho", serif',
+      googleFontFamily: "Shippori Mincho",
+      showPageNumbers: true,
+      pageNumberFormat: "fraction",
+      pageNumberPosition: "top-right",
+      textIndent: 2,
+      fullwidthSpaceIndent: true,
+    });
   });
 });
 
