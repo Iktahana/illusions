@@ -102,6 +102,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Export
   generatePdfPreview: invokeChannel(EXPORT_CHANNELS.invoke.generatePdfPreview, { arity: 3 }),
   cancelPdfPreview: invokeChannel(EXPORT_CHANNELS.invoke.cancelPdfPreview, { arity: 0 }),
+  exportHTML: invokeChannel(EXPORT_CHANNELS.invoke.exportHtml, { arity: 3 }),
   exportMdiText: invokeChannel(EXPORT_CHANNELS.invoke.exportMdiText, { arity: 5 }),
   copyMdiText: invokeChannel(EXPORT_CHANNELS.invoke.copyMdiText, { arity: 4 }),
   exportPDF: invokeChannel(EXPORT_CHANNELS.invoke.exportPdf, { arity: 2 }),
@@ -109,6 +110,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   exportDOCX: invokeChannel(EXPORT_CHANNELS.invoke.exportDocx, { arity: 2 }),
   printDocument: invokeChannel(EXPORT_CHANNELS.invoke.printDocument, { arity: 2 }),
   onMenuPrint: eventChannel(MENU_CHANNELS.event.print, { arity: 0 }),
+  onMenuExportHTML: eventChannel(MENU_CHANNELS.event.exportHtml, { arity: 0 }),
   onMenuExportTxt: eventChannel(MENU_CHANNELS.event.exportTxt, { arity: 0 }),
   onMenuExportTxtRuby: eventChannel(MENU_CHANNELS.event.exportTxtRuby, { arity: 0 }),
   onMenuExportNarou: eventChannel(MENU_CHANNELS.event.exportNarou, { arity: 0 }),

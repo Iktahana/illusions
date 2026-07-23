@@ -114,6 +114,11 @@ declare global {
       | { success: false; error: string; cancelled?: boolean; code?: string }
     >;
     cancelPdfPreview?: () => Promise<boolean>;
+    exportHTML?: (
+      content: string,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      title?: string,
+    ) => Promise<string | { success: false; error: string; code?: string } | null>;
     exportMdiText?: (
       content: string,
       format: import("@/lib/export/txt-export-types").TxtExportFormat,
@@ -150,6 +155,7 @@ declare global {
       options: PdfGenerationOptions,
     ) => Promise<{ success: boolean; error?: string }>;
     onMenuPrint?: (callback: () => void) => (() => void) | void;
+    onMenuExportHTML?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;
     onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
     onMenuExportNarou?: (callback: () => void) => (() => void) | void;

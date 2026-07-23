@@ -282,6 +282,7 @@ export default function MilkdownEditor({
           enableNoBreak: mdiExtensionsEnabled,
           enableKern: mdiExtensionsEnabled,
           enableMdiBreak: mdiExtensionsEnabled,
+          enableFrontmatter: mdiExtensionsEnabled,
           // .txt: characters like *, #, ** are literal — copy must bypass
           // markdown stripping / MDI conversion (P2-A).
           plainText: isPlainText,

@@ -91,6 +91,7 @@ const EXPORT_CHANNELS = Object.freeze({
   invoke: Object.freeze({
     generatePdfPreview: "generate-pdf-preview",
     cancelPdfPreview: "cancel-pdf-preview",
+    exportHtml: "export-html",
     exportMdiText: "export-mdi-text",
     copyMdiText: "copy-mdi-text",
     exportPdf: "export-pdf",
@@ -160,6 +161,7 @@ const MENU_CHANNELS = Object.freeze({
     format: "menu-format",
     theme: "menu-theme",
     print: "menu-print",
+    exportHtml: "menu-export-html",
     exportTxt: "menu-export-txt",
     exportTxtRuby: "menu-export-txt-ruby",
     exportNarou: "menu-export-narou",

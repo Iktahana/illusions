@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
+import type { ExportFormat } from "@/lib/export/types";
 
 // ---------------------------------------------------------------------------
 // Pure logic extracted from useWebMenuHandlers for guard testing
@@ -15,8 +16,6 @@ import { describe, it, expect, vi } from "vitest";
 // Here we extract only the guard predicate and the action dispatch table so
 // we can unit-test them without @testing-library/react.
 // ---------------------------------------------------------------------------
-
-type ExportFormat = "pdf" | "epub" | "docx" | "txt" | "txt-ruby";
 
 interface CommandGuardParams {
   isEditorTabActive: boolean;
@@ -48,6 +47,18 @@ function handleMenuAction(action: string, params: CommandGuardParams): void {
       break;
     case "export-txt-ruby":
       if (isEditorTabActive) onExport("txt-ruby");
+      break;
+    case "export-narou":
+      if (isEditorTabActive) onExport("narou");
+      break;
+    case "export-kakuyomu":
+      if (isEditorTabActive) onExport("kakuyomu");
+      break;
+    case "export-aozora":
+      if (isEditorTabActive) onExport("aozora");
+      break;
+    case "export-html":
+      if (isEditorTabActive) onExport("html");
       break;
     case "export-pdf":
       if (isEditorTabActive) onExport("pdf");
@@ -85,6 +96,10 @@ describe("command guards – export actions", () => {
   const exportActions: Array<[string, ExportFormat]> = [
     ["export-txt", "txt"],
     ["export-txt-ruby", "txt-ruby"],
+    ["export-narou", "narou"],
+    ["export-kakuyomu", "kakuyomu"],
+    ["export-aozora", "aozora"],
+    ["export-html", "html"],
     ["export-pdf", "pdf"],
     ["export-epub", "epub"],
     ["export-docx", "docx"],
@@ -137,13 +152,33 @@ describe("command guards – file actions are always active", () => {
 describe("isEditorTabActive flag semantics", () => {
   it("false means all export actions produce zero onExport calls", () => {
     const { dispatch, onExport } = buildParams(false);
-    ["export-txt", "export-txt-ruby", "export-pdf", "export-epub", "export-docx"].forEach(dispatch);
+    [
+      "export-txt",
+      "export-txt-ruby",
+      "export-narou",
+      "export-kakuyomu",
+      "export-aozora",
+      "export-html",
+      "export-pdf",
+      "export-epub",
+      "export-docx",
+    ].forEach(dispatch);
     expect(onExport).not.toHaveBeenCalled();
   });
 
   it("true means all export actions each invoke onExport once", () => {
     const { dispatch, onExport } = buildParams(true);
-    ["export-txt", "export-txt-ruby", "export-pdf", "export-epub", "export-docx"].forEach(dispatch);
-    expect(onExport).toHaveBeenCalledTimes(5);
+    [
+      "export-txt",
+      "export-txt-ruby",
+      "export-narou",
+      "export-kakuyomu",
+      "export-aozora",
+      "export-html",
+      "export-pdf",
+      "export-epub",
+      "export-docx",
+    ].forEach(dispatch);
+    expect(onExport).toHaveBeenCalledTimes(9);
   });
 });

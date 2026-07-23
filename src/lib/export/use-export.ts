@@ -99,6 +99,7 @@ export function useExport({
       const fileType = getFileType();
 
       const formatLabels: Record<ExportFormat, string> = {
+        html: "HTML",
         pdf: "PDF",
         epub: "EPUB",
         docx: "DOCX",
@@ -172,6 +173,9 @@ export function useExport({
         let result: string | { success: false; error: string } | null | undefined;
 
         switch (format) {
+          case "html":
+            result = await window.electronAPI.exportHTML?.(content, fileType, title);
+            break;
           case "pdf":
             // Thread fileType so the HTML pipeline un-escapes MDI macros for
             // ".mdi" and preserves \[\[blank]] literals in ".md"/".txt".
@@ -304,6 +308,9 @@ export function useExport({
     }
     if (window.electronAPI.onMenuExportAozora) {
       cleanups.push(window.electronAPI.onMenuExportAozora(() => void exportAs("aozora")));
+    }
+    if (window.electronAPI.onMenuExportHTML) {
+      cleanups.push(window.electronAPI.onMenuExportHTML(() => void exportAs("html")));
     }
     if (window.electronAPI.onMenuCopyTxt) {
       cleanups.push(window.electronAPI.onMenuCopyTxt(() => void copyAs("txt")));
