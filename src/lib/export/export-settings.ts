@@ -12,8 +12,7 @@
 
 import { getStorageService } from "@/lib/storage/storage-service";
 import { ALL_JAPANESE_FONTS } from "@/lib/utils/fonts";
-import { PAGE_DIMENSIONS, ALL_PAGE_SIZE_KEYS } from "./page-sizes";
-import { resolvePrintProfile } from "@illusions-lab/mdi-export-profile";
+import { ALL_PAGE_SIZE_KEYS, MDI_VERTICAL_PRINT_DEFAULTS, PAGE_DIMENSIONS } from "./page-sizes";
 
 import type { PdfExportSettings } from "./pdf-export-settings";
 import type { ChapterSplitLevel, EpubExportOptions } from "./epub-shared";
@@ -60,19 +59,14 @@ export interface UnifiedExportSettings {
   epubChapterSplitLevel: ChapterSplitLevel;
 }
 
-const UPSTREAM_DEFAULTS = resolvePrintProfile(
-  { layout: { system: "japanese-publisher" } },
-  "vertical",
-);
-
 export const DEFAULT_EXPORT_SETTINGS: UnifiedExportSettings = {
   htmlBodyOnly: false,
-  pageSize: UPSTREAM_DEFAULTS.pagination.pageSize,
-  landscape: UPSTREAM_DEFAULTS.pagination.landscape,
-  verticalWriting: UPSTREAM_DEFAULTS.typesetting.writingMode === "vertical",
-  charsPerLine: UPSTREAM_DEFAULTS.pagination.charactersPerLine,
-  linesPerPage: UPSTREAM_DEFAULTS.pagination.linesPerPage,
-  margins: { ...UPSTREAM_DEFAULTS.pagination.margins },
+  pageSize: MDI_VERTICAL_PRINT_DEFAULTS.pageSize,
+  landscape: MDI_VERTICAL_PRINT_DEFAULTS.landscape,
+  verticalWriting: MDI_VERTICAL_PRINT_DEFAULTS.verticalWriting,
+  charsPerLine: MDI_VERTICAL_PRINT_DEFAULTS.charsPerLine,
+  linesPerPage: MDI_VERTICAL_PRINT_DEFAULTS.linesPerPage,
+  margins: { ...MDI_VERTICAL_PRINT_DEFAULTS.margins },
   fontFamily: "serif",
   showPageNumbers: true,
   pageNumberFormat: "simple",
