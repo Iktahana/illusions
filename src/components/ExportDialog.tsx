@@ -8,6 +8,7 @@ import {
   loadExportSettings,
   saveExportSettings,
   toPdfExportSettings,
+  toPdfGenerationOptions,
   toEpubExportOptions,
 } from "@/lib/export/export-settings";
 import { FontSelector } from "@/components/explorer/FontSelector";
@@ -360,23 +361,7 @@ function ExportDialogInner({
       try {
         const result = await window.electronAPI!.generatePdfPreview!(
           content,
-          {
-            metadata,
-            verticalWriting: settings.verticalWriting,
-            pageSize: previewSettings.pageSize,
-            landscape: previewSettings.landscape,
-            margins: previewSettings.margins,
-            charsPerLine: previewSettings.charsPerLine,
-            linesPerPage: previewSettings.linesPerPage,
-            fontFamily: previewSettings.fontFamily,
-            showPageNumbers: previewSettings.showPageNumbers,
-            pageNumberFormat: previewSettings.pageNumberFormat,
-            pageNumberPosition: previewSettings.pageNumberPosition,
-            textIndent: previewSettings.textIndent,
-            fullwidthSpaceIndent: previewSettings.fullwidthSpaceIndent,
-            googleFontFamily: previewSettings.googleFontFamily,
-            fileType,
-          },
+          toPdfGenerationOptions(previewSettings, metadata, fileType),
           previewMaxPagesPreference === "auto" ? undefined : Number(previewMaxPagesPreference),
         );
 

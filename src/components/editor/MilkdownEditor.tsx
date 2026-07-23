@@ -48,6 +48,7 @@ import {
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import { getLayoutCharsPerLine } from "@/lib/editor-page/chars-per-line-layout";
+import { resolveVerticalWheelScrollDelta } from "@/lib/editor-page/vertical-wheel-scroll";
 import type { LintIssue } from "@/lib/linting";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import {
@@ -502,49 +503,17 @@ export default function MilkdownEditor({
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      const sensitivity = scrollSensitivity;
-      const absX = Math.abs(event.deltaX);
-      const absY = Math.abs(event.deltaY);
-      const mouseHorizontalDelta = -event.deltaY * sensitivity;
-      const hasBothAxes = absX > 0 && absY > 0;
-      const hasFineGrainedValues = (absY > 0 && absY < 50) || (absX > 0 && absX < 50);
-      const isTrackpadInput =
-        verticalScrollBehavior === "trackpad" ||
-        (verticalScrollBehavior === "auto" &&
-          (hasBothAxes || (hasFineGrainedValues && !event.ctrlKey)));
+      const scrollDelta = resolveVerticalWheelScrollDelta({
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+        ctrlKey: event.ctrlKey,
+        behavior: verticalScrollBehavior,
+        sensitivity: scrollSensitivity,
+      });
+      if (scrollDelta === null) return;
 
-      if (verticalScrollBehavior === "mouse") {
-        if (absY >= absX && absY > 0) {
-          container.scrollLeft += mouseHorizontalDelta;
-          event.preventDefault();
-        } else if (absX > 0) {
-          container.scrollLeft -= event.deltaX * sensitivity;
-          event.preventDefault();
-        }
-        return;
-      }
-
-      if (isTrackpadInput) {
-        // 縦書きは横スクロールのみ（overflowY hidden）。2本指パンは支配的な軸だけを
-        // 横スクロールへ写像し、対角・慣性入力で deltaX/deltaY が競合して引っかかるのを防ぐ。
-        // 横スワイプは指の向きに追従（-deltaX）、縦スワイプは読み進み方向（+deltaY）。
-        if (absX > 0 || absY > 0) {
-          const primaryDelta = absX >= absY ? -event.deltaX : event.deltaY;
-          container.scrollLeft += primaryDelta * sensitivity;
-        }
-        event.preventDefault();
-        return;
-      }
-
-      // Mouse semantics: treat dominant deltaY as vertical wheel input and map it
-      // to horizontal movement for vertical writing.
-      if (absY >= absX && absY > 0) {
-        container.scrollLeft += mouseHorizontalDelta;
-        event.preventDefault();
-      } else if (absX > 0) {
-        container.scrollLeft -= event.deltaX * sensitivity;
-        event.preventDefault();
-      }
+      container.scrollLeft += scrollDelta;
+      event.preventDefault();
     };
 
     container.addEventListener("wheel", handleWheel, { passive: false });
