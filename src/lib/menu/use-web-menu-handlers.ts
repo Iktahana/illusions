@@ -17,7 +17,7 @@ interface UseWebMenuHandlersProps {
   onToggleCompactMode?: () => void;
   onToggleWritingMode?: () => void;
   onExport?: (format: ExportFormat) => void;
-  onCopyExport?: (format: "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora") => void;
+  onCopyExport?: (format: "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora" | "note") => void;
   onPrint?: () => void;
   editorView?: EditorView | null;
   fontScale?: number;
@@ -120,6 +120,9 @@ export function useWebMenuHandlers({
         case "export-aozora":
           if (isEditorTabActive) onExport?.("aozora");
           break;
+        case "export-note":
+          if (isEditorTabActive) onExport?.("note");
+          break;
         case "export-pdf":
           if (isEditorTabActive) onExport?.("pdf");
           break;
@@ -146,6 +149,9 @@ export function useWebMenuHandlers({
           break;
         case "copy-aozora":
           if (isEditorTabActive) onCopyExport?.("aozora");
+          break;
+        case "copy-note":
+          if (isEditorTabActive) onCopyExport?.("note");
           break;
 
         // Edit menu — guard with both editorView and isEditorTabActive

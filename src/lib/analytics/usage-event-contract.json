@@ -477,6 +477,10 @@
     "document_output_completed": {
       "operation": ["export", "copy"],
       "format": ["html", "pdf", "epub", "docx", "txt", "txt-ruby", "narou", "kakuyomu", "aozora"]
+    },
+    "note_output_completed": {
+      "operation": ["export", "copy"],
+      "format": ["note"]
     }
   }
 }

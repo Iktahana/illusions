@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { trackDocumentOutputResult } from "@/lib/analytics/document-output-events";
+import {
+  trackDocumentOutputResult,
+  type OutputOperation,
+  type OutputResult,
+} from "@/lib/analytics/document-output-events";
+import { trackNoteOutputResult } from "@/lib/analytics/note-output-events";
 import { notificationManager } from "@/lib/services/notification-manager";
 import type { TxtExportFormat, TxtIndentOptions } from "./txt-export-types";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -52,6 +57,7 @@ const TXT_EXPORT_FORMATS: readonly TxtExportFormat[] = [
   "narou",
   "kakuyomu",
   "aozora",
+  "note",
 ];
 
 const TXT_FORMAT_LABELS: Record<TxtExportFormat, string> = {
@@ -60,7 +66,21 @@ const TXT_FORMAT_LABELS: Record<TxtExportFormat, string> = {
   narou: "小説家になろう形式",
   kakuyomu: "カクヨム形式",
   aozora: "青空文庫形式",
+  note: "note形式",
 };
+
+function trackOutputResult(
+  operation: OutputOperation,
+  format: ExportFormat,
+  result: OutputResult,
+): void {
+  if (format === "note") {
+    trackNoteOutputResult(operation, result);
+    return;
+  }
+
+  trackDocumentOutputResult(operation, format, result);
+}
 
 /**
  * Hook that provides export functionality and registers Electron menu handlers.
@@ -109,6 +129,7 @@ export function useExport({
         narou: "小説家になろう形式",
         kakuyomu: "カクヨム形式",
         aozora: "青空文庫形式",
+        note: "note形式",
       };
       const label = formatLabels[format];
 
@@ -138,7 +159,7 @@ export function useExport({
             indentOptions,
             title,
           );
-          trackDocumentOutputResult("export", format, result);
+          trackOutputResult("export", format, result);
           notificationManager.dismiss(progressId);
 
           if (result === null || result === undefined) return;
@@ -202,7 +223,7 @@ export function useExport({
             break;
         }
 
-        trackDocumentOutputResult("export", format, result);
+        trackOutputResult("export", format, result);
         notificationManager.dismiss(progressId);
 
         if (result === null || result === undefined) {
@@ -264,7 +285,7 @@ export function useExport({
           getFileType(),
           indentOptions,
         );
-        trackDocumentOutputResult("copy", format, result);
+        trackOutputResult("copy", format, result);
         notificationManager.dismiss(progressId);
 
         if (!result.success) {
@@ -316,6 +337,9 @@ export function useExport({
     if (window.electronAPI.onMenuExportAozora) {
       cleanups.push(window.electronAPI.onMenuExportAozora(() => void exportAs("aozora")));
     }
+    if (window.electronAPI.onMenuExportNote) {
+      cleanups.push(window.electronAPI.onMenuExportNote(() => void exportAs("note")));
+    }
     if (window.electronAPI.onMenuExportHTML) {
       cleanups.push(window.electronAPI.onMenuExportHTML(() => void exportAs("html")));
     }
@@ -333,6 +357,9 @@ export function useExport({
     }
     if (window.electronAPI.onMenuCopyAozora) {
       cleanups.push(window.electronAPI.onMenuCopyAozora(() => void copyAs("aozora")));
+    }
+    if (window.electronAPI.onMenuCopyNote) {
+      cleanups.push(window.electronAPI.onMenuCopyNote(() => void copyAs("note")));
     }
     if (window.electronAPI.onMenuExportPDF) {
       cleanups.push(window.electronAPI.onMenuExportPDF(() => void exportAs("pdf")));

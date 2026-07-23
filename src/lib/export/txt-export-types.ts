@@ -1,4 +1,4 @@
-export type TxtExportFormat = "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora";
+export type TxtExportFormat = "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora" | "note";
 
 export interface TxtIndentOptions {
   fullwidthSpaceIndent: boolean;
