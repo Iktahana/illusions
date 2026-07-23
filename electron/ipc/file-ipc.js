@@ -507,23 +507,20 @@ function registerFileHandlers() {
       try {
         const {
           generatePdfPreview,
-          pdfPreviewPageLimitForMemory,
-          PDF_PREVIEW_ABSOLUTE_MAX_PAGES,
+          resolvePdfPreviewPagePolicy,
         } = require("../../src/lib/export/pdf-exporter");
         const totalMemoryBytes = os.totalmem();
-        const automaticMaxPages = pdfPreviewPageLimitForMemory(totalMemoryBytes);
-        const configuredMaxPages = Number.isFinite(requestedMaxPages)
-          ? Math.max(1, Math.min(Math.floor(requestedMaxPages), PDF_PREVIEW_ABSOLUTE_MAX_PAGES))
-          : null;
-        const maxPages = configuredMaxPages ?? automaticMaxPages;
+        const { automaticMaxPages, maxPages } = resolvePdfPreviewPagePolicy(
+          totalMemoryBytes,
+          requestedMaxPages,
+        );
         const result = await generatePdfPreview(content, options || {}, {
           signal: controller.signal,
           maxPages,
         });
-        const data = Uint8Array.from(result.pdf).buffer;
         return {
           success: true,
-          data,
+          data: result.pdf,
           maxPages: result.maxPages,
           automaticMaxPages,
           systemMemoryGiB: Math.round((totalMemoryBytes / 1024 ** 3) * 10) / 10,

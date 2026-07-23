@@ -20,7 +20,21 @@ describe("ExportDialog PDF preview lifecycle", () => {
 
   it("cancels stale previews on rerender and unmount", () => {
     expect(source.match(/cancelPdfPreview/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(source).toContain("const id = ++generationIdRef.current");
+    expect(source).toContain("generationIdRef.current === id");
+    expect(source).toContain("generationIdRef.current += 1");
     expect(source).toContain("if (!result.cancelled)");
+  });
+
+  it("revokes the base Blob URL without the PDF viewer fragment", () => {
+    expect(source).toContain("pdfUrlRef.current = objectUrl");
+    expect(source).toContain("setPdfUrl(`${objectUrl}#view=FitH`)");
+    expect(source).not.toContain("pdfUrlRef.current = newPdfUrl");
+  });
+
+  it("shows a regeneration error even when an older preview URL exists", () => {
+    expect(source).toMatch(/previewError\s*\?\s*\(/);
+    expect(source).toMatch(/\)\s*:\s*pdfUrl\s*\?\s*\(/);
   });
 
   it("shows natural Japanese memory and page-limit guidance", () => {

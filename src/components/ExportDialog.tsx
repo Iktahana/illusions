@@ -302,15 +302,29 @@ function ExportDialogInner({
 
   // --- Electron: debounced PDF preview generation ---
   useEffect(() => {
-    if (!hasPreviewApi || isEpub) return;
+    const id = ++generationIdRef.current;
+
+    if (!hasPreviewApi || isEpub) {
+      void window.electronAPI?.cancelPdfPreview?.();
+      setPreviewLoading(false);
+      setPreviewError(null);
+      setPreviewInfo(null);
+      if (pdfUrlRef.current) {
+        URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = null;
+      }
+      setPdfUrl(null);
+      return;
+    }
 
     if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
-    const id = ++generationIdRef.current;
     void window.electronAPI?.cancelPdfPreview?.();
 
     previewTimeoutRef.current = setTimeout(async () => {
+      previewTimeoutRef.current = null;
       setPreviewLoading(true);
       setPreviewError(null);
+      setPreviewInfo(null);
 
       const previewSettings = toPdfExportSettings(settings);
 
@@ -343,9 +357,9 @@ function ExportDialogInner({
           if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
 
           const blob = new Blob([result.data], { type: "application/pdf" });
-          const newPdfUrl = URL.createObjectURL(blob) + "#view=FitH";
-          pdfUrlRef.current = newPdfUrl;
-          setPdfUrl(newPdfUrl);
+          const objectUrl = URL.createObjectURL(blob);
+          pdfUrlRef.current = objectUrl;
+          setPdfUrl(`${objectUrl}#view=FitH`);
           setPreviewInfo({
             systemMemoryGiB: result.systemMemoryGiB,
             maxPages: result.maxPages,
@@ -365,6 +379,7 @@ function ExportDialogInner({
     }, 800);
 
     return () => {
+      if (generationIdRef.current === id) generationIdRef.current += 1;
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
       void window.electronAPI?.cancelPdfPreview?.();
     };
@@ -374,6 +389,7 @@ function ExportDialogInner({
   // Cleanup blob URLs on unmount (refs always hold the latest values)
   useEffect(() => {
     return () => {
+      generationIdRef.current += 1;
       if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
       if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
@@ -875,7 +891,11 @@ function ExportDialogInner({
 
             <div className="flex-1 overflow-hidden">
               {hasPreviewApi ? (
-                pdfUrl ? (
+                previewError ? (
+                  <div className="w-full h-full flex items-center justify-center px-6">
+                    <span className="text-sm text-danger">{previewError}</span>
+                  </div>
+                ) : pdfUrl ? (
                   <embed src={pdfUrl} type="application/pdf" className="w-full h-full" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -884,7 +904,6 @@ function ExportDialogInner({
                         プレビューを生成中...
                       </span>
                     )}
-                    {previewError && <span className="text-sm text-danger">{previewError}</span>}
                   </div>
                 )
               ) : selectedFormat === "pdf" ? (

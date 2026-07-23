@@ -54,7 +54,7 @@ vi.mock("electron", () => ({
   },
 }));
 
-const { writePdfToFile } = await import("../pdf-exporter");
+const { generatePdfPreview, writePdfToFile } = await import("../pdf-exporter");
 
 const options = {
   metadata: { title: "長編テスト" },
@@ -118,6 +118,16 @@ describe("writePdfToFile", () => {
     await expect(writing).rejects.toMatchObject({ name: "AbortError" });
     expect(await fs.readFile(target, "utf8")).toBe("previous PDF");
     expect(await fs.readdir(testDirectory)).toEqual(["existing.pdf"]);
+    expect(electronState.windows[0].destroyed).toBe(true);
+  });
+});
+
+describe("generatePdfPreview", () => {
+  it("enforces the absolute page limit in the Chromium page range", async () => {
+    const result = await generatePdfPreview("本文。", options, { maxPages: 999 });
+
+    expect(result.maxPages).toBe(500);
+    expect(electronState.printOptions).toMatchObject({ pageRanges: "1-500" });
     expect(electronState.windows[0].destroyed).toBe(true);
   });
 });

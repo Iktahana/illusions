@@ -16,7 +16,17 @@ import type {
 } from "electron";
 
 import { normalizeExportSource } from "./mdi-export";
+import { PDF_PREVIEW_ABSOLUTE_MAX_PAGES, PDF_PREVIEW_DEFAULT_PAGES } from "./pdf-preview-limits";
 import type { ExportMetadata } from "./types";
+
+export {
+  PDF_PREVIEW_ABSOLUTE_MAX_PAGES,
+  PDF_PREVIEW_DEFAULT_PAGES,
+  PDF_PREVIEW_LOW_MEMORY_PAGES,
+  PDF_PREVIEW_MANUAL_PAGE_LIMITS,
+  pdfPreviewPageLimitForMemory,
+  resolvePdfPreviewPagePolicy,
+} from "./pdf-preview-limits";
 
 export interface PdfExportOptions {
   metadata: ExportMetadata;
@@ -43,10 +53,6 @@ const PRINT_DOCUMENT_SCHEME_PREFIX = "illusions-print";
 const PDF_FILE_WRITE_CHUNK_BYTES = 1024 * 1024;
 const DEFAULT_CHARACTERS_PER_LINE = 40;
 const DEFAULT_LINES_PER_PAGE = 30;
-
-export const PDF_PREVIEW_LOW_MEMORY_PAGES = 32;
-export const PDF_PREVIEW_DEFAULT_PAGES = 300;
-export const PDF_PREVIEW_ABSOLUTE_MAX_PAGES = 500;
 
 /**
  * A second safety ceiling for unusual page grids. One million Japanese
@@ -157,16 +163,6 @@ export function pdfPreviewSourceCharacterLimit(
     PDF_PREVIEW_MAX_SOURCE_CHARACTERS,
     charactersPerLine * linesPerPage * positiveInteger(maxPages, PDF_PREVIEW_DEFAULT_PAGES),
   );
-}
-
-/** Select a bounded preview size from installed physical memory. */
-export function pdfPreviewPageLimitForMemory(totalMemoryBytes: number): number {
-  const gibibytes = totalMemoryBytes / 1024 ** 3;
-  if (!Number.isFinite(gibibytes) || gibibytes <= 8) return PDF_PREVIEW_LOW_MEMORY_PAGES;
-  if (gibibytes <= 16) return 100;
-  if (gibibytes <= 24) return 200;
-  if (gibibytes < 64) return PDF_PREVIEW_DEFAULT_PAGES;
-  return PDF_PREVIEW_ABSOLUTE_MAX_PAGES;
 }
 
 function sliceWithoutSplittingSurrogatePair(source: string, limit: number): string {

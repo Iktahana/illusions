@@ -18,9 +18,8 @@ describe("file-ipc PDF preview boundary", () => {
 
   it("uses system memory unless a validated setting overrides it", () => {
     expect(previewHandler).toContain("os.totalmem()");
-    expect(previewHandler).toContain("pdfPreviewPageLimitForMemory(totalMemoryBytes)");
-    expect(previewHandler).toContain("configuredMaxPages ?? automaticMaxPages");
-    expect(previewHandler).toContain("PDF_PREVIEW_ABSOLUTE_MAX_PAGES");
+    expect(previewHandler).toContain("resolvePdfPreviewPagePolicy(");
+    expect(previewHandler).toContain("requestedMaxPages");
   });
 
   it("actively cancels stale and destroyed-window jobs", () => {
@@ -31,8 +30,9 @@ describe("file-ipc PDF preview boundary", () => {
     expect(previewHandler).toContain("controller.signal.aborted");
   });
 
-  it("returns a transferable ArrayBuffer and never base64-encodes the PDF", () => {
-    expect(previewHandler).toContain("Uint8Array.from(result.pdf).buffer");
+  it("returns binary PDF data without an extra copy or base64 encoding", () => {
+    expect(previewHandler).toContain("data: result.pdf");
+    expect(previewHandler).not.toContain("Uint8Array.from(result.pdf)");
     expect(previewHandler).not.toContain('toString("base64")');
     expect(previewHandler).toContain("systemMemoryGiB");
     expect(previewHandler).toContain("sourceTruncated");

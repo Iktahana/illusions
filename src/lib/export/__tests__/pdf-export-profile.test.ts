@@ -8,6 +8,7 @@ import {
   pdfPreviewSourceCharacterLimit,
   preparePdfPreviewDocument,
   preparePdfPrintDocument,
+  resolvePdfPreviewPagePolicy,
   PDF_PREVIEW_ABSOLUTE_MAX_PAGES,
   PDF_PREVIEW_MAX_SOURCE_CHARACTERS,
   type PdfExportOptions,
@@ -162,6 +163,23 @@ describe("memory-adaptive PDF preview", () => {
   ])("maps %s bytes to a %s-page ceiling", (bytes, pages) => {
     expect(pdfPreviewPageLimitForMemory(bytes)).toBe(pages);
   });
+
+  it.each([32, 100, 200, 300, 500])("accepts the supported manual limit %s", (maxPages) => {
+    expect(resolvePdfPreviewPagePolicy(8 * gib, maxPages)).toEqual({
+      automaticMaxPages: 32,
+      maxPages,
+    });
+  });
+
+  it.each([undefined, null, 0, 1, 31, 33, 501, 500.1, Number.NaN, Infinity, "300"])(
+    "falls back to automatic for the untrusted override %s",
+    (requestedMaxPages) => {
+      expect(resolvePdfPreviewPagePolicy(32 * gib, requestedMaxPages)).toEqual({
+        automaticMaxPages: 300,
+        maxPages: 300,
+      });
+    },
+  );
 
   it("derives the source budget from the selected layout and caps extreme grids", () => {
     expect(pdfPreviewSourceCharacterLimit(options, 32)).toBe(33 * 22 * 32);

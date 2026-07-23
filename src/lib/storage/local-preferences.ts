@@ -5,6 +5,13 @@
  * which is why they use localStorage instead of the async StorageService.
  */
 
+import {
+  isPdfPreviewMaxPagesPreference,
+  type PdfPreviewMaxPagesPreference,
+} from "@/lib/export/pdf-preview-limits";
+
+export type { PdfPreviewMaxPagesPreference } from "@/lib/export/pdf-preview-limits";
+
 const PREFIX = "illusions:" as const;
 
 const KEYS = {
@@ -69,17 +76,6 @@ function set(key: string, value: string): void {
 
 export type ThemeMode = "light" | "dark" | "auto";
 export type WritingMode = "vertical" | "horizontal";
-export type PdfPreviewMaxPagesPreference = "auto" | "32" | "100" | "200" | "300" | "500";
-
-const PDF_PREVIEW_MAX_PAGES_VALUES: readonly PdfPreviewMaxPagesPreference[] = [
-  "auto",
-  "32",
-  "100",
-  "200",
-  "300",
-  "500",
-];
-
 export const localPreferences = {
   // --- Theme ---
   getThemeMode(): ThemeMode | null {
@@ -169,12 +165,10 @@ export const localPreferences = {
   // --- PDF preview ---
   getPdfPreviewMaxPages(): PdfPreviewMaxPagesPreference {
     const value = get(KEYS.pdfPreviewMaxPages);
-    return PDF_PREVIEW_MAX_PAGES_VALUES.includes(value as PdfPreviewMaxPagesPreference)
-      ? (value as PdfPreviewMaxPagesPreference)
-      : "auto";
+    return isPdfPreviewMaxPagesPreference(value) ? value : "auto";
   },
   setPdfPreviewMaxPages(value: PdfPreviewMaxPagesPreference): void {
-    if (PDF_PREVIEW_MAX_PAGES_VALUES.includes(value)) {
+    if (isPdfPreviewMaxPagesPreference(value)) {
       set(KEYS.pdfPreviewMaxPages, value);
     }
   },

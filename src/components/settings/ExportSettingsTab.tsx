@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 
+import { localPreferences } from "@/lib/storage/local-preferences";
 import {
-  localPreferences,
+  PDF_PREVIEW_MANUAL_PAGE_LIMITS,
   type PdfPreviewMaxPagesPreference,
-} from "@/lib/storage/local-preferences";
+} from "@/lib/export/pdf-preview-limits";
 import { SelectField, SettingsSection } from "./primitives";
 
 const PDF_PREVIEW_PAGE_OPTIONS = [
@@ -14,11 +15,10 @@ const PDF_PREVIEW_PAGE_OPTIONS = [
     label: "自動（推奨）",
     description: "システムメモリに合わせて、32～500ページの範囲で自動調整します。",
   },
-  { value: "32", label: "32ページ" },
-  { value: "100", label: "100ページ" },
-  { value: "200", label: "200ページ" },
-  { value: "300", label: "300ページ" },
-  { value: "500", label: "500ページ" },
+  ...PDF_PREVIEW_MANUAL_PAGE_LIMITS.map((value) => ({
+    value: String(value) as `${typeof value}`,
+    label: `${value}ページ`,
+  })),
 ] as const;
 
 export default function ExportSettingsTab(): React.ReactElement {

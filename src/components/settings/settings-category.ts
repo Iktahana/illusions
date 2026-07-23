@@ -51,7 +51,10 @@ export function resolveLegacyCategory(
   const normalized: SettingsCategory = category ?? "typography";
   if (
     !options.isElectron &&
-    (normalized === "terminal" || normalized === "power" || normalized === "privacy")
+    (normalized === "terminal" ||
+      normalized === "power" ||
+      normalized === "privacy" ||
+      normalized === "export")
   ) {
     return "account";
   }

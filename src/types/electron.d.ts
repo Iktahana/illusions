@@ -104,7 +104,7 @@ declare global {
     ) => Promise<
       | {
           success: true;
-          data: ArrayBuffer;
+          data: Uint8Array<ArrayBuffer>;
           maxPages: number;
           automaticMaxPages: number;
           systemMemoryGiB: number;
