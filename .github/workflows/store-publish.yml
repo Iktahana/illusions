@@ -90,6 +90,7 @@ jobs:
       mode: flight-submission
       release_tag: ${{ needs.resolve-msstore-flight-tag.outputs.tag }}
       dry_run: ${{ inputs.dry_run || false }}
+      trusted_store_publish: true
     secrets: inherit
 
   # ---------------------------------------------------------------------------
@@ -134,6 +135,7 @@ jobs:
       mode: full-submission
       release_tag: ${{ needs.resolve-msstore-stable-tag.outputs.tag }}
       dry_run: ${{ inputs.dry_run || false }}
+      trusted_store_publish: true
     secrets: inherit
 
   # ---------------------------------------------------------------------------
