@@ -52,6 +52,17 @@ describe("MDI official export format acceptance matrix", () => {
     expectNoFrontmatterLeak(html);
   });
 
+  it("passes the upstream bodyOnly option through without inventing a second renderer", async () => {
+    const fragment = await generateHtml(source, ".mdi", { bodyOnly: true });
+
+    expect(fragment).toMatch(/^<h1>第一章<\/h1>/);
+    expect(fragment).not.toContain("<!DOCTYPE html>");
+    expect(fragment).not.toContain("<html");
+    expect(fragment).toContain('<ruby class="mdi-ruby">東京');
+    expect(fragment).toContain('<p class="mdi-blank"></p>');
+    expectNoFrontmatterLeak(fragment);
+  });
+
   it.each<[TxtExportFormat, string]>([
     ["txt", "東京へ行った。"],
     ["txt-ruby", "{東京|とうきょう}へ行った。"],

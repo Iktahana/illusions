@@ -135,6 +135,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
     expect(EXPORT_CHANNELS.invoke).toEqual({
       generatePdfPreview: "generate-pdf-preview",
       cancelPdfPreview: "cancel-pdf-preview",
+      generateHtmlPreview: "generate-html-preview",
       exportHtml: "export-html",
       exportMdiText: "export-mdi-text",
       copyMdiText: "copy-mdi-text",

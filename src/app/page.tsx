@@ -35,6 +35,7 @@ import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
+import type { HtmlExportOptions } from "@/lib/export/html-shared";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
@@ -810,9 +811,9 @@ function EditorPageContent() {
     return (tab && isEditorTab(tab) ? tab.fileType : undefined) ?? ".mdi";
   }, [tabs, activeTabId]);
 
-  // Export dialog state (PDF / DOCX share a single state slot)
+  // Shared export dialog state for HTML / PDF / DOCX / EPUB.
   interface ExportDialogState {
-    format: "pdf" | "docx" | "epub";
+    format: "html" | "pdf" | "docx" | "epub";
     content: string;
     metadata: ExportMetadata;
     /** Snapshot of the active tab's file type at the moment the dialog opened. */
@@ -863,7 +864,7 @@ function EditorPageContent() {
   }, []);
 
   const handleExportDialogRequest = useCallback(
-    (format: "pdf" | "docx" | "epub", content: string, metadata: ExportMetadata) => {
+    (format: "html" | "pdf" | "docx" | "epub", content: string, metadata: ExportMetadata) => {
       const state: ExportDialogState = {
         format,
         content,
@@ -875,6 +876,43 @@ function EditorPageContent() {
     },
     [],
   );
+
+  const handleHtmlExportConfirm = useCallback(async (options: HtmlExportOptions) => {
+    const dialogState = exportDialogStateRef.current;
+    if (!dialogState) return;
+
+    if (window.electronAPI?.exportHTML) {
+      setExportDialogState(null);
+
+      const progressId = notificationManager.showProgress("HTMLをエクスポート中...", {
+        type: "info",
+      });
+
+      try {
+        const result = await window.electronAPI.exportHTML(
+          dialogState.content,
+          dialogState.fileType,
+          dialogState.metadata.title,
+          options,
+        );
+
+        notificationManager.dismiss(progressId);
+        if (result === null || result === undefined) return;
+        if (typeof result === "object" && "success" in result && !result.success) {
+          notificationManager.error(`HTMLのエクスポートに失敗しました: ${result.error}`);
+          return;
+        }
+        notificationManager.success("HTMLをエクスポートしました");
+      } catch (error) {
+        notificationManager.dismiss(progressId);
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`HTMLのエクスポートに失敗しました: ${message}`);
+      }
+      return;
+    }
+
+    notificationManager.error("HTMLエクスポート機能を利用できません。アプリを再起動してください");
+  }, []);
 
   const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
     const dialogState = exportDialogStateRef.current;
@@ -1631,6 +1669,7 @@ function EditorPageContent() {
           exportDialog: {
             state: exportDialogState,
             onClose: () => setExportDialogState(null),
+            onHtmlExport: handleHtmlExportConfirm,
             onPdfExport: handlePdfExportConfirm,
             onDocxExport: handleDocxExportConfirm,
             onEpubExport: handleEpubExportConfirm,

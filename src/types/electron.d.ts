@@ -114,10 +114,18 @@ declare global {
       | { success: false; error: string; cancelled?: boolean; code?: string }
     >;
     cancelPdfPreview?: () => Promise<boolean>;
+    generateHtmlPreview?: (
+      content: string,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      options?: import("@/lib/export/html-shared").HtmlExportOptions,
+    ) => Promise<
+      { success: true; html: string } | { success: false; error: string; code?: string }
+    >;
     exportHTML?: (
       content: string,
       fileType?: import("@/lib/project/project-types").SupportedFileExtension,
       title?: string,
+      options?: import("@/lib/export/html-shared").HtmlExportOptions,
     ) => Promise<string | { success: false; error: string; code?: string } | null>;
     exportMdiText?: (
       content: string,

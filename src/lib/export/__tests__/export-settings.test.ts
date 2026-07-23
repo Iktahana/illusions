@@ -73,6 +73,14 @@ describe("toPdfExportSettings", () => {
 });
 
 describe("loadExportSettings", () => {
+  it("HTMLの本文のみ設定を保存値から復元する", async () => {
+    kvStore.set(STORAGE_KEY, JSON.stringify({ ...DEFAULT_EXPORT_SETTINGS, htmlBodyOnly: true }));
+
+    const loaded = await loadExportSettings();
+
+    expect(loaded.htmlBodyOnly).toBe(true);
+  });
+
   it("StorageService に保存済みの設定を読み込む", async () => {
     const settings = { ...DEFAULT_EXPORT_SETTINGS, linesPerPage: 22, landscape: false };
     kvStore.set(STORAGE_KEY, JSON.stringify(settings));
