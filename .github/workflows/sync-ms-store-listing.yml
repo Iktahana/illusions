@@ -26,6 +26,11 @@ on:
         required: false
         type: boolean
         default: false
+      trusted_store_publish:
+        description: "Whether this call was routed through store-publish.yml"
+        required: false
+        type: boolean
+        default: false
 
   workflow_call:
     inputs:
@@ -73,14 +78,11 @@ jobs:
 
     steps:
       - name: Verify running from main branch or version tag
-        # Skipped when called via workflow_call (store-publish.yml) — github.ref
-        # there reflects the caller's context, not this job's actual checkout
-        # ref (which the Checkout step below pins explicitly based on `mode`
-        # regardless). store-publish.yml's own job-level `if:` conditions
-        # already ensure the right mode fires at the right time. This check
-        # only guards against a human directly workflow_dispatch-ing this
-        # file from the wrong branch.
-        if: github.event_name != 'workflow_call'
+        # Reusable workflows inherit the caller's event name, so event_name
+        # cannot distinguish workflow_call from workflow_dispatch here.
+        # store-publish.yml sets an explicit trusted flag after applying its
+        # own event/branch routing; direct dispatches still enforce this guard.
+        if: inputs.trusted_store_publish != true
         shell: bash
         run: |
           case "${{ inputs.mode }}" in

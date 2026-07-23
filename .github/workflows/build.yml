@@ -900,6 +900,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ needs.compute-version.outputs.full }}
+          target_commitish: ${{ github.sha }}
           name: Illusions v${{ needs.compute-version.outputs.full }}
           files: release-assets/*
           draft: true
