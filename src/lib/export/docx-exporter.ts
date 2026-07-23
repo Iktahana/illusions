@@ -23,21 +23,12 @@ export function docxExportProfile(options: DocxExportOptions) {
   };
 }
 
-export async function generateDocx(content: string, options: DocxExportOptions): Promise<Buffer> {
-  return Buffer.from(
-    await renderDocxWithProfile(
-      normalizeExportSource(content, options.fileType),
-      docxExportProfile(options),
-    ),
-  );
-}
-
-export async function generateDocxBlob(content: string, options: DocxExportOptions): Promise<Blob> {
-  const bytes = await renderDocxWithProfile(
+export async function generateDocx(
+  content: string,
+  options: DocxExportOptions,
+): Promise<Uint8Array> {
+  return renderDocxWithProfile(
     normalizeExportSource(content, options.fileType),
     docxExportProfile(options),
   );
-  return new Blob([new Uint8Array(bytes)], {
-    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  });
 }

@@ -100,13 +100,33 @@ declare global {
     generatePdfPreview?: (
       content: string,
       options: PdfGenerationOptions,
-    ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
-    renderMdiText?: (
+      maxPages?: number,
+    ) => Promise<
+      | {
+          success: true;
+          data: Uint8Array<ArrayBuffer>;
+          maxPages: number;
+          automaticMaxPages: number;
+          systemMemoryGiB: number;
+          sourceCharacterLimit: number;
+          sourceTruncated: boolean;
+        }
+      | { success: false; error: string; cancelled?: boolean; code?: string }
+    >;
+    cancelPdfPreview?: () => Promise<boolean>;
+    exportMdiText?: (
       content: string,
       format: import("@/lib/export/txt-export-types").TxtExportFormat,
       fileType?: import("@/lib/project/project-types").SupportedFileExtension,
       indent?: import("@/lib/export/txt-export-types").TxtIndentOptions,
-    ) => Promise<string>;
+      title?: string,
+    ) => Promise<string | { success: false; error: string; code?: string } | null>;
+    copyMdiText?: (
+      content: string,
+      format: import("@/lib/export/txt-export-types").TxtExportFormat,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      indent?: import("@/lib/export/txt-export-types").TxtIndentOptions,
+    ) => Promise<{ success: true } | { success: false; error: string; code?: string }>;
     exportPDF?: (
       content: string,
       options: PdfGenerationOptions,
@@ -135,6 +155,11 @@ declare global {
     onMenuExportNarou?: (callback: () => void) => (() => void) | void;
     onMenuExportKakuyomu?: (callback: () => void) => (() => void) | void;
     onMenuExportAozora?: (callback: () => void) => (() => void) | void;
+    onMenuCopyTxt?: (callback: () => void) => (() => void) | void;
+    onMenuCopyTxtRuby?: (callback: () => void) => (() => void) | void;
+    onMenuCopyNarou?: (callback: () => void) => (() => void) | void;
+    onMenuCopyKakuyomu?: (callback: () => void) => (() => void) | void;
+    onMenuCopyAozora?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;

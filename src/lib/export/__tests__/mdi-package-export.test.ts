@@ -27,6 +27,18 @@ describe("@illusions-lab/mdi export boundary", () => {
     ).resolves.toBe(expected);
   });
 
+  it.each([
+    [Number.NaN, 1],
+    [-100, 1],
+    [999_999, 4],
+  ])("bounds an untrusted TXT indent count %s to %s spaces", async (indentCount, spaces) => {
+    const output = await exportMdiText("本文。", "txt", ".mdi", {
+      fullwidthSpaceIndent: true,
+      indentCount,
+    });
+    expect(output).toBe(`${"　".repeat(spaces)}本文。`);
+  });
+
   it("normalizes escaped MDI blank macros without rewriting raw Markdown/TXT source", () => {
     const editorOutput = String.raw`前。\n\n\[\[blank]]\n\n後。`;
     expect(normalizeExportSource(editorOutput, ".mdi")).toBe(String.raw`前。\n\n[[blank]]\n\n後。`);
@@ -85,5 +97,31 @@ B`;
     expect(documentXml).toMatch(/<w:p><w:r><w:t xml:space="preserve"><\/w:t><\/w:r><\/w:p>/);
     expect(chapterXml).not.toContain("[[blank]]");
     expect(chapterXml).toContain('<p class="mdi-blank"></p>');
+  });
+
+  it("applies the unified grid and full-width indentation to the DOCX output", async () => {
+    async function documentXml(charsPerLine: number, linesPerPage: number): Promise<string> {
+      const docx = await generateDocx("本文。", {
+        metadata: { title: "組版" },
+        settings: {
+          ...DEFAULT_EXPORT_SETTINGS,
+          charsPerLine,
+          linesPerPage,
+          textIndent: 2,
+          fullwidthSpaceIndent: true,
+        },
+      });
+      return strFromU8(unzipSync(docx)["word/document.xml"]!);
+    }
+
+    const defaults = await documentXml(40, 30);
+    const customized = await documentXml(33, 22);
+    const defaultGrid = defaults.match(/<w:docGrid\b[^>]*>/)?.[0];
+    const customizedGrid = customized.match(/<w:docGrid\b[^>]*>/)?.[0];
+
+    expect(defaultGrid).toBeDefined();
+    expect(customizedGrid).toBeDefined();
+    expect(customizedGrid).not.toBe(defaultGrid);
+    expect(customized).toContain('<w:t xml:space="preserve">　　</w:t>');
   });
 });

@@ -15,6 +15,8 @@ interface TxtExportDialogProps {
   isOpen: boolean;
   /** Which TXT variant is being exported (affects only the heading). */
   format: TxtExportFormat;
+  /** Whether the converted text will be saved to a file or copied. */
+  operation?: "export" | "copy";
   /** Called with the chosen 字下げ options when the user confirms. */
   onConfirm: (options: TxtIndentOptions) => void;
   /** Called when the user cancels or dismisses the dialog. */
@@ -37,6 +39,7 @@ function clampCount(value: number): number {
 export default function TxtExportDialog({
   isOpen,
   format,
+  operation = "export",
   onConfirm,
   onCancel,
 }: TxtExportDialogProps): React.ReactNode {
@@ -80,19 +83,19 @@ export default function TxtExportDialog({
     <GlassDialog
       isOpen
       onBackdropClick={onCancel}
-      ariaLabel="テキストエクスポート設定"
+      ariaLabel="テキスト出力設定"
       panelClassName="mx-4 w-full max-w-md p-6"
     >
       <h2 className="text-lg font-semibold text-foreground mb-1">
         {format === "txt-ruby"
-          ? "テキスト（ルビ付き）エクスポート"
+          ? "テキスト（ルビ付き）"
           : format === "narou"
-            ? "小説家になろう形式エクスポート"
+            ? "小説家になろう形式"
             : format === "kakuyomu"
-              ? "カクヨム形式エクスポート"
+              ? "カクヨム形式"
               : format === "aozora"
-                ? "青空文庫形式エクスポート"
-                : "テキストエクスポート"}
+                ? "青空文庫形式"
+                : "テキスト（プレーン）"}
       </h2>
       <p className="text-xs text-foreground-tertiary mb-4">字下げの方法を選択してください。</p>
 
@@ -145,7 +148,7 @@ export default function TxtExportDialog({
           className="w-full px-4 py-2 rounded-lg text-sm bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
           onClick={handleConfirm}
         >
-          エクスポート
+          {operation === "copy" ? "クリップボードにコピー" : "エクスポート"}
         </button>
         <button
           type="button"
