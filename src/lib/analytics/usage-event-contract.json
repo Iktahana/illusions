@@ -473,6 +473,10 @@
       ],
       "file_type": ["mdi", "md", "txt", "unknown"],
       "collision": ["none", "confirmed", "blocked"]
+    },
+    "document_output_completed": {
+      "operation": ["export", "copy"],
+      "format": ["html", "pdf", "epub", "docx", "txt", "txt-ruby", "narou", "kakuyomu", "aozora"]
     }
   }
 }
