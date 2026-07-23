@@ -56,6 +56,7 @@ import {
   usePosHighlightSettings,
   usePowerSettings,
   useScrollSettings,
+  useKeyboardInputSettings,
 } from "@/contexts/EditorSettingsContext";
 import { usePosHighlightActivation } from "@/lib/editor-page/use-pos-highlight-activation";
 import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
@@ -148,6 +149,7 @@ export default function MilkdownEditor({
     usePosHighlightSettings();
   const { powerSaveMode } = usePowerSettings();
   const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
+  const { allowOptionKeySpecialCharacterInput } = useKeyboardInputSettings();
   const { measureRef: charMeasureRef, charWidth } = useCharWidth({
     fontFamily,
     fontScale,
@@ -168,6 +170,8 @@ export default function MilkdownEditor({
   const onInsertTextRef = useRef(onInsertText);
   const onLintIssuesUpdatedRef = useRef(onLintIssuesUpdated);
   const onNlpErrorRef = useRef(onNlpError);
+  const allowOptionKeySpecialCharacterInputRef = useRef(allowOptionKeySpecialCharacterInput);
+  allowOptionKeySpecialCharacterInputRef.current = allowOptionKeySpecialCharacterInput;
 
   // コールバックが変わったら ref を更新する
 
@@ -290,7 +294,11 @@ export default function MilkdownEditor({
         .use(cursor)
         // Prevent macOS Option-generated characters (for example ⌥V → √)
         // without stopping propagation to the global shortcut listener.
-        .use($prose(() => createMacOptionInputGuardPlugin()))
+        .use(
+          $prose(() =>
+            createMacOptionInputGuardPlugin(() => allowOptionKeySpecialCharacterInputRef.current),
+          ),
+        )
         .use(verticalScrollPlugin)
         .use($prose(() => searchHighlightPlugin))
         .use($prose(() => speechHighlightPlugin))

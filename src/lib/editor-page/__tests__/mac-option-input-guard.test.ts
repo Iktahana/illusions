@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createMacOptionInputGuardPlugin,
   shouldSuppressMacOptionTextInput,
   suppressMacOptionTextInput,
 } from "../mac-option-input-guard";
@@ -23,5 +24,20 @@ describe("macOS Option text input guard", () => {
     expect(shouldSuppressMacOptionTextInput({ altKey: true, key: "Alt" }, true)).toBe(false);
     expect(shouldSuppressMacOptionTextInput({ altKey: true, key: "ArrowLeft" }, true)).toBe(false);
     expect(shouldSuppressMacOptionTextInput({ altKey: true, key: "√" }, false)).toBe(false);
+  });
+
+  it("does not suppress Option text when the input preference is enabled", () => {
+    const plugin = createMacOptionInputGuardPlugin(() => true);
+    const keydown = plugin.props.handleDOMEvents?.keydown;
+    const preventDefault = vi.fn();
+
+    expect(
+      keydown?.call(
+        plugin,
+        {} as never,
+        { altKey: true, key: "√", preventDefault } as unknown as KeyboardEvent,
+      ),
+    ).toBe(false);
+    expect(preventDefault).not.toHaveBeenCalled();
   });
 });
