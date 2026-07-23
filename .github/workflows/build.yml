@@ -473,7 +473,7 @@ jobs:
         run: npm run download:fonts
 
       - name: Build Next.js and bundle Electron main process
-        run: npm run generate:credits && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
+        run: npm run build && npm run bundle:electron
 
       - name: Upload build output
         uses: actions/upload-artifact@v7

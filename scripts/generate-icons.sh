@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Icon Generation Script
-# Generates all required icon sizes and formats for both web and Electron builds
+# Generates renderer favicon sizes and native Electron package icons
 
 set -e
 
@@ -32,13 +32,13 @@ echo "🎨 Generating icon assets..."
 echo ""
 
 # ============================================================================
-# SECTION 1: Generate Web Icons from illusions.png
+# SECTION 1: Generate renderer favicons from illusions.png
 # ============================================================================
-echo "📱 Generating web icons from illusions.png..."
+echo "🖥️  Generating renderer favicons from illusions.png..."
 
-declare -a WEB_SIZES=(16 32 180 192 512)
+declare -a RENDERER_ICON_SIZES=(16 32)
 
-for size in "${WEB_SIZES[@]}"; do
+for size in "${RENDERER_ICON_SIZES[@]}"; do
   output="$ICON_DIR/illusions-${size}.png"
   if convert "$ICON_DIR/illusions.png" -resize "${size}x${size}" "$output" 2>/dev/null; then
     log_info "Generated $(basename $output) (${size}×${size})"
@@ -51,26 +51,7 @@ done
 echo ""
 
 # ============================================================================
-# SECTION 2: Generate Web Icons from illusions-mdi.png
-# ============================================================================
-echo "📱 Generating MDI web icons from illusions-mdi.png..."
-
-declare -a MDI_WEB_SIZES=(16 32 180 192 512)
-
-for size in "${MDI_WEB_SIZES[@]}"; do
-  output="$ICON_DIR/illusions-mdi-${size}.png"
-  if convert "$ICON_DIR/illusions-mdi.png" -resize "${size}x${size}" "$output" 2>/dev/null; then
-    log_info "Generated $(basename $output) (${size}×${size})"
-  else
-    log_error "Failed to generate $(basename $output)"
-    exit 1
-  fi
-done
-
-echo ""
-
-# ============================================================================
-# SECTION 3: Copy Icons for Linux Builds
+# SECTION 2: Copy Icons for Linux Builds
 # ============================================================================
 echo "🐧 Copying PNG icons for Linux builds..."
 
@@ -91,7 +72,7 @@ fi
 echo ""
 
 # ============================================================================
-# SECTION 4: Generate .icns Files for macOS (icon)
+# SECTION 3: Generate .icns Files for macOS (icon)
 # ============================================================================
 echo "🍎 Generating icon.icns for macOS..."
 
@@ -136,7 +117,7 @@ fi
 echo ""
 
 # ============================================================================
-# SECTION 5: Generate .icns Files for macOS (mdi-icon)
+# SECTION 4: Generate .icns Files for macOS (mdi-icon)
 # ============================================================================
 echo "🍎 Generating mdi-icon.icns for macOS..."
 
@@ -167,7 +148,7 @@ fi
 echo ""
 
 # ============================================================================
-# SECTION 6: Generate .ico Files for Windows (icon)
+# SECTION 5: Generate .ico Files for Windows (icon)
 # ============================================================================
 echo "🪟 Generating icon.ico for Windows..."
 
@@ -181,7 +162,7 @@ fi
 echo ""
 
 # ============================================================================
-# SECTION 7: Generate .ico Files for Windows (mdi-icon)
+# SECTION 6: Generate .ico Files for Windows (mdi-icon)
 # ============================================================================
 echo "🪟 Generating mdi-icon.ico for Windows..."
 
@@ -195,7 +176,7 @@ fi
 echo ""
 
 # ============================================================================
-# SECTION 8: Generate AppX/MSIX Tile Assets for Windows Store
+# SECTION 7: Generate AppX/MSIX Tile Assets for Windows Store
 # ============================================================================
 echo "🏪 Generating AppX/MSIX tile assets for Windows Store..."
 
@@ -249,17 +230,13 @@ fi
 echo ""
 
 # ============================================================================
-# SECTION 9: Verification
+# SECTION 8: Verification
 # ============================================================================
 echo "🔍 Verifying generated files..."
 echo ""
 
-echo "Web Icons (public/icon/):"
-ls -lh "$ICON_DIR"/illusions-{16,32,180,192,512}.png 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
-echo ""
-
-echo "MDI Web Icons (public/icon/):"
-ls -lh "$ICON_DIR"/illusions-mdi-{16,32,180,192,512}.png 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
+echo "Renderer Favicons (public/icon/):"
+ls -lh "$ICON_DIR"/illusions-{16,32}.png 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
 echo ""
 
 echo "Electron Icons (build/):"
@@ -271,7 +248,7 @@ ls -lh "$APPX_DIR"/*.png 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
 echo ""
 
 # ============================================================================
-# SECTION 10: Size Comparison
+# SECTION 9: Size Comparison
 # ============================================================================
 echo "📊 Icon Size Summary:"
 echo ""

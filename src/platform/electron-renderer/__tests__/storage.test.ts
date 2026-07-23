@@ -129,11 +129,32 @@ describe("ElectronStorageProvider", () => {
   // =====================================================================
 
   describe("when electronAPI is not available", () => {
+    it("fails initialization with an actionable storage bridge error", async () => {
+      removeElectronAPI();
+      const provider = new ElectronStorageProvider();
+
+      await expect(provider.initialize()).rejects.toThrow(
+        "window.electronAPI.storage was not exposed",
+      );
+    });
+
     it("throws an error for any storage method call", async () => {
       removeElectronAPI();
       const provider = new ElectronStorageProvider();
 
       await expect(provider.loadAppState()).rejects.toThrow(/storage API/);
+    });
+
+    it("identifies a missing storage sub-bridge", async () => {
+      Object.defineProperty(window, "electronAPI", {
+        configurable: true,
+        value: { isElectron: true },
+      });
+      const provider = new ElectronStorageProvider();
+
+      await expect(provider.getRecentFiles()).rejects.toThrow(
+        "Ensure the Electron preload script exposes the storage IPC bridge.",
+      );
     });
   });
 
