@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import type { EditorView } from "@milkdown/prose/view";
 import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
+import type { ExportFormat } from "@/lib/export/types";
 
 interface UseWebMenuHandlersProps {
   onNew: () => void;
@@ -15,9 +16,7 @@ interface UseWebMenuHandlersProps {
   onCloseWindow?: () => void;
   onToggleCompactMode?: () => void;
   onToggleWritingMode?: () => void;
-  onExport?: (
-    format: "pdf" | "epub" | "docx" | "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora",
-  ) => void;
+  onExport?: (format: ExportFormat) => void;
   onCopyExport?: (format: "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora") => void;
   onPrint?: () => void;
   editorView?: EditorView | null;
@@ -129,6 +128,9 @@ export function useWebMenuHandlers({
           break;
         case "export-docx":
           if (isEditorTabActive) onExport?.("docx");
+          break;
+        case "export-html":
+          if (isEditorTabActive) onExport?.("html");
           break;
         case "copy-txt":
           if (isEditorTabActive) onCopyExport?.("txt");

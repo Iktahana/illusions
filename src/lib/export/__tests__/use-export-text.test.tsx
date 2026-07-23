@@ -24,6 +24,7 @@ let root: Root;
 let container: HTMLDivElement;
 let api: ExportApi | undefined;
 const exportMdiText = vi.fn();
+const exportHTML = vi.fn();
 const copyMdiText = vi.fn();
 const indent: TxtIndentOptions = { fullwidthSpaceIndent: true, indentCount: 2 };
 const requestTxtExportOptions = vi.fn(async () => indent as TxtIndentOptions | null);
@@ -47,7 +48,7 @@ beforeEach(async () => {
   api = undefined;
   Object.defineProperty(window, "electronAPI", {
     configurable: true,
-    value: { exportMdiText, copyMdiText },
+    value: { exportHTML, exportMdiText, copyMdiText },
   });
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -88,6 +89,30 @@ describe("useExport native text export", () => {
 
     expect(notifications.error).toHaveBeenCalledWith(
       "青空文庫形式のエクスポートに失敗しました: 書き込みに失敗しました",
+    );
+    expect(notifications.success).not.toHaveBeenCalled();
+  });
+});
+
+describe("useExport native HTML export", () => {
+  it("forwards live source, file type, and title to the main process", async () => {
+    exportHTML.mockResolvedValue("/tmp/作品.html");
+
+    await act(async () => api?.exportAs("html"));
+
+    expect(exportHTML).toHaveBeenCalledWith("本文。", ".mdi", "作品.mdi");
+    expect(requestTxtExportOptions).not.toHaveBeenCalled();
+    expect(notifications.dismiss).toHaveBeenCalledWith("progress-id");
+    expect(notifications.success).toHaveBeenCalledWith("HTMLをエクスポートしました");
+  });
+
+  it("reports a structured HTML export failure", async () => {
+    exportHTML.mockResolvedValue({ success: false, error: "HTML生成に失敗しました" });
+
+    await act(async () => api?.exportAs("html"));
+
+    expect(notifications.error).toHaveBeenCalledWith(
+      "HTMLのエクスポートに失敗しました: HTML生成に失敗しました",
     );
     expect(notifications.success).not.toHaveBeenCalled();
   });

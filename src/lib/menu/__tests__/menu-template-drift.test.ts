@@ -417,6 +417,7 @@ describe("WEB_MENU_STRUCTURE", () => {
                 action: "copy-aozora",
               },
               { type: "separator" },
+              { label: "HTML としてエクスポート...", action: "export-html" },
               { label: "PDF としてエクスポート...", action: "export-pdf" },
               { label: "EPUB としてエクスポート...", action: "export-epub" },
               { label: "DOCX としてエクスポート...", action: "export-docx" },
