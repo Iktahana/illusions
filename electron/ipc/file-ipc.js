@@ -1,6 +1,6 @@
 // File-related IPC handlers: open, save, export, and file security utilities
 
-const { ipcMain, dialog, app } = require("electron");
+const { ipcMain, dialog, app, clipboard } = require("electron");
 const path = require("path");
 const fs = require("fs/promises");
 const os = require("os");
@@ -11,6 +11,42 @@ const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy
 const { FILE_CHANNELS, EXPORT_CHANNELS } = require("../lib/ipc-channels");
 const { readFileStrictUtf8 } = require("../lib/text-decode");
 const { addStandalonePath, hasStandalonePath } = require("../lib/standalone-files");
+
+const TEXT_EXPORT_FORMATS = new Set(["txt", "txt-ruby", "narou", "kakuyomu", "aozora"]);
+
+/**
+ * Validate text conversion requests before loading the Rust-backed MDI renderer.
+ * Both file export and clipboard copy use the same ceiling and format allowlist.
+ * @param {unknown} content
+ * @param {unknown} format
+ * @returns {{ success: false, error: string, code?: string } | null}
+ */
+function validateTextExportRequest(content, format) {
+  if (typeof content !== "string" || !TEXT_EXPORT_FORMATS.has(format)) {
+    return { success: false, error: "Invalid text export request" };
+  }
+  if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+    return {
+      success: false,
+      error: "コンテンツが大きすぎて処理できません（50 MB）",
+      code: "CONTENT_TOO_LARGE",
+    };
+  }
+  return null;
+}
+
+/**
+ * Convert editor source through @illusions-lab/mdi's Rust-backed renderer.
+ * @param {string} content
+ * @param {string} format
+ * @param {string | undefined} fileType
+ * @param {{ fullwidthSpaceIndent?: boolean, indentCount?: number } | undefined} indent
+ * @returns {Promise<string>}
+ */
+async function renderMdiText(content, format, fileType, indent) {
+  const { exportMdiText } = require("../../src/lib/export/txt-exporter");
+  return exportMdiText(content, format, fileType, indent);
+}
 
 /**
  * Absolute path to the persisted standalone-opened-paths allowlist (#1965).
@@ -460,24 +496,45 @@ function registerFileHandlers() {
   // --- Export handlers ---
 
   ipcMain.handle(
-    EXPORT_CHANNELS.invoke.renderMdiText,
+    EXPORT_CHANNELS.invoke.exportMdiText,
+    async (_event, content, format, fileType, indent, title) => {
+      const invalid = validateTextExportRequest(content, format);
+      if (invalid) return invalid;
+
+      try {
+        const { txtExportSuggestedName } = require("../../src/lib/export/txt-export-filename");
+        const { filePath } = await dialog.showSaveDialog({
+          title: "テキストとしてエクスポート",
+          defaultPath: txtExportSuggestedName(title, format),
+          filters: [{ name: "テキストファイル", extensions: ["txt"] }],
+        });
+        if (!filePath) return null;
+
+        const converted = await renderMdiText(content, format, fileType, indent);
+        await writeBufferDurably(filePath, Buffer.from(converted, "utf-8"));
+        log.info(`Exported text: ${filePath}`);
+        return filePath;
+      } catch (error) {
+        log.error("Text export failed:", error);
+        return { success: false, error: error?.message || "Text export failed" };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.copyMdiText,
     async (_event, content, format, fileType, indent) => {
-      if (
-        typeof content !== "string" ||
-        !["txt", "txt-ruby", "narou", "kakuyomu", "aozora"].includes(format)
-      ) {
-        throw new Error("Invalid text export request");
+      const invalid = validateTextExportRequest(content, format);
+      if (invalid) return invalid;
+
+      try {
+        const converted = await renderMdiText(content, format, fileType, indent);
+        clipboard.writeText(converted);
+        return { success: true };
+      } catch (error) {
+        log.error("Text clipboard copy failed:", error);
+        return { success: false, error: error?.message || "Text clipboard copy failed" };
       }
-      if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
-        throw new Error("コンテンツが大きすぎてエクスポートできません（50 MB）");
-      }
-      const { renderTextFormat } = await import("@illusions-lab/mdi");
-      const { normalizeExportSource } = require("../../src/lib/export/mdi-export");
-      const { fullwidthIndentPrefix } = require("../../src/lib/export/fullwidth-indent");
-      const prefix = indent?.fullwidthSpaceIndent
-        ? fullwidthIndentPrefix(indent.indentCount)
-        : undefined;
-      return renderTextFormat(normalizeExportSource(content, fileType), format, prefix);
     },
   );
 

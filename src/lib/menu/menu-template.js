@@ -145,6 +145,37 @@ const MENU_TEMPLATE = [
           },
           SEPARATOR,
           {
+            id: "copy-txt",
+            label: "テキスト（プレーン）をクリップボードにコピー",
+            requiresActiveEditor: true,
+            electronChannel: "menu-copy-txt",
+          },
+          {
+            id: "copy-txt-ruby",
+            label: "テキスト（ルビ付き）をクリップボードにコピー",
+            requiresActiveEditor: true,
+            electronChannel: "menu-copy-txt-ruby",
+          },
+          {
+            id: "copy-narou",
+            label: "小説家になろう形式をクリップボードにコピー",
+            requiresActiveEditor: true,
+            electronChannel: "menu-copy-narou",
+          },
+          {
+            id: "copy-kakuyomu",
+            label: "カクヨム形式をクリップボードにコピー",
+            requiresActiveEditor: true,
+            electronChannel: "menu-copy-kakuyomu",
+          },
+          {
+            id: "copy-aozora",
+            label: "青空文庫形式をクリップボードにコピー",
+            requiresActiveEditor: true,
+            electronChannel: "menu-copy-aozora",
+          },
+          SEPARATOR,
+          {
             id: "export-pdf",
             label: "PDF としてエクスポート...",
             requiresActiveEditor: true,

@@ -12,26 +12,14 @@ export async function exportMdiText(
   indent?: TxtIndentOptions,
 ): Promise<string> {
   const { renderTextFormat } = await import("@illusions-lab/mdi");
-  const indentPrefix = indent?.fullwidthSpaceIndent
-    ? fullwidthIndentPrefix(indent.indentCount)
-    : "";
+  const indentCount =
+    typeof indent?.indentCount === "number" && Number.isFinite(indent.indentCount)
+      ? Math.max(1, Math.min(4, Math.round(indent.indentCount)))
+      : 1;
+  const indentPrefix = indent?.fullwidthSpaceIndent ? fullwidthIndentPrefix(indentCount) : "";
   return renderTextFormat(
     normalizeExportSource(content, fileType),
     format,
     indentPrefix || undefined,
   );
 }
-
-/** @deprecated Use exportMdiText with the upstream format name. */
-export const mdiToPlainText = async (
-  content: string,
-  fileType = ".mdi",
-  indent?: TxtIndentOptions,
-) => exportMdiText(content, "txt", fileType, indent);
-
-/** @deprecated Use exportMdiText with the upstream format name. */
-export const mdiToRubyText = async (
-  content: string,
-  fileType = ".mdi",
-  indent?: TxtIndentOptions,
-) => exportMdiText(content, "txt-ruby", fileType, indent);

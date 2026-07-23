@@ -66,8 +66,30 @@ const generatePdfPreview = vi.fn();
 const cancelPdfPreview = vi.fn().mockResolvedValue(true);
 const createObjectURL = vi.fn();
 const revokeObjectURL = vi.fn();
+const controlledReaders: ControlledFileReader[] = [];
 let root: Root | null;
 let container: HTMLDivElement;
+
+class ControlledFileReader {
+  result: ArrayBuffer | null = null;
+  onload: ((event: ProgressEvent<FileReader>) => void) | null = null;
+  onerror: ((event: ProgressEvent<FileReader>) => void) | null = null;
+  onabort: ((event: ProgressEvent<FileReader>) => void) | null = null;
+  abort = vi.fn(() => {
+    this.onabort?.(new ProgressEvent("abort") as ProgressEvent<FileReader>);
+  });
+
+  constructor() {
+    controlledReaders.push(this);
+  }
+
+  readAsArrayBuffer(): void {}
+
+  resolve(bytes: number[]): void {
+    this.result = new Uint8Array(bytes).buffer;
+    this.onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>);
+  }
+}
 
 function render(content: string) {
   root?.render(
@@ -90,6 +112,7 @@ beforeEach(() => {
   cancelPdfPreview.mockClear();
   createObjectURL.mockReset();
   revokeObjectURL.mockReset();
+  controlledReaders.length = 0;
   exportSettingsMocks.loadExportSettings.mockReset();
   exportSettingsMocks.loadExportSettings.mockReturnValue(new Promise(() => undefined));
   Object.defineProperty(window, "electronAPI", {
@@ -103,6 +126,10 @@ beforeEach(() => {
   Object.defineProperty(URL, "revokeObjectURL", {
     configurable: true,
     value: revokeObjectURL,
+  });
+  Object.defineProperty(globalThis, "FileReader", {
+    configurable: true,
+    value: ControlledFileReader,
   });
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -235,5 +262,38 @@ describe("ExportDialog PDF preview lifecycle", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:pdf-preview");
     expect(container.querySelector("embed")).toBeNull();
     expect(cancelPdfPreview).toHaveBeenCalled();
+  });
+
+  it("ignores a stale cover read when a newer image finishes first", async () => {
+    createObjectURL.mockReturnValue("blob:new-cover");
+    await act(async () => render("本文"));
+    const epubButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "EPUB",
+    );
+    await act(async () => epubButton?.click());
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const first = new File(["first"], "first.png", { type: "image/png" });
+    const second = new File(["second"], "second.png", { type: "image/png" });
+
+    await act(async () => {
+      Object.defineProperty(input, "files", { configurable: true, value: [first] });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => {
+      Object.defineProperty(input, "files", { configurable: true, value: [second] });
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    expect(controlledReaders).toHaveLength(2);
+    expect(controlledReaders[0].abort).toHaveBeenCalledOnce();
+
+    await act(async () => controlledReaders[1].resolve([2]));
+    await act(async () => controlledReaders[0].resolve([1]));
+
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(container.querySelector('img[alt="表紙プレビュー"]')?.getAttribute("src")).toBe(
+      "blob:new-cover",
+    );
   });
 });

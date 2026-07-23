@@ -12,7 +12,6 @@ import {
 } from "@/lib/export/export-settings";
 import { FontSelector } from "@/components/explorer/FontSelector";
 import { PageSizeSelector } from "@/components/PageSizeSelector";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import { useAuthSafe } from "@/contexts/AuthContext";
 
@@ -166,8 +165,7 @@ function ExportDialogInner({
   }, []);
 
   const isEpub = selectedFormat === "epub";
-  const isElectron = typeof window !== "undefined" && isElectronRenderer();
-  const hasPreviewApi = isElectron && !!window.electronAPI?.generatePdfPreview;
+  const hasPreviewApi = typeof window !== "undefined" && !!window.electronAPI?.generatePdfPreview;
 
   // --- Author auto-fill from auth context ---
   const authContext = useAuthSafe();
@@ -189,6 +187,7 @@ function ExportDialogInner({
   const [coverMediaType, setCoverMediaType] = useState<"image/jpeg" | "image/png" | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const coverReaderRef = useRef<FileReader | null>(null);
 
   // --- Blob URL refs for cleanup (state captures stale values in [] effects) ---
   const pdfUrlRef = useRef<string | null>(null);
@@ -206,8 +205,6 @@ function ExportDialogInner({
   const [previewMaxPagesPreference] = useState(() => localPreferences.getPdfPreviewMaxPages());
   const generationIdRef = useRef(0);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showWebPageNumberHint = !isElectron && selectedFormat === "pdf" && settings.showPageNumbers;
 
   const updateField = useCallback(
     <K extends keyof UnifiedExportSettings>(key: K, value: UnifiedExportSettings[K]) => {
@@ -228,8 +225,12 @@ function ExportDialogInner({
   // --- Cover image handling ---
   const handleCoverFile = useCallback((file: File) => {
     if (!file.type.match(/^image\/(jpeg|png)$/)) return;
+    coverReaderRef.current?.abort();
     const reader = new FileReader();
+    coverReaderRef.current = reader;
     reader.onload = () => {
+      if (coverReaderRef.current !== reader) return;
+      coverReaderRef.current = null;
       const buf = new Uint8Array(reader.result as ArrayBuffer);
       setCoverImage(buf);
       setCoverMediaType(file.type as "image/jpeg" | "image/png");
@@ -241,10 +242,15 @@ function ExportDialogInner({
         return newUrl;
       });
     };
+    reader.onerror = reader.onabort = () => {
+      if (coverReaderRef.current === reader) coverReaderRef.current = null;
+    };
     reader.readAsArrayBuffer(file);
   }, []);
 
   const handleCoverRemove = useCallback(() => {
+    coverReaderRef.current?.abort();
+    coverReaderRef.current = null;
     setCoverImage(null);
     setCoverMediaType(null);
     setCoverPreviewUrl((prev) => {
@@ -405,6 +411,8 @@ function ExportDialogInner({
   useEffect(() => {
     return () => {
       generationIdRef.current += 1;
+      coverReaderRef.current?.abort();
+      coverReaderRef.current = null;
       if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
       if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
@@ -793,12 +801,6 @@ function ExportDialogInner({
                     />
                   </button>
                 </div>
-                {showWebPageNumberHint && (
-                  <p className="text-xs text-foreground-tertiary -mt-2">
-                    Web版ではこの設定は適用されません。必要な場合はブラウザの印刷設定でヘッダー/フッターを有効にしてください。
-                  </p>
-                )}
-
                 {settings.showPageNumbers && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -922,17 +924,10 @@ function ExportDialogInner({
                   </div>
                 )
               ) : selectedFormat === "pdf" ? (
-                <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
-                  <div className="text-center space-y-2">
-                    <p className="text-sm text-foreground-secondary">
-                      エクスポートボタンをクリックすると印刷ダイアログが開きます。
-                      「PDFとして保存」を選択してください。
-                    </p>
-                    <p className="text-xs text-foreground-tertiary">
-                      {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-                      {settings.verticalWriting ? "縦書き" : "横書き"} · {settings.fontFamily}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-center h-full px-6">
+                  <p className="text-sm text-danger text-center">
+                    PDFプレビューを利用できません。アプリを再起動してください。
+                  </p>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full">
