@@ -28,11 +28,16 @@ export function suppressMacOptionTextInput(event: OptionKeyEvent, isMac = isMacO
 }
 
 /** ProseMirror integration for the editor's editable DOM only. */
-export function createMacOptionInputGuardPlugin(): Plugin {
+export function createMacOptionInputGuardPlugin(
+  isOptionCharacterInputAllowed: () => boolean = () => false,
+): Plugin {
   return new Plugin({
     props: {
       handleDOMEvents: {
-        keydown: (_view, event) => suppressMacOptionTextInput(event),
+        keydown: (_view, event) => {
+          if (isOptionCharacterInputAllowed()) return false;
+          return suppressMacOptionTextInput(event);
+        },
       },
     },
   });

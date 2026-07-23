@@ -19,6 +19,7 @@ export interface DisplaySettings {
   verticalScrollBehavior: "auto" | "mouse" | "trackpad";
   scrollSensitivity: number;
   compactMode: boolean;
+  allowOptionKeySpecialCharacterInput: boolean;
   showSettingsModal: boolean;
   speechVoiceURI: string;
   speechRate: number;
@@ -56,6 +57,7 @@ export interface DisplaySettingsHandlers {
   handleVerticalScrollBehaviorChange: (value: "auto" | "mouse" | "trackpad") => void;
   handleScrollSensitivityChange: (value: number) => void;
   handleToggleCompactMode: () => void;
+  handleAllowOptionKeySpecialCharacterInputChange: (value: boolean) => void;
   setShowSettingsModal: (value: boolean) => void;
   handleSpeechVoiceURIChange: (value: string) => void;
   handleSpeechRateChange: (value: number) => void;
@@ -123,6 +125,8 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
   >("auto");
   const [scrollSensitivity, setScrollSensitivity] = useState(1.0);
   const [compactMode, setCompactMode] = useState(false);
+  const [allowOptionKeySpecialCharacterInput, setAllowOptionKeySpecialCharacterInput] =
+    useState(false);
 
   // Terminal settings
   const [terminalBackground, setTerminalBackground] = useState("#000000");
@@ -187,6 +191,9 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
     if (typeof appState.scrollSensitivity === "number")
       setScrollSensitivity(appState.scrollSensitivity);
     if (typeof appState.compactMode === "boolean") setCompactMode(appState.compactMode);
+    if (typeof appState.allowOptionKeySpecialCharacterInput === "boolean") {
+      setAllowOptionKeySpecialCharacterInput(appState.allowOptionKeySpecialCharacterInput);
+    }
     if (typeof appState.speechVoiceURI === "string") setSpeechVoiceURI(appState.speechVoiceURI);
     if (typeof appState.speechRate === "number") setSpeechRate(appState.speechRate);
     if (typeof appState.speechPitch === "number") setSpeechPitch(appState.speechPitch);
@@ -400,6 +407,13 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
     });
   }, []);
 
+  const handleAllowOptionKeySpecialCharacterInputChange = useCallback((value: boolean) => {
+    setAllowOptionKeySpecialCharacterInput(value);
+    void persistAppState({ allowOptionKeySpecialCharacterInput: value }).catch((e) =>
+      console.error("Failed to persist allowOptionKeySpecialCharacterInput:", e),
+    );
+  }, []);
+
   const handleSpeechVoiceURIChange = useCallback((value: string) => {
     setSpeechVoiceURI(value);
     void persistAppState({ speechVoiceURI: value }).catch((e) =>
@@ -569,6 +583,7 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
       verticalScrollBehavior,
       scrollSensitivity,
       compactMode,
+      allowOptionKeySpecialCharacterInput,
       showSettingsModal,
       speechVoiceURI,
       speechRate,
@@ -604,6 +619,7 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
       handleVerticalScrollBehaviorChange,
       handleScrollSensitivityChange,
       handleToggleCompactMode,
+      handleAllowOptionKeySpecialCharacterInputChange,
       setShowSettingsModal,
       handleSpeechVoiceURIChange,
       handleSpeechRateChange,
