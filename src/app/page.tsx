@@ -27,6 +27,7 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
+import { trackDocumentOutputResult } from "@/lib/analytics/document-output-events";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
@@ -896,6 +897,7 @@ function EditorPageContent() {
           options,
         );
 
+        trackDocumentOutputResult("export", "html", result);
         notificationManager.dismiss(progressId);
         if (result === null || result === undefined) return;
         if (typeof result === "object" && "success" in result && !result.success) {
@@ -932,6 +934,7 @@ function EditorPageContent() {
           toPdfGenerationOptions(settings, dialogState.metadata, dialogState.fileType),
         );
 
+        trackDocumentOutputResult("export", "pdf", result);
         notificationManager.dismiss(progressId);
 
         if (result === null || result === undefined) return;
@@ -1012,6 +1015,7 @@ function EditorPageContent() {
           fileType: dialogState.fileType,
         });
 
+        trackDocumentOutputResult("export", "docx", result);
         notificationManager.dismiss(progressId);
 
         if (result === null || result === undefined) return;
@@ -1056,6 +1060,7 @@ function EditorPageContent() {
         // Electron IPC serializes Uint8Array automatically
         const result = await window.electronAPI.exportEPUB(dialogState.content, epubOptions);
 
+        trackDocumentOutputResult("export", "epub", result);
         notificationManager.dismiss(progressId);
 
         if (result === null || result === undefined) return;

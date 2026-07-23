@@ -26,6 +26,7 @@ let api: ExportApi | undefined;
 const exportMdiText = vi.fn();
 const exportHTML = vi.fn();
 const copyMdiText = vi.fn();
+const trackEvent = vi.fn(async () => undefined);
 const requestExportDialog = vi.fn();
 const indent: TxtIndentOptions = { fullwidthSpaceIndent: true, indentCount: 2 };
 const requestTxtExportOptions = vi.fn(async () => indent as TxtIndentOptions | null);
@@ -50,7 +51,7 @@ beforeEach(async () => {
   api = undefined;
   Object.defineProperty(window, "electronAPI", {
     configurable: true,
-    value: { exportHTML, exportMdiText, copyMdiText },
+    value: { exportHTML, exportMdiText, copyMdiText, analytics: { trackEvent } },
   });
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -70,6 +71,10 @@ describe("useExport native text export", () => {
     await act(async () => api?.exportAs("narou"));
 
     expect(exportMdiText).toHaveBeenCalledWith("本文。", "narou", ".mdi", indent, "作品.mdi");
+    expect(trackEvent).toHaveBeenCalledWith("document_output_completed", {
+      operation: "export",
+      format: "narou",
+    });
     expect(notifications.dismiss).toHaveBeenCalledWith("progress-id");
     expect(notifications.success).toHaveBeenCalledWith("小説家になろう形式をエクスポートしました");
   });
@@ -82,6 +87,7 @@ describe("useExport native text export", () => {
     expect(notifications.dismiss).toHaveBeenCalledWith("progress-id");
     expect(notifications.success).not.toHaveBeenCalled();
     expect(notifications.error).not.toHaveBeenCalled();
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 
   it("reports a structured main-process export failure", async () => {
@@ -93,6 +99,17 @@ describe("useExport native text export", () => {
       "青空文庫形式のエクスポートに失敗しました: 書き込みに失敗しました",
     );
     expect(notifications.success).not.toHaveBeenCalled();
+    expect(trackEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps a successful export successful when analytics delivery fails", async () => {
+    exportMdiText.mockResolvedValue("/tmp/作品.txt");
+    trackEvent.mockRejectedValueOnce(new Error("analytics offline"));
+
+    await act(async () => api?.exportAs("txt"));
+
+    expect(notifications.success).toHaveBeenCalledWith("テキストをエクスポートしました");
+    expect(notifications.error).not.toHaveBeenCalled();
   });
 });
 
@@ -107,6 +124,7 @@ describe("useExport native HTML export", () => {
       language: "ja",
     });
     expect(exportHTML).not.toHaveBeenCalled();
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 
   it("forwards live source, file type, and title to the main process", async () => {
@@ -115,6 +133,10 @@ describe("useExport native HTML export", () => {
     await act(async () => api?.exportAs("html"));
 
     expect(exportHTML).toHaveBeenCalledWith("本文。", ".mdi", "作品.mdi");
+    expect(trackEvent).toHaveBeenCalledWith("document_output_completed", {
+      operation: "export",
+      format: "html",
+    });
     expect(requestTxtExportOptions).not.toHaveBeenCalled();
     expect(notifications.dismiss).toHaveBeenCalledWith("progress-id");
     expect(notifications.success).toHaveBeenCalledWith("HTMLをエクスポートしました");
@@ -129,6 +151,7 @@ describe("useExport native HTML export", () => {
       "HTMLのエクスポートに失敗しました: HTML生成に失敗しました",
     );
     expect(notifications.success).not.toHaveBeenCalled();
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 });
 
@@ -146,6 +169,10 @@ describe("useExport native text clipboard copy", () => {
 
     expect(requestTxtExportOptions).toHaveBeenCalledWith(format, "copy");
     expect(copyMdiText).toHaveBeenCalledWith("本文。", format, ".mdi", indent);
+    expect(trackEvent).toHaveBeenCalledWith("document_output_completed", {
+      operation: "copy",
+      format,
+    });
     expect(notifications.dismiss).toHaveBeenCalledWith("progress-id");
     expect(notifications.success).toHaveBeenCalledWith(`${label}をクリップボードにコピーしました`);
   });
@@ -158,6 +185,7 @@ describe("useExport native text clipboard copy", () => {
     expect(copyMdiText).not.toHaveBeenCalled();
     expect(notifications.showProgress).not.toHaveBeenCalled();
     expect(notifications.success).not.toHaveBeenCalled();
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 
   it("reports a structured clipboard failure", async () => {
@@ -169,5 +197,6 @@ describe("useExport native text clipboard copy", () => {
       "青空文庫形式のクリップボードへのコピーに失敗しました: クリップボードを利用できません",
     );
     expect(notifications.success).not.toHaveBeenCalled();
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 });

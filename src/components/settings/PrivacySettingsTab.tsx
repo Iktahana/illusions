@@ -31,7 +31,9 @@ export default function PrivacySettingsTab(): React.ReactElement {
         </SettingsField>
 
         <div className="text-xs text-foreground-secondary space-y-1">
-          <p>・送信されるのは起動回数や機能利用状況などの匿名データのみです</p>
+          <p>
+            ・送信されるのは起動回数や、エクスポート・クリップボード出力の形式を含む機能利用状況などの匿名データのみです
+          </p>
           <p>・いつでもオフに切り替えられます</p>
         </div>
       </SettingsSection>

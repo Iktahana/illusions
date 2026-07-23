@@ -72,6 +72,58 @@ describe("registerAnalyticsHandlers", () => {
     expect(trackEventMock).toHaveBeenCalledWith("app_closed", { duration_bucket: "15_60m" });
   });
 
+  it.each([
+    ["export", "html"],
+    ["export", "pdf"],
+    ["export", "epub"],
+    ["export", "docx"],
+    ["export", "txt"],
+    ["export", "txt-ruby"],
+    ["export", "narou"],
+    ["export", "kakuyomu"],
+    ["export", "aozora"],
+    ["copy", "txt"],
+    ["copy", "txt-ruby"],
+    ["copy", "narou"],
+    ["copy", "kakuyomu"],
+    ["copy", "aozora"],
+  ] as const)("tracks approved %s output usage for %s", async (operation, format) => {
+    const handler = await createHandler();
+
+    await handler({}, "document_output_completed", { operation, format });
+
+    expect(loadAppStateMock).toHaveBeenCalledOnce();
+    expect(trackEventMock).toHaveBeenCalledWith("document_output_completed", {
+      operation,
+      format,
+    });
+  });
+
+  it("rejects document output data outside the fixed enums", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "document_output_completed", {
+      operation: "export",
+      format: "/Users/alice/private/novel.epub",
+    });
+
+    expect(loadAppStateMock).not.toHaveBeenCalled();
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a document output event carrying a file path", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "document_output_completed", {
+      operation: "export",
+      format: "epub",
+      path: "/Users/alice/private/novel.epub",
+    });
+
+    expect(loadAppStateMock).not.toHaveBeenCalled();
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
   it("rejects app_closed with a non-contract duration bucket before reading consent", async () => {
     const handler = await createHandler();
 

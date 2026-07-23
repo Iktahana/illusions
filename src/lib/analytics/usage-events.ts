@@ -43,7 +43,8 @@ export type UsageEventName =
   | "project_folder_created"
   | "project_file_renamed"
   | "project_file_deleted"
-  | "project_file_duplicated";
+  | "project_file_duplicated"
+  | "document_output_completed";
 
 export type TelemetryReason =
   | "cancelled"

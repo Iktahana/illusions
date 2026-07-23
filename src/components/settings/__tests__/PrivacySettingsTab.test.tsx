@@ -44,6 +44,7 @@ describe("PrivacySettingsTab", () => {
     expect(container.textContent).toContain("匿名の使用統計を送信する");
     expect(container.textContent).toContain("エラーレポートを送信する");
     expect(container.textContent).toContain("原稿本文・ファイル名・ファイルパス");
+    expect(container.textContent).toContain("エクスポート・クリップボード出力の形式");
 
     const switches = container.querySelectorAll('[role="switch"]');
     expect(switches).toHaveLength(2);
