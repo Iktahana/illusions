@@ -127,7 +127,7 @@ describe("MDI official export format acceptance matrix", () => {
     expect(documentXml).toContain("第一章");
     expect(documentXml).toContain("東京");
     expect(documentXml).toContain("とうきょう");
-    expect(documentXml).toMatch(/<w:p><w:r><w:t xml:space="preserve"><\/w:t><\/w:r><\/w:p>/);
+    expect(documentXml).toContain("<w:p/>");
     expect(documentXml).not.toContain("[[blank]]");
     expectNoFrontmatterLeak(documentXml);
   });
