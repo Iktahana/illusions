@@ -4,6 +4,7 @@ import AboutSection from "./AboutSection";
 import AccountSettingsTab from "./AccountSettingsTab";
 import AiApiSettingsTab from "./AiApiSettingsTab";
 import DictSettingsTab from "./DictSettingsTab";
+import ExportSettingsTab from "./ExportSettingsTab";
 import KeymapSettingsTab from "./KeymapSettingsTab";
 import LintingSettingsTab from "./LintingSettingsTab";
 import PosHighlightSettingsTab from "./PosHighlightSettingsTab";
@@ -49,6 +50,7 @@ export function buildSettingsTabRegistry(options: {
     about: { component: AboutSection },
   };
   if (options.isElectron) {
+    base.export = { component: ExportSettingsTab };
     base.terminal = { component: TerminalSettingsTab };
     base.power = { component: PowerSettingsTab };
     base.privacy = { component: PrivacySettingsTab };

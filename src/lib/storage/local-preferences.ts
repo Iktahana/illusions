@@ -16,6 +16,7 @@ const KEYS = {
   sidebarBottomOrder: `${PREFIX}sidebar-bottom-order`,
   searchHistory: `${PREFIX}search-history`,
   genjiAnalysisExpanded: `${PREFIX}genji-analysis-expanded`,
+  pdfPreviewMaxPages: `${PREFIX}pdf-preview-max-pages`,
 } as const;
 
 // One-time migration from old keys to new keys
@@ -68,6 +69,16 @@ function set(key: string, value: string): void {
 
 export type ThemeMode = "light" | "dark" | "auto";
 export type WritingMode = "vertical" | "horizontal";
+export type PdfPreviewMaxPagesPreference = "auto" | "32" | "100" | "200" | "300" | "500";
+
+const PDF_PREVIEW_MAX_PAGES_VALUES: readonly PdfPreviewMaxPagesPreference[] = [
+  "auto",
+  "32",
+  "100",
+  "200",
+  "300",
+  "500",
+];
 
 export const localPreferences = {
   // --- Theme ---
@@ -153,5 +164,18 @@ export const localPreferences = {
   },
   setGenjiAnalysisExpanded(expanded: boolean): void {
     set(KEYS.genjiAnalysisExpanded, expanded ? "1" : "0");
+  },
+
+  // --- PDF preview ---
+  getPdfPreviewMaxPages(): PdfPreviewMaxPagesPreference {
+    const value = get(KEYS.pdfPreviewMaxPages);
+    return PDF_PREVIEW_MAX_PAGES_VALUES.includes(value as PdfPreviewMaxPagesPreference)
+      ? (value as PdfPreviewMaxPagesPreference)
+      : "auto";
+  },
+  setPdfPreviewMaxPages(value: PdfPreviewMaxPagesPreference): void {
+    if (PDF_PREVIEW_MAX_PAGES_VALUES.includes(value)) {
+      set(KEYS.pdfPreviewMaxPages, value);
+    }
   },
 } as const;

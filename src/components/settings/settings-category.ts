@@ -9,6 +9,7 @@ export type SettingsCategory =
   | "pos-highlight"
   | "linting"
   | "speech"
+  | "export"
   | "keymap"
   | "terminal"
   | "power"
@@ -25,6 +26,7 @@ export const GLOBAL_SETTINGS_CATEGORIES: readonly SettingsCategory[] = [
   "dictionary",
   "keymap",
   "speech",
+  "export",
   "terminal",
   "power",
   "privacy",

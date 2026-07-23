@@ -90,6 +90,7 @@ const FILE_CHANNELS = Object.freeze({
 const EXPORT_CHANNELS = Object.freeze({
   invoke: Object.freeze({
     generatePdfPreview: "generate-pdf-preview",
+    cancelPdfPreview: "cancel-pdf-preview",
     renderMdiText: "render-mdi-text",
     exportPdf: "export-pdf",
     exportEpub: "export-epub",

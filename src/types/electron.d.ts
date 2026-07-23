@@ -100,7 +100,20 @@ declare global {
     generatePdfPreview?: (
       content: string,
       options: PdfGenerationOptions,
-    ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
+      maxPages?: number,
+    ) => Promise<
+      | {
+          success: true;
+          data: ArrayBuffer;
+          maxPages: number;
+          automaticMaxPages: number;
+          systemMemoryGiB: number;
+          sourceCharacterLimit: number;
+          sourceTruncated: boolean;
+        }
+      | { success: false; error: string; cancelled?: boolean; code?: string }
+    >;
+    cancelPdfPreview?: () => Promise<boolean>;
     renderMdiText?: (
       content: string,
       format: import("@/lib/export/txt-export-types").TxtExportFormat,

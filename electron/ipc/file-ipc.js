@@ -3,6 +3,7 @@
 const { ipcMain, dialog, app } = require("electron");
 const path = require("path");
 const fs = require("fs/promises");
+const os = require("os");
 const log = require("electron-log");
 const { createApprovedPathRegistry } = require("../lib/approved-paths");
 const { normalizeSeparators } = require("../lib/path-utils");
@@ -60,6 +61,15 @@ async function writeBufferDurably(target, buffer) {
 // Intentional difference vs vfs-ipc.js: this registry is module-level so save-file
 // approvals persist for the whole app lifetime (until the window is destroyed).
 const dialogApprovedPaths = createApprovedPathRegistry();
+const activePdfPreviews = new Map();
+
+function cancelPdfPreview(webContentsId) {
+  const active = activePdfPreviews.get(webContentsId);
+  if (!active) return false;
+  active.controller.abort();
+  activePdfPreviews.delete(webContentsId);
+  return true;
+}
 
 /**
  * Add a path to the dialog-approved set for a specific window, with LRU eviction.
@@ -471,20 +481,78 @@ function registerFileHandlers() {
     },
   );
 
-  ipcMain.handle(EXPORT_CHANNELS.invoke.generatePdfPreview, async (_event, content, options) => {
-    if (typeof content !== "string") {
-      return { success: false, error: "Invalid content" };
-    }
-    try {
-      const { generatePdf } = require("../../src/lib/export/pdf-exporter");
-      const pdfBuffer = await generatePdf(content, options || {});
-      return { success: true, data: pdfBuffer.toString("base64") };
-    } catch (error) {
-      log.error("PDF preview generation failed:", error);
-      return { success: false, error: error.message || "PDF preview generation failed" };
-    }
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.generatePdfPreview,
+    async (event, content, options, requestedMaxPages) => {
+      const webContentsId = event.sender.id;
+      cancelPdfPreview(webContentsId);
+
+      if (typeof content !== "string") {
+        return { success: false, error: "Invalid content" };
+      }
+      if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+        return {
+          success: false,
+          error: "コンテンツが大きすぎてプレビューできません（50 MB）",
+          code: "CONTENT_TOO_LARGE",
+        };
+      }
+
+      const controller = new AbortController();
+      const job = { controller };
+      activePdfPreviews.set(webContentsId, job);
+      const abortOnDestroyed = () => controller.abort();
+      event.sender.once("destroyed", abortOnDestroyed);
+
+      try {
+        const {
+          generatePdfPreview,
+          pdfPreviewPageLimitForMemory,
+          PDF_PREVIEW_ABSOLUTE_MAX_PAGES,
+        } = require("../../src/lib/export/pdf-exporter");
+        const totalMemoryBytes = os.totalmem();
+        const automaticMaxPages = pdfPreviewPageLimitForMemory(totalMemoryBytes);
+        const configuredMaxPages = Number.isFinite(requestedMaxPages)
+          ? Math.max(1, Math.min(Math.floor(requestedMaxPages), PDF_PREVIEW_ABSOLUTE_MAX_PAGES))
+          : null;
+        const maxPages = configuredMaxPages ?? automaticMaxPages;
+        const result = await generatePdfPreview(content, options || {}, {
+          signal: controller.signal,
+          maxPages,
+        });
+        const data = Uint8Array.from(result.pdf).buffer;
+        return {
+          success: true,
+          data,
+          maxPages: result.maxPages,
+          automaticMaxPages,
+          systemMemoryGiB: Math.round((totalMemoryBytes / 1024 ** 3) * 10) / 10,
+          sourceCharacterLimit: result.sourceCharacterLimit,
+          sourceTruncated: result.sourceTruncated,
+        };
+      } catch (error) {
+        if (controller.signal.aborted || error?.name === "AbortError") {
+          return { success: false, cancelled: true, error: "プレビューをキャンセルしました" };
+        }
+        log.error("PDF preview generation failed:", error);
+        return { success: false, error: error.message || "PDF preview generation failed" };
+      } finally {
+        event.sender.removeListener("destroyed", abortOnDestroyed);
+        if (activePdfPreviews.get(webContentsId) === job) {
+          activePdfPreviews.delete(webContentsId);
+        }
+      }
+    },
+  );
+
+  ipcMain.handle(EXPORT_CHANNELS.invoke.cancelPdfPreview, async (event) => {
+    return cancelPdfPreview(event.sender.id);
   });
 
+  /*
+   * Formal PDF export never crosses IPC. Preview stays a bounded in-memory
+   * payload because Chromium's embedded PDF viewer needs the complete Blob.
+   */
   ipcMain.handle(EXPORT_CHANNELS.invoke.exportPdf, async (_event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
@@ -497,9 +565,6 @@ function registerFileHandlers() {
       };
     }
     try {
-      const { generatePdf } = require("../../src/lib/export/pdf-exporter");
-      const pdfBuffer = await generatePdf(content, options || {});
-
       const { filePath } = await dialog.showSaveDialog({
         title: "PDFとしてエクスポート",
         defaultPath: `${options?.metadata?.title || "untitled"}.pdf`,
@@ -507,7 +572,8 @@ function registerFileHandlers() {
       });
 
       if (!filePath) return null;
-      await writeBufferDurably(filePath, pdfBuffer);
+      const { writePdfToFile } = require("../../src/lib/export/pdf-exporter");
+      await writePdfToFile(content, options || {}, filePath);
       log.info(`Exported PDF: ${filePath}`);
       return filePath;
     } catch (error) {
@@ -523,10 +589,12 @@ function registerFileHandlers() {
     // Declared outside try so the finally block can always destroy it,
     // preventing hidden BrowserWindow accumulation on print failures (#1919).
     let printWin = null;
+    let disposePrintDocument = null;
     try {
       const { BrowserWindow } = require("electron");
       const {
         electronSystemPrintOptions,
+        loadPrintDocumentHtml,
         preparePdfPrintDocument,
         waitForPrintFonts,
       } = require("../../src/lib/export/pdf-exporter");
@@ -569,7 +637,7 @@ function registerFileHandlers() {
         printWin.webContents.once("did-finish-load", () => resolve());
       });
 
-      await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(prepared.html)}`);
+      disposePrintDocument = await loadPrintDocumentHtml(printWin, prepared.html);
       await loadPromise;
       await waitForPrintFonts(printWin.webContents);
 
@@ -601,6 +669,9 @@ function registerFileHandlers() {
       // regardless of whether the print succeeded, was cancelled, or failed.
       if (printWin && !printWin.isDestroyed()) {
         printWin.destroy();
+      }
+      if (typeof disposePrintDocument === "function") {
+        disposePrintDocument();
       }
     }
   });

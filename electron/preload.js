@@ -100,7 +100,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onFormatChange: eventChannel(MENU_CHANNELS.event.format, { arity: 2 }),
   onThemeChange: eventChannel(MENU_CHANNELS.event.theme),
   // Export
-  generatePdfPreview: invokeChannel(EXPORT_CHANNELS.invoke.generatePdfPreview, { arity: 2 }),
+  generatePdfPreview: invokeChannel(EXPORT_CHANNELS.invoke.generatePdfPreview, { arity: 3 }),
+  cancelPdfPreview: invokeChannel(EXPORT_CHANNELS.invoke.cancelPdfPreview, { arity: 0 }),
   renderMdiText: invokeChannel(EXPORT_CHANNELS.invoke.renderMdiText, { arity: 4 }),
   exportPDF: invokeChannel(EXPORT_CHANNELS.invoke.exportPdf, { arity: 2 }),
   exportEPUB: invokeChannel(EXPORT_CHANNELS.invoke.exportEpub, { arity: 2 }),

@@ -13,6 +13,7 @@ import {
 import { FontSelector } from "@/components/explorer/FontSelector";
 import { PageSizeSelector } from "@/components/PageSizeSelector";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { localPreferences } from "@/lib/storage/local-preferences";
 import { useAuthSafe } from "@/contexts/AuthContext";
 
 import type {
@@ -196,6 +197,12 @@ function ExportDialogInner({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewInfo, setPreviewInfo] = useState<{
+    systemMemoryGiB: number;
+    maxPages: number;
+    sourceTruncated: boolean;
+  } | null>(null);
+  const [previewMaxPagesPreference] = useState(() => localPreferences.getPdfPreviewMaxPages());
   const generationIdRef = useRef(0);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -298,44 +305,53 @@ function ExportDialogInner({
     if (!hasPreviewApi || isEpub) return;
 
     if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+    const id = ++generationIdRef.current;
+    void window.electronAPI?.cancelPdfPreview?.();
 
     previewTimeoutRef.current = setTimeout(async () => {
-      const id = ++generationIdRef.current;
       setPreviewLoading(true);
       setPreviewError(null);
 
       const previewSettings = toPdfExportSettings(settings);
 
       try {
-        const result = await window.electronAPI!.generatePdfPreview!(content, {
-          metadata,
-          verticalWriting: settings.verticalWriting,
-          pageSize: previewSettings.pageSize,
-          landscape: previewSettings.landscape,
-          margins: previewSettings.margins,
-          charsPerLine: previewSettings.charsPerLine,
-          linesPerPage: previewSettings.linesPerPage,
-          fontFamily: previewSettings.fontFamily,
-          showPageNumbers: previewSettings.showPageNumbers,
-          pageNumberFormat: previewSettings.pageNumberFormat,
-          pageNumberPosition: previewSettings.pageNumberPosition,
-          textIndent: previewSettings.textIndent,
-          fullwidthSpaceIndent: previewSettings.fullwidthSpaceIndent,
-          googleFontFamily: previewSettings.googleFontFamily,
-          fileType,
-        });
+        const result = await window.electronAPI!.generatePdfPreview!(
+          content,
+          {
+            metadata,
+            verticalWriting: settings.verticalWriting,
+            pageSize: previewSettings.pageSize,
+            landscape: previewSettings.landscape,
+            margins: previewSettings.margins,
+            charsPerLine: previewSettings.charsPerLine,
+            linesPerPage: previewSettings.linesPerPage,
+            fontFamily: previewSettings.fontFamily,
+            showPageNumbers: previewSettings.showPageNumbers,
+            pageNumberFormat: previewSettings.pageNumberFormat,
+            pageNumberPosition: previewSettings.pageNumberPosition,
+            textIndent: previewSettings.textIndent,
+            fullwidthSpaceIndent: previewSettings.fullwidthSpaceIndent,
+            googleFontFamily: previewSettings.googleFontFamily,
+            fileType,
+          },
+          previewMaxPagesPreference === "auto" ? undefined : Number(previewMaxPagesPreference),
+        );
 
         if (id !== generationIdRef.current) return;
 
         if (result.success) {
-          if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+          if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
 
-          const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
-          const blob = new Blob([bytes], { type: "application/pdf" });
+          const blob = new Blob([result.data], { type: "application/pdf" });
           const newPdfUrl = URL.createObjectURL(blob) + "#view=FitH";
           pdfUrlRef.current = newPdfUrl;
           setPdfUrl(newPdfUrl);
-        } else {
+          setPreviewInfo({
+            systemMemoryGiB: result.systemMemoryGiB,
+            maxPages: result.maxPages,
+            sourceTruncated: result.sourceTruncated,
+          });
+        } else if (!result.cancelled) {
           setPreviewError(result.error);
         }
       } catch (err) {
@@ -350,6 +366,7 @@ function ExportDialogInner({
 
     return () => {
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+      void window.electronAPI?.cancelPdfPreview?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPreviewApi, settings, selectedFormat, content, metadata, fileType]);
@@ -360,6 +377,7 @@ function ExportDialogInner({
       if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
       if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+      void window.electronAPI?.cancelPdfPreview?.();
     };
   }, []);
 
@@ -837,12 +855,22 @@ function ExportDialogInner({
         {/* Right: Preview panel (hidden for EPUB) */}
         {!isEpub && (
           <div className="flex-1 flex flex-col bg-background-secondary min-w-0">
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-shrink-0">
-              <span className="text-sm font-medium text-foreground">プレビュー</span>
-              <span className="text-xs text-foreground-tertiary">
-                {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-                {settings.verticalWriting ? "縦書き" : "横書き"}
-              </span>
+            <div className="px-4 py-3 border-b border-border flex-shrink-0 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">プレビュー</span>
+                <span className="text-xs text-foreground-tertiary">
+                  {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
+                  {settings.verticalWriting ? "縦書き" : "横書き"}
+                </span>
+              </div>
+              {previewInfo && (
+                <p className="text-xs text-foreground-tertiary">
+                  搭載メモリは {previewInfo.systemMemoryGiB} GBです。プレビューの上限は
+                  {previewInfo.maxPages}ページです。設定の「エクスポート」で変更できます。
+                  {previewInfo.sourceTruncated &&
+                    " 長い文書のため、末尾はプレビューに含まれません。"}
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-hidden">

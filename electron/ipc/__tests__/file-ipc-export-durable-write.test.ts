@@ -48,8 +48,11 @@ describe("file-ipc.js export handlers — durable binary writes (#2147)", () => 
     expect(exportDocxHandler.length).toBeGreaterThan(100);
   });
 
-  it("writes PDF/EPUB/DOCX through the durable helper", () => {
-    expect(exportPdfHandler).toContain("await writeBufferDurably(filePath, pdfBuffer)");
+  it("writes PDF atomically while EPUB/DOCX use the durable buffer helper", () => {
+    expect(exportPdfHandler).toContain("writePdfToFile");
+    expect(exportPdfHandler).toContain("await writePdfToFile(content, options || {}, filePath)");
+    expect(exportPdfHandler).not.toContain("generatePdf(");
+    expect(exportPdfHandler).not.toContain("pdfBuffer");
     expect(exportEpubHandler).toContain("await writeBufferDurably(filePath, epubBuffer)");
     expect(exportDocxHandler).toContain("await writeBufferDurably(filePath, docxBuffer)");
   });
