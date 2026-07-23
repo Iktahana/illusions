@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   electronPdfOptions,
+  electronSystemPrintHtml,
   electronSystemPrintOptions,
   isPrintCancellationReason,
   loadPrintDocumentHtml,
@@ -92,6 +93,63 @@ describe("PDF Chromium profile adapter", () => {
       pageSize: { width: 210_000, height: 297_000 },
       margins: { marginType: "none" },
     });
+  });
+
+  it.each(
+    (
+      [
+        ["simple", "content:counter(page)"],
+        ["dash", String.raw`content:"\2014 " counter(page) " \2014"`],
+        ["fraction", 'content:counter(page) " / " counter(pages)'],
+      ] as const
+    ).flatMap(([format, expectedContent]) =>
+      (
+        [
+          "bottom-left",
+          "bottom-center",
+          "bottom-right",
+          "top-left",
+          "top-center",
+          "top-right",
+        ] as const
+      ).map((position) => [format, position, expectedContent] as const),
+    ),
+  )(
+    "adds %s page counters at %s for Chromium system print",
+    (format, position, expectedContent) => {
+      const prepared = preparePdfPrintDocument("本文。", {
+        ...options,
+        pageNumberFormat: format,
+        pageNumberPosition: position,
+      });
+      const html = electronSystemPrintHtml(prepared);
+
+      expect(html).toContain('<style id="mdi-system-print-page-numbers">');
+      expect(html).toContain(`@page{@${position}{${expectedContent};`);
+      expect(html).toContain("writing-mode:horizontal-tb");
+      expect(html).toContain("text-orientation:mixed");
+    },
+  );
+
+  it("does not inject page counters when page numbering is disabled", () => {
+    const prepared = preparePdfPrintDocument("本文。", {
+      ...options,
+      showPageNumbers: false,
+    });
+
+    expect(electronSystemPrintHtml(prepared)).toBe(prepared.html);
+  });
+
+  it.each([
+    [
+      "<html><body><p>本文。</p></body></html>",
+      /<html><head><style id="mdi-system-print-page-numbers">/,
+    ],
+    ["<p>本文。</p>", /^<style id="mdi-system-print-page-numbers">[\s\S]*<\/style><p>本文。<\/p>$/],
+  ])("injects page counters into alternate Chromium HTML shells", (html, expected) => {
+    const prepared = preparePdfPrintDocument("本文。", options);
+
+    expect(electronSystemPrintHtml({ ...prepared, html })).toMatch(expected);
   });
 
   it("keeps preview and final export profile semantics identical", () => {

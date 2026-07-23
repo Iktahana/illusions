@@ -729,6 +729,7 @@ function registerFileHandlers() {
     try {
       const { BrowserWindow } = require("electron");
       const {
+        electronSystemPrintHtml,
         electronSystemPrintOptions,
         isPrintCancellationReason,
         loadPrintDocumentHtml,
@@ -738,6 +739,7 @@ function registerFileHandlers() {
 
       const opts = options || {};
       const prepared = preparePdfPrintDocument(content, opts);
+      const printHtml = electronSystemPrintHtml(prepared);
 
       const partition = `print-${Date.now()}`;
       printWin = new BrowserWindow({
@@ -774,7 +776,7 @@ function registerFileHandlers() {
         printWin.webContents.once("did-finish-load", () => resolve());
       });
 
-      disposePrintDocument = await loadPrintDocumentHtml(printWin, prepared.html);
+      disposePrintDocument = await loadPrintDocumentHtml(printWin, printHtml);
       await loadPromise;
       await waitForPrintFonts(printWin.webContents);
 
