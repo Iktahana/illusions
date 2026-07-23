@@ -80,6 +80,11 @@ describe("file-ipc.js printDocument handler — BrowserWindow leak fix (#1919)",
     expect(printHandler).not.toContain("data:text/html");
   });
 
+  it("treats Electron's platform-specific cancellation reason as a normal cancel", () => {
+    expect(printHandler).toContain("isPrintCancellationReason(failureReason)");
+    expect(printHandler).not.toContain('failureReason === "cancelled"');
+  });
+
   it("catch block does NOT call printWin.destroy() (finally handles it)", () => {
     const catchBodyMatch = printHandler.match(
       /\bcatch\s*\([^)]+\)\s*\{([\s\S]*?)\}\s*finally\s*\{/,

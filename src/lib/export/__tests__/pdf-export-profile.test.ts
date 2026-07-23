@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   electronPdfOptions,
   electronSystemPrintOptions,
+  isPrintCancellationReason,
   loadPrintDocumentHtml,
   pdfPreviewPageLimitForMemory,
   pdfPreviewSourceCharacterLimit,
@@ -92,6 +93,20 @@ describe("PDF Chromium profile adapter", () => {
       margins: { marginType: "none" },
     });
   });
+
+  it.each(["cancelled", "canceled", "Print job canceled", "Print job cancelled"])(
+    "recognizes the system-print cancellation reason %s",
+    (reason) => {
+      expect(isPrintCancellationReason(reason)).toBe(true);
+    },
+  );
+
+  it.each([undefined, null, "", "Invalid printer settings", "Print job failed"])(
+    "does not hide the system-print failure reason %s",
+    (reason) => {
+      expect(isPrintCancellationReason(reason)).toBe(false);
+    },
+  );
 
   it("loads large print HTML through an in-memory protocol instead of a data URL", async () => {
     const html = `<!doctype html><html><body>${"長編本文。".repeat(300_000)}</body></html>`;

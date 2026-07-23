@@ -12,6 +12,7 @@ import {
   DEFAULT_EXPORT_SETTINGS,
   loadExportSettings,
   saveExportSettings,
+  toPdfExportSettings,
 } from "@/lib/export/export-settings";
 
 // インメモリ KV で StorageService をモックする
@@ -46,6 +47,28 @@ describe("saveExportSettings", () => {
 
     expect(kvStore.get(STORAGE_KEY)).toBe(JSON.stringify(settings));
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe("toPdfExportSettings", () => {
+  it("旧形式の Noto Serif キーでも Google Fonts を読み込む", () => {
+    const converted = toPdfExportSettings({
+      ...DEFAULT_EXPORT_SETTINGS,
+      fontFamily: "noto-serif",
+    });
+
+    expect(converted.fontFamily).toBe('"Noto Serif JP", serif');
+    expect(converted.googleFontFamily).toBe("Noto Serif JP");
+  });
+
+  it("直接選択した Google Fonts のファミリー名を保持する", () => {
+    const converted = toPdfExportSettings({
+      ...DEFAULT_EXPORT_SETTINGS,
+      fontFamily: "Shippori Mincho",
+    });
+
+    expect(converted.fontFamily).toBe('"Shippori Mincho", serif');
+    expect(converted.googleFontFamily).toBe("Shippori Mincho");
   });
 });
 

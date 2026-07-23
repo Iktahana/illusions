@@ -591,6 +591,7 @@ function registerFileHandlers() {
       const { BrowserWindow } = require("electron");
       const {
         electronSystemPrintOptions,
+        isPrintCancellationReason,
         loadPrintDocumentHtml,
         preparePdfPrintDocument,
         waitForPrintFonts,
@@ -647,7 +648,7 @@ function registerFileHandlers() {
               resolve();
             } else {
               // User cancelled is not an error
-              if (failureReason === "cancelled") {
+              if (isPrintCancellationReason(failureReason)) {
                 resolve();
               } else {
                 reject(new Error(failureReason || "Print failed"));

@@ -234,6 +234,11 @@ export function electronSystemPrintOptions(
   };
 }
 
+/** Electron uses platform-dependent spelling and may prefix cancellation text. */
+export function isPrintCancellationReason(reason: unknown): boolean {
+  return typeof reason === "string" && /\bcancel(?:l)?ed\b/i.test(reason);
+}
+
 /** Wait for local/remote fonts without letting a network failure hang export. */
 export async function waitForPrintFonts(webContents: WebContents, timeoutMs = 10_000) {
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -321,6 +326,10 @@ async function withPreparedPrintWindow<T>(
   control.signal?.addEventListener("abort", abort, { once: true });
 
   try {
+    // The signal may have been aborted while the dynamic Electron import or
+    // BrowserWindow construction was in progress. Avoid loading a potentially
+    // huge manuscript into a window that is already obsolete.
+    throwIfPdfCancelled(control.signal);
     disposePrintDocument = await loadPrintDocumentHtml(hiddenWin, prepared.html);
     throwIfPdfCancelled(control.signal);
     await waitForPrintFonts(hiddenWin.webContents);
@@ -345,16 +354,8 @@ async function renderPreparedPdf(
       electronPdfOptions(prepared, control.pageRanges),
     );
     throwIfPdfCancelled(control.signal);
-    return Buffer.from(pdf);
+    return pdf;
   });
-}
-
-export async function generatePdf(
-  content: string,
-  options: PdfExportOptions,
-  control: PdfRenderControl = {},
-): Promise<Buffer> {
-  return renderPreparedPdf(preparePdfPrintDocument(content, options), control);
 }
 
 export async function generatePdfPreview(

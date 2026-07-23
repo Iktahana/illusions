@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const electronState = vi.hoisted(() => ({
   failPrint: false,
   printDelayMs: 0,
+  printResult: Buffer.from("%PDF-1.7\n%%EOF"),
   printOptions: null as Record<string, unknown> | null,
+  loadCount: 0,
+  onWindowCreated: undefined as (() => void) | undefined,
   windows: [] as Array<{ destroyed: boolean }>,
 }));
 
@@ -29,15 +32,17 @@ vi.mock("electron", () => ({
         if (electronState.printDelayMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, electronState.printDelayMs));
         }
-        return Buffer.from("%PDF-1.7\n%%EOF");
+        return electronState.printResult;
       }),
     };
 
     constructor() {
       electronState.windows.push(this);
+      electronState.onWindowCreated?.();
     }
 
     async loadURL(url: string) {
+      electronState.loadCount += 1;
       const response = this.protocolHandler?.({ url });
       if (!response || !(await response.text()).includes("<html")) {
         throw new Error("print document was not loaded");
@@ -71,7 +76,10 @@ beforeEach(async () => {
   testDirectory = await fs.mkdtemp(path.resolve("tmp/pdfs/pdf-stream-unit-"));
   electronState.failPrint = false;
   electronState.printDelayMs = 0;
+  electronState.printResult = Buffer.from("%PDF-1.7\n%%EOF");
   electronState.printOptions = null;
+  electronState.loadCount = 0;
+  electronState.onWindowCreated = undefined;
   electronState.windows.length = 0;
 });
 
@@ -127,7 +135,21 @@ describe("generatePdfPreview", () => {
     const result = await generatePdfPreview("本文。", options, { maxPages: 999 });
 
     expect(result.maxPages).toBe(500);
+    expect(result.pdf).toBe(electronState.printResult);
     expect(electronState.printOptions).toMatchObject({ pageRanges: "1-500" });
+    expect(electronState.windows[0].destroyed).toBe(true);
+  });
+
+  it("does not load the document when cancellation wins during window creation", async () => {
+    const controller = new AbortController();
+    electronState.onWindowCreated = () => controller.abort();
+
+    await expect(
+      generatePdfPreview("本文。", options, { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(electronState.loadCount).toBe(0);
+    expect(electronState.printOptions).toBeNull();
     expect(electronState.windows[0].destroyed).toBe(true);
   });
 });

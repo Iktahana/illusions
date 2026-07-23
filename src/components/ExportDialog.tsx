@@ -152,12 +152,13 @@ function ExportDialogInner({
   const [settings, setSettings] = useState<UnifiedExportSettings>(() => ({
     ...DEFAULT_EXPORT_SETTINGS,
   }));
+  const settingsEditedRef = useRef(false);
 
   // 保存済みのエクスポート設定を StorageService から非同期に読み込む
   useEffect(() => {
     let cancelled = false;
     void loadExportSettings().then((loaded) => {
-      if (!cancelled) setSettings(loaded);
+      if (!cancelled && !settingsEditedRef.current) setSettings(loaded);
     });
     return () => {
       cancelled = true;
@@ -210,12 +211,14 @@ function ExportDialogInner({
 
   const updateField = useCallback(
     <K extends keyof UnifiedExportSettings>(key: K, value: UnifiedExportSettings[K]) => {
+      settingsEditedRef.current = true;
       setSettings((prev) => ({ ...prev, [key]: value }));
     },
     [],
   );
 
   const updateMargin = useCallback((side: "top" | "bottom" | "left" | "right", value: number) => {
+    settingsEditedRef.current = true;
     setSettings((prev) => ({
       ...prev,
       margins: { ...prev.margins, [side]: value },
@@ -354,7 +357,10 @@ function ExportDialogInner({
         if (id !== generationIdRef.current) return;
 
         if (result.success) {
-          if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
+          if (pdfUrlRef.current) {
+            URL.revokeObjectURL(pdfUrlRef.current);
+            pdfUrlRef.current = null;
+          }
 
           const blob = new Blob([result.data], { type: "application/pdf" });
           const objectUrl = URL.createObjectURL(blob);
@@ -366,10 +372,20 @@ function ExportDialogInner({
             sourceTruncated: result.sourceTruncated,
           });
         } else if (!result.cancelled) {
+          if (pdfUrlRef.current) {
+            URL.revokeObjectURL(pdfUrlRef.current);
+            pdfUrlRef.current = null;
+          }
+          setPdfUrl(null);
           setPreviewError(result.error);
         }
       } catch (err) {
         if (id !== generationIdRef.current) return;
+        if (pdfUrlRef.current) {
+          URL.revokeObjectURL(pdfUrlRef.current);
+          pdfUrlRef.current = null;
+        }
+        setPdfUrl(null);
         setPreviewError(err instanceof Error ? err.message : "Preview generation failed");
       } finally {
         if (id === generationIdRef.current) {
@@ -383,8 +399,7 @@ function ExportDialogInner({
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
       void window.electronAPI?.cancelPdfPreview?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPreviewApi, settings, selectedFormat, content, metadata, fileType]);
+  }, [hasPreviewApi, isEpub, settings, content, metadata, fileType, previewMaxPagesPreference]);
 
   // Cleanup blob URLs on unmount (refs always hold the latest values)
   useEffect(() => {

@@ -2,6 +2,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_EXPORT_SETTINGS, type UnifiedExportSettings } from "@/lib/export/export-settings";
+
 vi.mock("@/lib/utils/runtime-env", () => ({ isElectronRenderer: () => true }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuthSafe: () => null }));
 vi.mock("@/shared/ui/GlassDialog", () => ({
@@ -9,12 +11,16 @@ vi.mock("@/shared/ui/GlassDialog", () => ({
 }));
 vi.mock("@/components/explorer/FontSelector", () => ({ FontSelector: () => null }));
 vi.mock("@/components/PageSizeSelector", () => ({ PageSizeSelector: () => null }));
+const exportSettingsMocks = vi.hoisted(() => ({
+  loadExportSettings: vi.fn(),
+  saveExportSettings: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/lib/export/export-settings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/export/export-settings")>();
   return {
     ...actual,
-    loadExportSettings: () => new Promise(() => undefined),
-    saveExportSettings: vi.fn().mockResolvedValue(undefined),
+    loadExportSettings: exportSettingsMocks.loadExportSettings,
+    saveExportSettings: exportSettingsMocks.saveExportSettings,
   };
 });
 
@@ -42,6 +48,10 @@ function previewResult(byte: number): PreviewSuccess {
     sourceCharacterLimit: 360_000,
     sourceTruncated: false,
   };
+}
+
+function storedSettings(charsPerLine: number): UnifiedExportSettings {
+  return { ...DEFAULT_EXPORT_SETTINGS, charsPerLine };
 }
 
 function deferred<T>() {
@@ -80,6 +90,8 @@ beforeEach(() => {
   cancelPdfPreview.mockClear();
   createObjectURL.mockReset();
   revokeObjectURL.mockReset();
+  exportSettingsMocks.loadExportSettings.mockReset();
+  exportSettingsMocks.loadExportSettings.mockReturnValue(new Promise(() => undefined));
   Object.defineProperty(window, "electronAPI", {
     configurable: true,
     value: { generatePdfPreview, cancelPdfPreview },
@@ -104,6 +116,28 @@ afterEach(() => {
 });
 
 describe("ExportDialog PDF preview lifecycle", () => {
+  it("does not overwrite an immediate user edit when stored settings finish loading", async () => {
+    const loaded = deferred<UnifiedExportSettings>();
+    exportSettingsMocks.loadExportSettings.mockReturnValue(loaded.promise);
+
+    await act(async () => render("本文"));
+    const charsPerLineInput = Array.from(container.querySelectorAll("input[type=number]")).find(
+      (input) => (input as HTMLInputElement).value === "40",
+    ) as HTMLInputElement | undefined;
+    expect(charsPerLineInput).toBeDefined();
+
+    await act(async () => {
+      if (!charsPerLineInput) return;
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      valueSetter?.call(charsPerLineInput, "35");
+      charsPerLineInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(charsPerLineInput?.value).toBe("35");
+
+    await act(async () => loaded.resolve(storedSettings(22)));
+    expect(charsPerLineInput?.value).toBe("35");
+  });
+
   it("ignores stale generation results after the source changes", async () => {
     const first = deferred<PreviewSuccess>();
     const second = deferred<PreviewSuccess>();
@@ -164,6 +198,25 @@ describe("ExportDialog PDF preview lifecycle", () => {
 
     expect(container.textContent).toContain("プレビュー生成エラー");
     expect(container.querySelector("embed")).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:old-preview");
+  });
+
+  it("releases the old preview when regeneration throws", async () => {
+    generatePdfPreview
+      .mockResolvedValueOnce(previewResult(1))
+      .mockRejectedValueOnce(new Error("IPC接続エラー"));
+    createObjectURL.mockReturnValue("blob:old-preview");
+
+    await act(async () => render("最初の本文"));
+    await act(async () => vi.advanceTimersByTimeAsync(800));
+    expect(container.querySelector("embed")).not.toBeNull();
+
+    await act(async () => render("通信に失敗する本文"));
+    await act(async () => vi.advanceTimersByTimeAsync(800));
+
+    expect(container.textContent).toContain("IPC接続エラー");
+    expect(container.querySelector("embed")).toBeNull();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:old-preview");
   });
 
   it("releases the preview when switching to EPUB", async () => {

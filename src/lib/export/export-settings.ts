@@ -177,8 +177,12 @@ export function fontKeyToDocx(key: string): string {
 // ---------------------------------------------------------------------------
 
 export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings {
-  // Determine if the font is a Google Font (for <link> injection in export HTML)
-  const isGoogleFont = ALL_JAPANESE_FONTS.some((f) => f.family === s.fontFamily);
+  const fontFamily = fontKeyToCss(s.fontFamily);
+  // Legacy settings use canonical keys such as `noto-serif`. Resolve the CSS
+  // first so those users still receive the required Google Fonts stylesheet.
+  const googleFontFamily = ALL_JAPANESE_FONTS.find(
+    (font) => font.family === s.fontFamily || fontFamily.includes(`"${font.family}"`),
+  )?.family;
 
   return {
     pageSize: s.pageSize,
@@ -187,13 +191,13 @@ export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings
     charsPerLine: s.charsPerLine,
     linesPerPage: s.linesPerPage,
     margins: { ...s.margins },
-    fontFamily: fontKeyToCss(s.fontFamily),
+    fontFamily,
     showPageNumbers: s.showPageNumbers,
     pageNumberFormat: s.pageNumberFormat,
     pageNumberPosition: s.pageNumberPosition,
     textIndent: s.textIndent,
     fullwidthSpaceIndent: s.fullwidthSpaceIndent,
-    googleFontFamily: isGoogleFont ? s.fontFamily : undefined,
+    googleFontFamily,
   };
 }
 
