@@ -26,11 +26,6 @@ on:
         required: false
         type: boolean
         default: false
-      trusted_store_publish:
-        description: "Whether this call was routed through store-publish.yml"
-        required: false
-        type: boolean
-        default: false
 
   workflow_call:
     inputs:
@@ -48,6 +43,11 @@ on:
         type: string
       dry_run:
         description: "Dry run — log actions without mutating"
+        required: false
+        type: boolean
+        default: false
+      trusted_store_publish:
+        description: "Whether this call was routed through store-publish.yml"
         required: false
         type: boolean
         default: false

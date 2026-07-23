@@ -5,14 +5,10 @@ on:
     branches: [dev, beta, alpha, main]
     paths-ignore:
       - "assets/store/**"
-      - ".github/workflows/sync-ms-store-listing.yml"
-      - ".github/workflows/store-publish.yml"
   push:
     branches: [dev, beta, alpha, main]
     paths-ignore:
       - "assets/store/**"
-      - ".github/workflows/sync-ms-store-listing.yml"
-      - ".github/workflows/store-publish.yml"
   workflow_dispatch:
 
 permissions:
