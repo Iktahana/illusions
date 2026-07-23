@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
+import { trackDocumentOutputResult } from "@/lib/analytics/document-output-events";
 import { notificationManager } from "@/lib/services/notification-manager";
 import type { TxtExportFormat, TxtIndentOptions } from "./txt-export-types";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -137,6 +138,7 @@ export function useExport({
             indentOptions,
             title,
           );
+          trackDocumentOutputResult("export", format, result);
           notificationManager.dismiss(progressId);
 
           if (result === null || result === undefined) return;
@@ -200,6 +202,7 @@ export function useExport({
             break;
         }
 
+        trackDocumentOutputResult("export", format, result);
         notificationManager.dismiss(progressId);
 
         if (result === null || result === undefined) {
@@ -261,6 +264,7 @@ export function useExport({
           getFileType(),
           indentOptions,
         );
+        trackDocumentOutputResult("copy", format, result);
         notificationManager.dismiss(progressId);
 
         if (!result.success) {
