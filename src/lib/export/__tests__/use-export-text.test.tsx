@@ -26,15 +26,17 @@ let api: ExportApi | undefined;
 const exportMdiText = vi.fn();
 const exportHTML = vi.fn();
 const copyMdiText = vi.fn();
+const requestExportDialog = vi.fn();
 const indent: TxtIndentOptions = { fullwidthSpaceIndent: true, indentCount: 2 };
 const requestTxtExportOptions = vi.fn(async () => indent as TxtIndentOptions | null);
 
-function Harness(): null {
+function Harness({ withDialog = false }: { withDialog?: boolean }): null {
   const value = useExport({
     getContent: () => "本文。",
     getTitle: () => "作品.mdi",
     getFileType: () => ".mdi",
     getIsEditorTabActive: () => true,
+    onExportDialogRequest: withDialog ? requestExportDialog : undefined,
     onRequestTxtExportOptions: requestTxtExportOptions,
   });
   useEffect(() => {
@@ -95,6 +97,18 @@ describe("useExport native text export", () => {
 });
 
 describe("useExport native HTML export", () => {
+  it("opens the shared settings dialog when the application provides it", async () => {
+    await act(async () => root.render(<Harness withDialog />));
+
+    await act(async () => api?.exportAs("html"));
+
+    expect(requestExportDialog).toHaveBeenCalledWith("html", "本文。", {
+      title: "作品.mdi",
+      language: "ja",
+    });
+    expect(exportHTML).not.toHaveBeenCalled();
+  });
+
   it("forwards live source, file type, and title to the main process", async () => {
     exportHTML.mockResolvedValue("/tmp/作品.html");
 

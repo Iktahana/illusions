@@ -22,13 +22,15 @@ import type {
 } from "@/lib/export/export-settings";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { EpubExportOptions, ChapterSplitLevel } from "@/lib/export/epub-shared";
+import type { HtmlExportOptions } from "@/lib/export/html-shared";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { ExportMetadata } from "@/lib/export/types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type ExportDialogFormat = "pdf" | "docx" | "epub";
+export type ExportDialogFormat = "html" | "pdf" | "docx" | "epub";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -39,6 +41,7 @@ interface ExportDialogProps {
   mode?: "export" | "print";
   initialFormat: ExportDialogFormat;
   onClose: () => void;
+  onExportHtml?: (options: HtmlExportOptions) => void;
   onExportPdf: (settings: PdfExportSettings) => void;
   onExportDocx: (settings: UnifiedExportSettings) => void;
   onExportEpub?: (options: EpubExportOptions) => void;
@@ -49,7 +52,7 @@ interface ExportDialogProps {
    * pipeline un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
    * literals in ".md"/".txt". Absent → ".mdi".
    */
-  fileType?: string;
+  fileType?: SupportedFileExtension;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +116,7 @@ export default function ExportDialog({
   mode = "export",
   initialFormat,
   onClose,
+  onExportHtml,
   onExportPdf,
   onExportDocx,
   onExportEpub,
@@ -126,6 +130,7 @@ export default function ExportDialog({
       mode={mode}
       initialFormat={initialFormat}
       onClose={onClose}
+      onExportHtml={onExportHtml}
       onExportPdf={onExportPdf}
       onExportDocx={onExportDocx}
       onExportEpub={onExportEpub}
@@ -140,6 +145,7 @@ function ExportDialogInner({
   mode = "export",
   initialFormat,
   onClose,
+  onExportHtml,
   onExportPdf,
   onExportDocx,
   onExportEpub,
@@ -164,8 +170,11 @@ function ExportDialogInner({
     };
   }, []);
 
+  const isHtml = selectedFormat === "html";
   const isEpub = selectedFormat === "epub";
   const hasPreviewApi = typeof window !== "undefined" && !!window.electronAPI?.generatePdfPreview;
+  const hasHtmlPreviewApi =
+    typeof window !== "undefined" && !!window.electronAPI?.generateHtmlPreview;
 
   // --- Author auto-fill from auth context ---
   const authContext = useAuthSafe();
@@ -205,6 +214,10 @@ function ExportDialogInner({
   const [previewMaxPagesPreference] = useState(() => localPreferences.getPdfPreviewMaxPages());
   const generationIdRef = useRef(0);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+  const [htmlPreviewLoading, setHtmlPreviewLoading] = useState(false);
+  const [htmlPreviewError, setHtmlPreviewError] = useState<string | null>(null);
+  const htmlGenerationIdRef = useRef(0);
 
   const updateField = useCallback(
     <K extends keyof UnifiedExportSettings>(key: K, value: UnifiedExportSettings[K]) => {
@@ -274,6 +287,11 @@ function ExportDialogInner({
   const handleExport = useCallback(() => {
     void saveExportSettings(settings);
 
+    if (isHtml && onExportHtml) {
+      onExportHtml({ bodyOnly: settings.htmlBodyOnly });
+      return;
+    }
+
     if (isEpub && onExportEpub) {
       const options = toEpubExportOptions(
         settings,
@@ -298,7 +316,9 @@ function ExportDialogInner({
     settings,
     selectedFormat,
     mode,
+    isHtml,
     isEpub,
+    onExportHtml,
     onExportPdf,
     onExportDocx,
     onExportEpub,
@@ -313,7 +333,7 @@ function ExportDialogInner({
   useEffect(() => {
     const id = ++generationIdRef.current;
 
-    if (!hasPreviewApi || isEpub) {
+    if (!hasPreviewApi || isEpub || isHtml) {
       void window.electronAPI?.cancelPdfPreview?.();
       setPreviewLoading(false);
       setPreviewError(null);
@@ -405,12 +425,64 @@ function ExportDialogInner({
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
       void window.electronAPI?.cancelPdfPreview?.();
     };
-  }, [hasPreviewApi, isEpub, settings, content, metadata, fileType, previewMaxPagesPreference]);
+  }, [
+    hasPreviewApi,
+    isEpub,
+    isHtml,
+    settings,
+    content,
+    metadata,
+    fileType,
+    previewMaxPagesPreference,
+  ]);
+
+  // --- Electron: Rust HTML renderer preview, displayed directly in a sandboxed iframe ---
+  useEffect(() => {
+    const id = ++htmlGenerationIdRef.current;
+
+    if (!isHtml || !hasHtmlPreviewApi) {
+      setHtmlPreview(null);
+      setHtmlPreviewLoading(false);
+      setHtmlPreviewError(null);
+      return;
+    }
+
+    setHtmlPreviewLoading(true);
+    setHtmlPreviewError(null);
+
+    void window.electronAPI!.generateHtmlPreview!(content, fileType, {
+      bodyOnly: settings.htmlBodyOnly,
+    })
+      .then((result) => {
+        if (id !== htmlGenerationIdRef.current) return;
+        if (result.success) {
+          setHtmlPreview(result.html);
+        } else {
+          setHtmlPreview(null);
+          setHtmlPreviewError(result.error);
+        }
+      })
+      .catch((error: unknown) => {
+        if (id !== htmlGenerationIdRef.current) return;
+        setHtmlPreview(null);
+        setHtmlPreviewError(
+          error instanceof Error ? error.message : "HTMLプレビューの生成に失敗しました",
+        );
+      })
+      .finally(() => {
+        if (id === htmlGenerationIdRef.current) setHtmlPreviewLoading(false);
+      });
+
+    return () => {
+      if (htmlGenerationIdRef.current === id) htmlGenerationIdRef.current += 1;
+    };
+  }, [isHtml, hasHtmlPreviewApi, content, fileType, settings.htmlBodyOnly]);
 
   // Cleanup blob URLs on unmount (refs always hold the latest values)
   useEffect(() => {
     return () => {
       generationIdRef.current += 1;
+      htmlGenerationIdRef.current += 1;
       coverReaderRef.current?.abort();
       coverReaderRef.current = null;
       if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
@@ -426,9 +498,11 @@ function ExportDialogInner({
       ? "印刷"
       : isEpub
         ? "EPUBとしてエクスポート"
-        : selectedFormat === "pdf"
-          ? "PDFとしてエクスポート"
-          : "DOCXとしてエクスポート";
+        : isHtml
+          ? "HTMLとしてエクスポート"
+          : selectedFormat === "pdf"
+            ? "PDFとしてエクスポート"
+            : "DOCXとしてエクスポート";
 
   return (
     <GlassDialog
@@ -452,7 +526,7 @@ function ExportDialogInner({
             {/* Format toggle (hidden in print mode) */}
             {mode !== "print" && (
               <div className="flex gap-1 p-1 bg-background-secondary rounded-lg">
-                {(["pdf", "docx", "epub"] as const).map((fmt) => (
+                {(["pdf", "docx", "epub", "html"] as const).map((fmt) => (
                   <button
                     key={fmt}
                     type="button"
@@ -477,6 +551,52 @@ function ExportDialogInner({
               isEpub && "max-w-lg mx-auto w-full",
             )}
           >
+            {/* ══════════════════════════════════════════════════════════ */}
+            {/* HTML-only: options owned by @illusions-lab/mdi           */}
+            {/* ══════════════════════════════════════════════════════════ */}
+            {isHtml && (
+              <>
+                <div>
+                  <label className={labelClass}>出力範囲</label>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      className={clsx(
+                        "w-full px-3 py-3 rounded-lg border text-left transition-colors",
+                        !settings.htmlBodyOnly
+                          ? "bg-accent text-accent-foreground border-accent"
+                          : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                      )}
+                      onClick={() => updateField("htmlBodyOnly", false)}
+                    >
+                      <span className="block text-sm font-medium">完全なHTML文書</span>
+                      <span className="block mt-1 text-xs opacity-75">
+                        DOCTYPE、メタデータ、MDI用CSSを含めます
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={clsx(
+                        "w-full px-3 py-3 rounded-lg border text-left transition-colors",
+                        settings.htmlBodyOnly
+                          ? "bg-accent text-accent-foreground border-accent"
+                          : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                      )}
+                      onClick={() => updateField("htmlBodyOnly", true)}
+                    >
+                      <span className="block text-sm font-medium">本文のみ</span>
+                      <span className="block mt-1 text-xs opacity-75">
+                        body要素の中身だけを書き出します
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-foreground-tertiary leading-relaxed">
+                  言語、書名、組方向はMDIフロントマターの設定を使用します。
+                </p>
+              </>
+            )}
+
             {/* ══════════════════════════════════════════════════════════ */}
             {/* EPUB-only: Metadata section                              */}
             {/* ══════════════════════════════════════════════════════════ */}
@@ -604,7 +724,7 @@ function ExportDialogInner({
             {/* ══════════════════════════════════════════════════════════ */}
             {/* Page layout section (hidden for EPUB)                     */}
             {/* ══════════════════════════════════════════════════════════ */}
-            {!isEpub && (
+            {!isEpub && !isHtml && (
               <>
                 {/* Paper size */}
                 <div>
@@ -649,47 +769,49 @@ function ExportDialogInner({
             )}
 
             {/* Writing direction (shared: PDF/DOCX/EPUB) */}
-            <div>
-              <label className={labelClass}>組方向</label>
-              {isEpub && (
-                <p className="text-xs text-foreground-tertiary mb-1">
-                  EPUBのCSS writing-modeに反映
-                </p>
-              )}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={clsx(
-                    "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
-                    settings.verticalWriting
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
-                  )}
-                  onClick={() => updateField("verticalWriting", true)}
-                >
-                  縦書き
-                </button>
-                <button
-                  type="button"
-                  className={clsx(
-                    "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
-                    !settings.verticalWriting
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
-                  )}
-                  onClick={() => updateField("verticalWriting", false)}
-                >
-                  横書き
-                </button>
+            {!isHtml && (
+              <div>
+                <label className={labelClass}>組方向</label>
+                {isEpub && (
+                  <p className="text-xs text-foreground-tertiary mb-1">
+                    EPUBのCSS writing-modeに反映
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={clsx(
+                      "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
+                      settings.verticalWriting
+                        ? "bg-accent text-accent-foreground border-accent"
+                        : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                    )}
+                    onClick={() => updateField("verticalWriting", true)}
+                  >
+                    縦書き
+                  </button>
+                  <button
+                    type="button"
+                    className={clsx(
+                      "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
+                      !settings.verticalWriting
+                        ? "bg-accent text-accent-foreground border-accent"
+                        : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                    )}
+                    onClick={() => updateField("verticalWriting", false)}
+                  >
+                    横書き
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
-            <hr className="border-border" />
+            {!isHtml && <hr className="border-border" />}
 
             {/* ── Typography section ── */}
 
             {/* Chars per line + Lines per page (PDF/DOCX only) */}
-            {!isEpub && (
+            {!isEpub && !isHtml && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>一行の文字数</label>
@@ -719,30 +841,34 @@ function ExportDialogInner({
             )}
 
             {/* Font (shared) */}
-            <div>
-              <label className={labelClass}>フォント</label>
-              <FontSelector
-                value={settings.fontFamily}
-                onChange={(font) => updateField("fontFamily", font)}
-              />
-            </div>
+            {!isHtml && (
+              <div>
+                <label className={labelClass}>フォント</label>
+                <FontSelector
+                  value={settings.fontFamily}
+                  onChange={(font) => updateField("fontFamily", font)}
+                />
+              </div>
+            )}
 
             {/* Indent (shared) */}
-            <div>
-              <label className={labelClass}>字下げ（em）</label>
-              <input
-                type="number"
-                className={numberInputClass + " w-full"}
-                min={0}
-                max={4}
-                step={0.5}
-                value={settings.textIndent}
-                onChange={(e) => updateField("textIndent", clampFloat(e.target.value, 0, 4))}
-              />
-            </div>
+            {!isHtml && (
+              <div>
+                <label className={labelClass}>字下げ（em）</label>
+                <input
+                  type="number"
+                  className={numberInputClass + " w-full"}
+                  min={0}
+                  max={4}
+                  step={0.5}
+                  value={settings.textIndent}
+                  onChange={(e) => updateField("textIndent", clampFloat(e.target.value, 0, 4))}
+                />
+              </div>
+            )}
 
             {/* Full-width-space indent toggle (PDF/DOCX only) */}
-            {!isEpub && (
+            {!isEpub && !isHtml && (
               <div>
                 <div className="flex items-center justify-between">
                   <label className={labelClass + " mb-0"}>全角スペースで字下げ</label>
@@ -777,7 +903,7 @@ function ExportDialogInner({
             )}
 
             {/* ── Page number section (PDF/DOCX only) ── */}
-            {!isEpub && (
+            {!isEpub && !isHtml && (
               <>
                 <hr className="border-border" />
 
@@ -892,8 +1018,13 @@ function ExportDialogInner({
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-foreground">プレビュー</span>
                 <span className="text-xs text-foreground-tertiary">
-                  {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-                  {settings.verticalWriting ? "縦書き" : "横書き"}
+                  {isHtml
+                    ? settings.htmlBodyOnly
+                      ? "本文のみ"
+                      : "完全なHTML文書"
+                    : `${settings.pageSize} · ${settings.landscape ? "横置き" : "縦置き"} · ${
+                        settings.verticalWriting ? "縦書き" : "横書き"
+                      }`}
                 </span>
               </div>
               {previewInfo && (
@@ -907,7 +1038,35 @@ function ExportDialogInner({
             </div>
 
             <div className="flex-1 overflow-hidden">
-              {hasPreviewApi ? (
+              {isHtml ? (
+                !hasHtmlPreviewApi ? (
+                  <div className="flex items-center justify-center h-full px-6">
+                    <p className="text-sm text-danger text-center">
+                      HTMLプレビューを利用できません。アプリを再起動してください。
+                    </p>
+                  </div>
+                ) : htmlPreviewError ? (
+                  <div className="w-full h-full flex items-center justify-center px-6">
+                    <span className="text-sm text-danger">{htmlPreviewError}</span>
+                  </div>
+                ) : htmlPreview !== null ? (
+                  <iframe
+                    title="HTMLプレビュー"
+                    srcDoc={htmlPreview}
+                    sandbox=""
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full border-0 bg-white"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {htmlPreviewLoading && (
+                      <span className="text-sm text-foreground-tertiary">
+                        プレビューを生成中...
+                      </span>
+                    )}
+                  </div>
+                )
+              ) : hasPreviewApi ? (
                 previewError ? (
                   <div className="w-full h-full flex items-center justify-center px-6">
                     <span className="text-sm text-danger">{previewError}</span>
