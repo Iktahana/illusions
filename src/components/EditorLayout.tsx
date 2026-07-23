@@ -51,6 +51,7 @@ import type { LintIssue } from "@/lib/linting/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
+import type { HtmlExportOptions } from "@/lib/export/html-shared";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import { decideResponsivePanels } from "@/lib/editor-page/responsive-layout";
@@ -107,14 +108,19 @@ interface EditorLayoutProps {
     rubySelectedText: string;
     handleApplyRuby: React.ComponentProps<typeof RubyDialog>["onApply"];
     exportDialog: {
-      state: { format: "pdf" | "docx" | "epub"; content: string; metadata: ExportMetadata } | null;
+      state: {
+        format: "html" | "pdf" | "docx" | "epub";
+        content: string;
+        metadata: ExportMetadata;
+      } | null;
       onClose: () => void;
+      onHtmlExport: (options: HtmlExportOptions) => void;
       onPdfExport: (settings: PdfExportSettings) => void;
       onDocxExport: (settings: UnifiedExportSettings) => void;
       onEpubExport: (options: EpubExportOptions) => void;
       content: string;
       metadata: ExportMetadata;
-      fileType?: string;
+      fileType?: SupportedFileExtension;
     };
     printDialog: {
       state: { content: string; metadata: ExportMetadata } | null;
@@ -122,7 +128,7 @@ interface EditorLayoutProps {
       onPrint: (settings: PdfExportSettings) => void;
       content: string;
       metadata: ExportMetadata;
-      fileType?: string;
+      fileType?: SupportedFileExtension;
     };
   };
   recovery: {
@@ -339,6 +345,7 @@ export default function EditorLayout({
                 isOpen={dialogs.exportDialog.state != null}
                 initialFormat={dialogs.exportDialog.state?.format ?? "pdf"}
                 onClose={dialogs.exportDialog.onClose}
+                onExportHtml={dialogs.exportDialog.onHtmlExport}
                 onExportPdf={dialogs.exportDialog.onPdfExport}
                 onExportDocx={dialogs.exportDialog.onDocxExport}
                 onExportEpub={dialogs.exportDialog.onEpubExport}

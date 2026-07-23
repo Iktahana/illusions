@@ -1,5 +1,5 @@
 /**
- * Unified export settings for PDF, DOCX, and EPUB.
+ * Unified export settings for HTML, PDF, DOCX, EPUB, and TXT.
  *
  * Uses charsPerLine / linesPerPage as the canonical typesetting model
  * (more expressive than raw fontSize + lineSpacing). The same canonical
@@ -31,6 +31,8 @@ export type PageNumberPosition =
   "bottom-left" | "bottom-center" | "bottom-right" | "top-left" | "top-center" | "top-right";
 
 export interface UnifiedExportSettings {
+  /** HTML export: emit only the semantic contents of `<body>`. Default false. */
+  htmlBodyOnly: boolean;
   pageSize: ExportPageSize;
   landscape: boolean;
   verticalWriting: boolean;
@@ -64,6 +66,7 @@ const UPSTREAM_DEFAULTS = resolvePrintProfile(
 );
 
 export const DEFAULT_EXPORT_SETTINGS: UnifiedExportSettings = {
+  htmlBodyOnly: false,
   pageSize: UPSTREAM_DEFAULTS.pagination.pageSize,
   landscape: UPSTREAM_DEFAULTS.pagination.landscape,
   verticalWriting: UPSTREAM_DEFAULTS.typesetting.writingMode === "vertical",
@@ -260,6 +263,7 @@ function sanitize(raw: Partial<UnifiedExportSettings>): UnifiedExportSettings {
     typeof raw.fontFamily === "string" && raw.fontFamily.length > 0 ? raw.fontFamily : d.fontFamily;
 
   return {
+    htmlBodyOnly: typeof raw.htmlBodyOnly === "boolean" ? raw.htmlBodyOnly : d.htmlBodyOnly,
     pageSize,
     landscape: typeof raw.landscape === "boolean" ? raw.landscape : d.landscape,
     verticalWriting:

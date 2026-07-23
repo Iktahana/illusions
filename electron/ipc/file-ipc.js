@@ -15,6 +15,44 @@ const { addStandalonePath, hasStandalonePath } = require("../lib/standalone-file
 const TEXT_EXPORT_FORMATS = new Set(["txt", "txt-ruby", "narou", "kakuyomu", "aozora"]);
 
 /**
+ * Validate the Rust HTML renderer boundary and reject unsupported option keys.
+ * @param {unknown} content
+ * @param {unknown} options
+ * @returns {{ success: false, error: string, code?: string } | null}
+ */
+function validateHtmlRenderRequest(content, options) {
+  if (typeof content !== "string") {
+    return { success: false, error: "Invalid HTML render request" };
+  }
+  if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+    return {
+      success: false,
+      error: "コンテンツが大きすぎて処理できません（50 MB）",
+      code: "CONTENT_TOO_LARGE",
+    };
+  }
+  if (
+    options != null &&
+    (typeof options !== "object" ||
+      Array.isArray(options) ||
+      Object.keys(options).some((key) => key !== "bodyOnly") ||
+      ("bodyOnly" in options &&
+        options.bodyOnly !== undefined &&
+        typeof options.bodyOnly !== "boolean"))
+  ) {
+    return { success: false, error: "Invalid HTML render options" };
+  }
+  return null;
+}
+
+/** @param {unknown} options */
+function normalizeHtmlRenderOptions(options) {
+  return options && typeof options === "object" && options.bodyOnly === true
+    ? { bodyOnly: true }
+    : {};
+}
+
+/**
  * Validate text conversion requests before loading the Rust-backed MDI renderer.
  * Both file export and clipboard copy use the same ceiling and format allowlist.
  * @param {unknown} content
@@ -495,37 +533,49 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
-  ipcMain.handle(EXPORT_CHANNELS.invoke.exportHtml, async (_event, content, fileType, title) => {
-    if (typeof content !== "string") {
-      return { success: false, error: "Invalid HTML export request" };
-    }
-    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
-      return {
-        success: false,
-        error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
-        code: "CONTENT_TOO_LARGE",
-      };
-    }
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.generateHtmlPreview,
+    async (_event, content, fileType, options) => {
+      const invalid = validateHtmlRenderRequest(content, options);
+      if (invalid) return invalid;
 
-    try {
-      const { safeExportBaseName } = require("../../src/lib/export/safe-export-filename");
-      const { filePath } = await dialog.showSaveDialog({
-        title: "HTMLとしてエクスポート",
-        defaultPath: `${safeExportBaseName(title)}.html`,
-        filters: [{ name: "HTMLファイル", extensions: ["html", "htm"] }],
-      });
-      if (!filePath) return null;
+      try {
+        const { generateHtml } = require("../../src/lib/export/html-exporter");
+        const html = await generateHtml(content, fileType, normalizeHtmlRenderOptions(options));
+        return { success: true, html };
+      } catch (error) {
+        log.error("HTML preview generation failed:", error);
+        return { success: false, error: error?.message || "HTML preview generation failed" };
+      }
+    },
+  );
 
-      const { generateHtml } = require("../../src/lib/export/html-exporter");
-      const html = await generateHtml(content, fileType);
-      await writeBufferDurably(filePath, Buffer.from(html, "utf-8"));
-      log.info(`Exported HTML: ${filePath}`);
-      return filePath;
-    } catch (error) {
-      log.error("HTML export failed:", error);
-      return { success: false, error: error?.message || "HTML export failed" };
-    }
-  });
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.exportHtml,
+    async (_event, content, fileType, title, options) => {
+      const invalid = validateHtmlRenderRequest(content, options);
+      if (invalid) return invalid;
+
+      try {
+        const { safeExportBaseName } = require("../../src/lib/export/safe-export-filename");
+        const { filePath } = await dialog.showSaveDialog({
+          title: "HTMLとしてエクスポート",
+          defaultPath: `${safeExportBaseName(title)}.html`,
+          filters: [{ name: "HTMLファイル", extensions: ["html", "htm"] }],
+        });
+        if (!filePath) return null;
+
+        const { generateHtml } = require("../../src/lib/export/html-exporter");
+        const html = await generateHtml(content, fileType, normalizeHtmlRenderOptions(options));
+        await writeBufferDurably(filePath, Buffer.from(html, "utf-8"));
+        log.info(`Exported HTML: ${filePath}`);
+        return filePath;
+      } catch (error) {
+        log.error("HTML export failed:", error);
+        return { success: false, error: error?.message || "HTML export failed" };
+      }
+    },
+  );
 
   ipcMain.handle(
     EXPORT_CHANNELS.invoke.exportMdiText,
