@@ -29,6 +29,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' }}
+
 jobs:
   # ---------------------------------------------------------------------------
   # Detect which areas changed — used to avoid running desktop builds when
@@ -64,6 +68,22 @@ jobs:
 
   # NOTE: All desktop jobs run only when desktop_changed=true.
   # PRs that touch only store/ or documentation are intentionally skipped.
+
+  pr-gate:
+    name: PR Build Gate
+    needs: detect-changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm build routing
+        env:
+          DESKTOP_CHANGED: ${{ needs.detect-changes.outputs.desktop_changed }}
+        run: |
+          if [ "$DESKTOP_CHANGED" = "true" ]; then
+            echo "Desktop changes detected. Code Quality owns PR validation."
+          else
+            echo "No desktop changes detected. Platform builds are not required."
+          fi
 
   # ---------------------------------------------------------------------------
   # Compute version — single source of truth for all build jobs (non-PR only)
@@ -238,24 +258,18 @@ jobs:
   build-macos:
     name: Build (macOS ${{ matrix.arch }})
     needs: [detect-changes, preflight-apple, compute-version]
-    # Allow PRs to run (preflight-apple and compute-version are skipped on PRs)
-    # always() keeps PR type-checks running while still requiring detect-changes
-    # to succeed AND report desktop_changed=true.
-    # Condition summary:
-    # - always(): keep PR type-check-only runs alive
-    # - preflight-apple: must succeed or be skipped
-    # - compute-version: must succeed for non-PR events
-    # - desktop_changed: ensure only desktop-affecting changes trigger builds
     if: |
       always() &&
-      (needs.preflight-apple.result == 'success' || needs.preflight-apple.result == 'skipped') &&
-      (github.event_name == 'pull_request' || needs.compute-version.result == 'success') &&
+      github.event_name != 'pull_request' &&
+      needs.preflight-apple.result == 'success' &&
+      needs.compute-version.result == 'success' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
+    runs-on: macos-latest
     strategy:
+      fail-fast: true
       matrix:
         arch: [x64, arm64]
-    environment: ${{ github.event_name != 'pull_request' && 'Apple' || '' }}
+    environment: Apple
     env:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -273,77 +287,52 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up build dependencies
+        id: build-setup
+        uses: ./.github/actions/setup-build
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Restore Electron caches
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ env.ELECTRON_CACHE }}
-            ${{ env.ELECTRON_BUILDER_CACHE }}
-          key: electron-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-${{ matrix.arch }}-
-
-      - name: Install dependencies
-        shell: bash
-        run: |
-          for i in 1 2 3; do
-            npm install && break
-            if [ $i -lt 3 ]; then
-              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
-              sleep 15
-            else
-              echo "::error::npm install failed after 3 attempts"
-              exit 1
-            fi
-          done
-
-      - name: Type check
-        if: github.event_name == 'pull_request'
-        run: npx tsc --noEmit
-
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
-
-      - name: Restore Next.js cache
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: .next/cache
-          key: next-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            next-${{ runner.os }}-${{ matrix.arch }}-
+          cache-scope: ${{ matrix.arch }}
+          cache-next: true
+          cache-fonts: true
 
       - name: Update package.json version
-        if: github.event_name != 'pull_request'
         run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version --allow-same-version
 
       - name: Download local fonts
-        if: github.event_name != 'pull_request'
+        if: steps.build-setup.outputs.font-cache-hit != 'true'
         run: npm run download:fonts
 
       - name: Build Quick Look plugin
-        if: github.event_name != 'pull_request'
         run: npm run build:quicklook
 
       - name: Build Electron application
-        if: github.event_name != 'pull_request'
         run: npm run electron:build -- --mac --${{ matrix.arch }} --publish never
         env:
           DEBUG: electron-builder
 
+      - name: Verify build artifacts
+        uses: ./.github/actions/verify-artifacts
+        with:
+          patterns: |
+            dist-electron/*.dmg
+            dist-electron/*.dmg.blockmap
+            dist-electron/*-mac.zip
+            dist-electron/*-mac.zip.blockmap
+            dist-electron/latest-mac.yml
+
       - name: Upload build artifacts
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: illusions-macos-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
-          path: dist-electron/**
+          path: |
+            dist-electron/*.dmg
+            dist-electron/*.dmg.blockmap
+            dist-electron/*-mac.zip
+            dist-electron/*-mac.zip.blockmap
+            dist-electron/*.yml
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
   build-mas:
     name: Build (Mac App Store)
@@ -382,36 +371,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up build dependencies
+        id: build-setup
+        uses: ./.github/actions/setup-build
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Restore Electron caches
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ env.ELECTRON_CACHE }}
-            ${{ env.ELECTRON_BUILDER_CACHE }}
-          key: electron-${{ runner.os }}-mas-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-mas-
-
-      - name: Install dependencies
-        shell: bash
-        run: |
-          for i in 1 2 3; do
-            npm install && break
-            if [ $i -lt 3 ]; then
-              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
-              sleep 15
-            else
-              echo "::error::npm install failed after 3 attempts"
-              exit 1
-            fi
-          done
+          cache-scope: mas
+          cache-next: true
+          cache-fonts: true
 
       - name: Prepare MAS signing credentials
         shell: bash
@@ -439,6 +405,7 @@ jobs:
         run: npm version ${{ needs.compute-version.outputs.base }} --no-git-tag-version --allow-same-version
 
       - name: Download local fonts
+        if: steps.build-setup.outputs.font-cache-hit != 'true'
         run: npm run download:fonts
 
       - name: Build Quick Look plugin
@@ -463,6 +430,8 @@ jobs:
         with:
           name: illusions-mas-pkg
           path: dist-electron/**/*.pkg
+          if-no-files-found: error
+          compression-level: 0
 
   # ---------------------------------------------------------------------------
   # Windows — shared build step, then separate NSIS / MSIX packaging
@@ -473,9 +442,10 @@ jobs:
     needs: [detect-changes, compute-version]
     if: |
       always() &&
-      (github.event_name == 'pull_request' || needs.compute-version.result == 'success') &&
+      github.event_name != 'pull_request' &&
+      needs.compute-version.result == 'success' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
+    runs-on: windows-latest
     env:
       APTABASE_APP_KEY: ${{ secrets.APTABASE_APP_KEY }}
       APTABASE_HOST: ${{ secrets.APTABASE_HOST }}
@@ -487,67 +457,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up build dependencies
+        id: build-setup
+        uses: ./.github/actions/setup-build
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Restore Electron caches
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ env.ELECTRON_CACHE }}
-            ${{ env.ELECTRON_BUILDER_CACHE }}
-          key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-${{ runner.arch }}-
-
-      - name: Install dependencies
-        shell: bash
-        run: |
-          for i in 1 2 3; do
-            npm install && break
-            if [ $i -lt 3 ]; then
-              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
-              sleep 15
-            else
-              echo "::error::npm install failed after 3 attempts"
-              exit 1
-            fi
-          done
-
-      - name: Type check
-        if: github.event_name == 'pull_request'
-        run: npx tsc --noEmit
-
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
-
-      - name: Restore Next.js cache
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: .next/cache
-          key: next-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            next-${{ runner.os }}-${{ runner.arch }}-
+          cache-scope: ${{ runner.arch }}
+          cache-next: true
+          cache-fonts: true
 
       - name: Update package.json version
-        if: github.event_name != 'pull_request'
         run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version --allow-same-version
 
       - name: Download local fonts
-        if: github.event_name != 'pull_request'
+        if: steps.build-setup.outputs.font-cache-hit != 'true'
         run: npm run download:fonts
 
       - name: Build Next.js and bundle Electron main process
-        if: github.event_name != 'pull_request'
         run: npm run generate:credits && npx cross-env ELECTRON_BUILD=1 next build && npm run bundle:electron
 
       - name: Upload build output
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: windows-build-output
@@ -555,24 +483,21 @@ jobs:
             .next/**
             dist-main/**
             out/**
+          if-no-files-found: error
           retention-days: 1
 
   package-windows-nsis:
     name: Build (Windows NSIS ${{ matrix.arch }})
     needs: [detect-changes, compute-version, build-windows-core]
-    # Allow PRs to run (build-windows-core runs in type-check-only mode on PRs; compute-version is skipped),
-    # but require successful compute-version and build-windows-core for non-PR events before packaging.
-    if: >
+    if: |
       always() &&
+      github.event_name != 'pull_request' &&
       needs.build-windows-core.result == 'success' &&
-      (
-        github.event_name == 'pull_request' ||
-        needs.compute-version.result == 'success'
-      )
-      &&
+      needs.compute-version.result == 'success' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
+    runs-on: windows-latest
     strategy:
+      fail-fast: true
       matrix:
         arch: [x64, arm64]
     env:
@@ -586,56 +511,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up build dependencies
+        uses: ./.github/actions/setup-build
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Restore Electron caches
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ env.ELECTRON_CACHE }}
-            ${{ env.ELECTRON_BUILDER_CACHE }}
-          key: electron-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-${{ matrix.arch }}-
-
-      - name: Install dependencies
-        shell: bash
-        run: |
-          for i in 1 2 3; do
-            npm install && break
-            if [ $i -lt 3 ]; then
-              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
-              sleep 15
-            else
-              echo "::error::npm install failed after 3 attempts"
-              exit 1
-            fi
-          done
-
-      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
+          cache-scope: ${{ matrix.arch }}
 
       - name: Update package.json version
-        if: github.event_name != 'pull_request'
         run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version --allow-same-version
 
       - name: Download build output
-        if: github.event_name != 'pull_request'
         uses: actions/download-artifact@v8
         with:
           name: windows-build-output
 
       - name: Rebuild native modules for target arch
-        if: github.event_name != 'pull_request'
         run: npm run bundle:electron -- --target-arch ${{ matrix.arch }}
 
       - name: Verify native module architecture
-        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $expectedArch = "${{ matrix.arch }}"
@@ -672,32 +564,40 @@ jobs:
           Write-Host "✅ Native modules verified for $expectedArch"
 
       - name: Build NSIS installer
-        if: github.event_name != 'pull_request'
         run: npx electron-builder --win nsis --${{ matrix.arch }} --publish never
 
+      - name: Verify NSIS artifacts
+        uses: ./.github/actions/verify-artifacts
+        with:
+          patterns: |
+            dist-electron/*.exe
+            dist-electron/*.exe.blockmap
+            dist-electron/latest.yml
+
       - name: Upload NSIS artifacts
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: illusions-windows-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
-          path: dist-electron/**
+          path: |
+            dist-electron/*.exe
+            dist-electron/*.exe.blockmap
+            dist-electron/*.yml
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
   package-windows-msix:
     name: Build (Windows Store ${{ matrix.arch }})
     needs: [detect-changes, compute-version, build-windows-core]
-    # Allow PRs to run: build-windows-core runs on PRs (type-check-only mode; compute-version is skipped).
-    # For non-PR events, require successful compute-version and build-windows-core before packaging.
-    if: >
+    if: |
       always() &&
+      github.event_name != 'pull_request' &&
       needs.build-windows-core.result == 'success' &&
-      (
-        github.event_name == 'pull_request' ||
-        needs.compute-version.result == 'success'
-      )
-      &&
+      needs.compute-version.result == 'success' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'windows-latest' }}
+    runs-on: windows-latest
     strategy:
+      fail-fast: true
       matrix:
         arch: [x64, arm64]
     outputs:
@@ -713,56 +613,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up build dependencies
+        uses: ./.github/actions/setup-build
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Restore Electron caches
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ env.ELECTRON_CACHE }}
-            ${{ env.ELECTRON_BUILDER_CACHE }}
-          key: electron-${{ runner.os }}-msix-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-msix-${{ matrix.arch }}-
-
-      - name: Install dependencies
-        shell: bash
-        run: |
-          for i in 1 2 3; do
-            npm install && break
-            if [ $i -lt 3 ]; then
-              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
-              sleep 15
-            else
-              echo "::error::npm install failed after 3 attempts"
-              exit 1
-            fi
-          done
-
-      # --- Full packaging steps (push to main/alpha/beta/dev only) ---
+          cache-scope: ${{ matrix.arch }}
 
       - name: Update package.json version for MSIX build
-        if: github.event_name != 'pull_request'
         run: node -e "const p=require('./package.json');p.version='${{ needs.compute-version.outputs.base }}';p.build={...(p.build||{}),buildVersion:'${{ needs.compute-version.outputs.msix }}'};require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
 
       - name: Download build output
-        if: github.event_name != 'pull_request'
         uses: actions/download-artifact@v8
         with:
           name: windows-build-output
 
       - name: Rebuild native modules for target arch
-        if: github.event_name != 'pull_request'
         run: npm run bundle:electron -- --target-arch ${{ matrix.arch }}
 
       - name: Verify native module architecture
-        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $expectedArch = "${{ matrix.arch }}"
@@ -796,11 +663,9 @@ jobs:
           Write-Host "✅ Native modules verified for $expectedArch"
 
       - name: Build MSIX package
-        if: github.event_name != 'pull_request'
         run: npx electron-builder --win appx --${{ matrix.arch }} --publish never
 
       - name: Normalize MSIX artifact names
-        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $fullVersion = "${{ needs.compute-version.outputs.full }}"
@@ -827,13 +692,15 @@ jobs:
           Write-Host "Renamed MSIX artifact to $targetPath"
 
       - name: Upload MSIX artifacts
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: illusions-windows-msix-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
           path: |
             dist-electron/*.appx
             dist-electron/*.appx.blockmap
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
   # ---------------------------------------------------------------------------
   # Linux
@@ -844,7 +711,8 @@ jobs:
     needs: [detect-changes, compute-version]
     if: |
       always() &&
-      (github.event_name == 'pull_request' || needs.compute-version.result == 'success') &&
+      github.event_name != 'pull_request' &&
+      needs.compute-version.result == 'success' &&
       needs.detect-changes.outputs.desktop_changed == 'true'
     runs-on: ubuntu-latest
     env:
@@ -858,77 +726,51 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
+      - name: Set up build dependencies
+        id: build-setup
+        uses: ./.github/actions/setup-build
         with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Restore Electron caches
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: |
-            ${{ env.ELECTRON_CACHE }}
-            ${{ env.ELECTRON_BUILDER_CACHE }}
-          key: electron-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            electron-${{ runner.os }}-x64-
-
-      - name: Install dependencies
-        shell: bash
-        run: |
-          for i in 1 2 3; do
-            npm install && break
-            if [ $i -lt 3 ]; then
-              echo "::warning::npm install failed (attempt $i/3), retrying in 15s..."
-              sleep 15
-            else
-              echo "::error::npm install failed after 3 attempts"
-              exit 1
-            fi
-          done
-
-      - name: Type check
-        if: github.event_name == 'pull_request'
-        run: npx tsc --noEmit
-
-      # --- Full build steps (push to main/alpha/beta/dev only) ---
+          cache-scope: x64
+          cache-next: true
+          cache-fonts: true
 
       - name: Install rpm build tools
-        if: github.event_name != 'pull_request'
         run: sudo apt-get update && sudo apt-get install -y rpm
 
-      - name: Restore Next.js cache
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: .next/cache
-          key: next-${{ runner.os }}-x64-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            next-${{ runner.os }}-x64-
-
       - name: Update package.json version
-        if: github.event_name != 'pull_request'
         run: npm version ${{ needs.compute-version.outputs.full }} --no-git-tag-version --allow-same-version
 
       - name: Download local fonts
-        if: github.event_name != 'pull_request'
+        if: steps.build-setup.outputs.font-cache-hit != 'true'
         run: npm run download:fonts
 
       - name: Build Electron application
-        if: github.event_name != 'pull_request'
         run: npm run electron:build -- --linux --x64 --publish never
         env:
           DEBUG: electron-builder
 
+      - name: Verify build artifacts
+        uses: ./.github/actions/verify-artifacts
+        with:
+          patterns: |
+            dist-electron/*.AppImage
+            dist-electron/*.deb
+            dist-electron/*.rpm
+            dist-electron/latest-linux.yml
+
       - name: Upload build artifacts
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: illusions-linux-x64-${{ needs.compute-version.outputs.full }}
-          path: dist-electron/**
+          path: |
+            dist-electron/*.AppImage
+            dist-electron/*.AppImage.blockmap
+            dist-electron/*.deb
+            dist-electron/*.rpm
+            dist-electron/*.yml
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
   # ---------------------------------------------------------------------------
   # Cross-platform unit tests — run in parallel with the platform builds above
@@ -1024,6 +866,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: dist-electron
+          pattern: illusions-*
 
       - name: Consolidate artifacts
         shell: bash
@@ -1031,6 +874,27 @@ jobs:
           mkdir -p release-assets
           find dist-electron -type f \( -name "*.yml" -o -name "*.exe" -o -name "*.exe.blockmap" -o -name "*.dmg" -o -name "*.dmg.blockmap" -o -name "*-mac.zip" -o -name "*-mac.zip.blockmap" -o -name "*.appx" -o -name "*.appx.blockmap" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec cp {} release-assets/ \;
           ls -lh release-assets/
+
+          required_patterns=(
+            "release-assets/*.dmg"
+            "release-assets/*-mac.zip"
+            "release-assets/*.exe"
+            "release-assets/*-x64.appx"
+            "release-assets/*-arm64.appx"
+            "release-assets/*.AppImage"
+            "release-assets/*.deb"
+            "release-assets/*.rpm"
+            "release-assets/latest.yml"
+            "release-assets/latest-mac.yml"
+            "release-assets/latest-linux.yml"
+          )
+
+          for pattern in "${required_patterns[@]}"; do
+            if ! compgen -G "$pattern" > /dev/null; then
+              echo "::error::Missing release artifact: $pattern"
+              exit 1
+            fi
+          done
 
       - name: Create draft GitHub Release and upload assets
         uses: softprops/action-gh-release@v3

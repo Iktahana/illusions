@@ -201,6 +201,19 @@ export function useUISettings() {
   );
 }
 
+/** Keyboard input behavior configuration. */
+export function useKeyboardInputSettings() {
+  const { settings, handlers } = useEditorSettingsContext();
+  return useMemo(
+    () => ({
+      allowOptionKeySpecialCharacterInput: settings.allowOptionKeySpecialCharacterInput,
+      onAllowOptionKeySpecialCharacterInputChange:
+        handlers.handleAllowOptionKeySpecialCharacterInputChange,
+    }),
+    [settings, handlers],
+  );
+}
+
 /** Speech / TTS configuration */
 export function useSpeechSettings() {
   const { settings, handlers } = useEditorSettingsContext();

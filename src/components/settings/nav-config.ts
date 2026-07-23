@@ -8,6 +8,7 @@ import {
   Highlighter,
   Keyboard,
   AudioLines,
+  FileOutput,
   Terminal,
   BatteryMedium,
   ShieldCheck,
@@ -59,7 +60,10 @@ export function buildSettingsNavConfig(
     },
     {
       label: "入出力",
-      items: [{ id: "speech", label: "音声読み上げ", icon: AudioLines }],
+      items: [
+        { id: "speech", label: "音声読み上げ", icon: AudioLines },
+        { id: "export", label: "エクスポート", icon: FileOutput, hidden: !isElectron },
+      ],
     },
     {
       label: "システム",

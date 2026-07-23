@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
+export const AUTO_RESTORE_TIMEOUT_MS = 10_000;
+
 interface UseAutoRestoreParams {
   autoRestoreProjectId: string | null;
   isElectron: boolean;
@@ -31,25 +33,40 @@ export function useAutoRestore({
     if (!autoRestoreProjectId || autoRestoreTriggeredRef.current) return;
     autoRestoreTriggeredRef.current = true;
 
-    let timerId: ReturnType<typeof setTimeout> | undefined;
+    let finishTimerId: ReturnType<typeof setTimeout> | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     isAutoRestoringRef.current = true;
     void (async () => {
       let success = false;
+      let timedOut = false;
       try {
-        success = await handleOpenRecentProject(autoRestoreProjectId);
+        success = await Promise.race([
+          handleOpenRecentProject(autoRestoreProjectId),
+          new Promise<boolean>((resolve) => {
+            timeoutId = setTimeout(() => {
+              timedOut = true;
+              resolve(false);
+            }, AUTO_RESTORE_TIMEOUT_MS);
+          }),
+        ]);
       } catch {
         // handleOpenRecentProject catches its own errors internally
       }
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
       trackUsageEvent(success ? "project_auto_restore_completed" : "project_auto_restore_failed", {
-        ...(success ? { restore_strategy: "recent" } : { reason: "unknown" }),
+        ...(success
+          ? { restore_strategy: "recent" }
+          : { reason: timedOut ? "timeout" : "unknown" }),
       });
       isAutoRestoringRef.current = false;
       signalVfsReady();
-      timerId = setTimeout(() => {
+      finishTimerId = setTimeout(() => {
         setIsRestoring((prev) => {
           if (prev && isElectron && !success) {
             setRestoreError(
-              "前回のプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。",
+              timedOut
+                ? "前回のプロジェクトの復元がタイムアウトしました。プロジェクトを開き直してください。"
+                : "前回のプロジェクトを開けませんでした。フォルダが移動または削除された可能性があります。",
             );
           }
           return false;
@@ -58,7 +75,8 @@ export function useAutoRestore({
     })();
 
     return () => {
-      if (timerId !== undefined) clearTimeout(timerId);
+      if (finishTimerId !== undefined) clearTimeout(finishTimerId);
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
     };
   }, [
     autoRestoreProjectId,

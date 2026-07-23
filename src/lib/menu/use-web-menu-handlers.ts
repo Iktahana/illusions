@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import type { EditorView } from "@milkdown/prose/view";
 import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
+import type { ExportFormat } from "@/lib/export/types";
 
 interface UseWebMenuHandlersProps {
   onNew: () => void;
@@ -15,9 +16,8 @@ interface UseWebMenuHandlersProps {
   onCloseWindow?: () => void;
   onToggleCompactMode?: () => void;
   onToggleWritingMode?: () => void;
-  onExport?: (
-    format: "pdf" | "epub" | "docx" | "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora",
-  ) => void;
+  onExport?: (format: ExportFormat) => void;
+  onCopyExport?: (format: "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora") => void;
   onPrint?: () => void;
   editorView?: EditorView | null;
   fontScale?: number;
@@ -50,6 +50,7 @@ export function useWebMenuHandlers({
   onToggleCompactMode,
   onToggleWritingMode,
   onExport,
+  onCopyExport,
   onPrint,
   editorView,
   fontScale = 100,
@@ -127,6 +128,24 @@ export function useWebMenuHandlers({
           break;
         case "export-docx":
           if (isEditorTabActive) onExport?.("docx");
+          break;
+        case "export-html":
+          if (isEditorTabActive) onExport?.("html");
+          break;
+        case "copy-txt":
+          if (isEditorTabActive) onCopyExport?.("txt");
+          break;
+        case "copy-txt-ruby":
+          if (isEditorTabActive) onCopyExport?.("txt-ruby");
+          break;
+        case "copy-narou":
+          if (isEditorTabActive) onCopyExport?.("narou");
+          break;
+        case "copy-kakuyomu":
+          if (isEditorTabActive) onCopyExport?.("kakuyomu");
+          break;
+        case "copy-aozora":
+          if (isEditorTabActive) onCopyExport?.("aozora");
           break;
 
         // Edit menu — guard with both editorView and isEditorTabActive
@@ -296,6 +315,7 @@ export function useWebMenuHandlers({
       onToggleCompactMode,
       onToggleWritingMode,
       onExport,
+      onCopyExport,
       onPrint,
       editorView,
       fontScale,

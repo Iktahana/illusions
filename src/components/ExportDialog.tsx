@@ -12,7 +12,7 @@ import {
 } from "@/lib/export/export-settings";
 import { FontSelector } from "@/components/explorer/FontSelector";
 import { PageSizeSelector } from "@/components/PageSizeSelector";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { localPreferences } from "@/lib/storage/local-preferences";
 import { useAuthSafe } from "@/contexts/AuthContext";
 
 import type {
@@ -151,12 +151,13 @@ function ExportDialogInner({
   const [settings, setSettings] = useState<UnifiedExportSettings>(() => ({
     ...DEFAULT_EXPORT_SETTINGS,
   }));
+  const settingsEditedRef = useRef(false);
 
   // 保存済みのエクスポート設定を StorageService から非同期に読み込む
   useEffect(() => {
     let cancelled = false;
     void loadExportSettings().then((loaded) => {
-      if (!cancelled) setSettings(loaded);
+      if (!cancelled && !settingsEditedRef.current) setSettings(loaded);
     });
     return () => {
       cancelled = true;
@@ -164,8 +165,7 @@ function ExportDialogInner({
   }, []);
 
   const isEpub = selectedFormat === "epub";
-  const isElectron = typeof window !== "undefined" && isElectronRenderer();
-  const hasPreviewApi = isElectron && !!window.electronAPI?.generatePdfPreview;
+  const hasPreviewApi = typeof window !== "undefined" && !!window.electronAPI?.generatePdfPreview;
 
   // --- Author auto-fill from auth context ---
   const authContext = useAuthSafe();
@@ -187,6 +187,7 @@ function ExportDialogInner({
   const [coverMediaType, setCoverMediaType] = useState<"image/jpeg" | "image/png" | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const coverReaderRef = useRef<FileReader | null>(null);
 
   // --- Blob URL refs for cleanup (state captures stale values in [] effects) ---
   const pdfUrlRef = useRef<string | null>(null);
@@ -196,19 +197,25 @@ function ExportDialogInner({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewInfo, setPreviewInfo] = useState<{
+    systemMemoryGiB: number;
+    maxPages: number;
+    sourceTruncated: boolean;
+  } | null>(null);
+  const [previewMaxPagesPreference] = useState(() => localPreferences.getPdfPreviewMaxPages());
   const generationIdRef = useRef(0);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showWebPageNumberHint = !isElectron && selectedFormat === "pdf" && settings.showPageNumbers;
-
   const updateField = useCallback(
     <K extends keyof UnifiedExportSettings>(key: K, value: UnifiedExportSettings[K]) => {
+      settingsEditedRef.current = true;
       setSettings((prev) => ({ ...prev, [key]: value }));
     },
     [],
   );
 
   const updateMargin = useCallback((side: "top" | "bottom" | "left" | "right", value: number) => {
+    settingsEditedRef.current = true;
     setSettings((prev) => ({
       ...prev,
       margins: { ...prev.margins, [side]: value },
@@ -218,8 +225,12 @@ function ExportDialogInner({
   // --- Cover image handling ---
   const handleCoverFile = useCallback((file: File) => {
     if (!file.type.match(/^image\/(jpeg|png)$/)) return;
+    coverReaderRef.current?.abort();
     const reader = new FileReader();
+    coverReaderRef.current = reader;
     reader.onload = () => {
+      if (coverReaderRef.current !== reader) return;
+      coverReaderRef.current = null;
       const buf = new Uint8Array(reader.result as ArrayBuffer);
       setCoverImage(buf);
       setCoverMediaType(file.type as "image/jpeg" | "image/png");
@@ -231,10 +242,15 @@ function ExportDialogInner({
         return newUrl;
       });
     };
+    reader.onerror = reader.onabort = () => {
+      if (coverReaderRef.current === reader) coverReaderRef.current = null;
+    };
     reader.readAsArrayBuffer(file);
   }, []);
 
   const handleCoverRemove = useCallback(() => {
+    coverReaderRef.current?.abort();
+    coverReaderRef.current = null;
     setCoverImage(null);
     setCoverMediaType(null);
     setCoverPreviewUrl((prev) => {
@@ -295,51 +311,87 @@ function ExportDialogInner({
 
   // --- Electron: debounced PDF preview generation ---
   useEffect(() => {
-    if (!hasPreviewApi || isEpub) return;
+    const id = ++generationIdRef.current;
+
+    if (!hasPreviewApi || isEpub) {
+      void window.electronAPI?.cancelPdfPreview?.();
+      setPreviewLoading(false);
+      setPreviewError(null);
+      setPreviewInfo(null);
+      if (pdfUrlRef.current) {
+        URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = null;
+      }
+      setPdfUrl(null);
+      return;
+    }
 
     if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+    void window.electronAPI?.cancelPdfPreview?.();
 
     previewTimeoutRef.current = setTimeout(async () => {
-      const id = ++generationIdRef.current;
+      previewTimeoutRef.current = null;
       setPreviewLoading(true);
       setPreviewError(null);
+      setPreviewInfo(null);
 
       const previewSettings = toPdfExportSettings(settings);
 
       try {
-        const result = await window.electronAPI!.generatePdfPreview!(content, {
-          metadata,
-          verticalWriting: settings.verticalWriting,
-          pageSize: previewSettings.pageSize,
-          landscape: previewSettings.landscape,
-          margins: previewSettings.margins,
-          charsPerLine: previewSettings.charsPerLine,
-          linesPerPage: previewSettings.linesPerPage,
-          fontFamily: previewSettings.fontFamily,
-          showPageNumbers: previewSettings.showPageNumbers,
-          pageNumberFormat: previewSettings.pageNumberFormat,
-          pageNumberPosition: previewSettings.pageNumberPosition,
-          textIndent: previewSettings.textIndent,
-          fullwidthSpaceIndent: previewSettings.fullwidthSpaceIndent,
-          googleFontFamily: previewSettings.googleFontFamily,
-          fileType,
-        });
+        const result = await window.electronAPI!.generatePdfPreview!(
+          content,
+          {
+            metadata,
+            verticalWriting: settings.verticalWriting,
+            pageSize: previewSettings.pageSize,
+            landscape: previewSettings.landscape,
+            margins: previewSettings.margins,
+            charsPerLine: previewSettings.charsPerLine,
+            linesPerPage: previewSettings.linesPerPage,
+            fontFamily: previewSettings.fontFamily,
+            showPageNumbers: previewSettings.showPageNumbers,
+            pageNumberFormat: previewSettings.pageNumberFormat,
+            pageNumberPosition: previewSettings.pageNumberPosition,
+            textIndent: previewSettings.textIndent,
+            fullwidthSpaceIndent: previewSettings.fullwidthSpaceIndent,
+            googleFontFamily: previewSettings.googleFontFamily,
+            fileType,
+          },
+          previewMaxPagesPreference === "auto" ? undefined : Number(previewMaxPagesPreference),
+        );
 
         if (id !== generationIdRef.current) return;
 
         if (result.success) {
-          if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+          if (pdfUrlRef.current) {
+            URL.revokeObjectURL(pdfUrlRef.current);
+            pdfUrlRef.current = null;
+          }
 
-          const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
-          const blob = new Blob([bytes], { type: "application/pdf" });
-          const newPdfUrl = URL.createObjectURL(blob) + "#view=FitH";
-          pdfUrlRef.current = newPdfUrl;
-          setPdfUrl(newPdfUrl);
-        } else {
+          const blob = new Blob([result.data], { type: "application/pdf" });
+          const objectUrl = URL.createObjectURL(blob);
+          pdfUrlRef.current = objectUrl;
+          setPdfUrl(`${objectUrl}#view=FitH`);
+          setPreviewInfo({
+            systemMemoryGiB: result.systemMemoryGiB,
+            maxPages: result.maxPages,
+            sourceTruncated: result.sourceTruncated,
+          });
+        } else if (!result.cancelled) {
+          if (pdfUrlRef.current) {
+            URL.revokeObjectURL(pdfUrlRef.current);
+            pdfUrlRef.current = null;
+          }
+          setPdfUrl(null);
           setPreviewError(result.error);
         }
       } catch (err) {
         if (id !== generationIdRef.current) return;
+        if (pdfUrlRef.current) {
+          URL.revokeObjectURL(pdfUrlRef.current);
+          pdfUrlRef.current = null;
+        }
+        setPdfUrl(null);
         setPreviewError(err instanceof Error ? err.message : "Preview generation failed");
       } finally {
         if (id === generationIdRef.current) {
@@ -349,17 +401,22 @@ function ExportDialogInner({
     }, 800);
 
     return () => {
+      if (generationIdRef.current === id) generationIdRef.current += 1;
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+      void window.electronAPI?.cancelPdfPreview?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPreviewApi, settings, selectedFormat, content, metadata, fileType]);
+  }, [hasPreviewApi, isEpub, settings, content, metadata, fileType, previewMaxPagesPreference]);
 
   // Cleanup blob URLs on unmount (refs always hold the latest values)
   useEffect(() => {
     return () => {
+      generationIdRef.current += 1;
+      coverReaderRef.current?.abort();
+      coverReaderRef.current = null;
       if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
       if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+      void window.electronAPI?.cancelPdfPreview?.();
     };
   }, []);
 
@@ -744,12 +801,6 @@ function ExportDialogInner({
                     />
                   </button>
                 </div>
-                {showWebPageNumberHint && (
-                  <p className="text-xs text-foreground-tertiary -mt-2">
-                    Web版ではこの設定は適用されません。必要な場合はブラウザの印刷設定でヘッダー/フッターを有効にしてください。
-                  </p>
-                )}
-
                 {settings.showPageNumbers && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -837,17 +888,31 @@ function ExportDialogInner({
         {/* Right: Preview panel (hidden for EPUB) */}
         {!isEpub && (
           <div className="flex-1 flex flex-col bg-background-secondary min-w-0">
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-shrink-0">
-              <span className="text-sm font-medium text-foreground">プレビュー</span>
-              <span className="text-xs text-foreground-tertiary">
-                {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-                {settings.verticalWriting ? "縦書き" : "横書き"}
-              </span>
+            <div className="px-4 py-3 border-b border-border flex-shrink-0 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">プレビュー</span>
+                <span className="text-xs text-foreground-tertiary">
+                  {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
+                  {settings.verticalWriting ? "縦書き" : "横書き"}
+                </span>
+              </div>
+              {previewInfo && (
+                <p className="text-xs text-foreground-tertiary">
+                  搭載メモリは {previewInfo.systemMemoryGiB} GBです。プレビューの上限は
+                  {previewInfo.maxPages}ページです。設定の「エクスポート」で変更できます。
+                  {previewInfo.sourceTruncated &&
+                    " 長い文書のため、末尾はプレビューに含まれません。"}
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-hidden">
               {hasPreviewApi ? (
-                pdfUrl ? (
+                previewError ? (
+                  <div className="w-full h-full flex items-center justify-center px-6">
+                    <span className="text-sm text-danger">{previewError}</span>
+                  </div>
+                ) : pdfUrl ? (
                   <embed src={pdfUrl} type="application/pdf" className="w-full h-full" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -856,21 +921,13 @@ function ExportDialogInner({
                         プレビューを生成中...
                       </span>
                     )}
-                    {previewError && <span className="text-sm text-danger">{previewError}</span>}
                   </div>
                 )
               ) : selectedFormat === "pdf" ? (
-                <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
-                  <div className="text-center space-y-2">
-                    <p className="text-sm text-foreground-secondary">
-                      エクスポートボタンをクリックすると印刷ダイアログが開きます。
-                      「PDFとして保存」を選択してください。
-                    </p>
-                    <p className="text-xs text-foreground-tertiary">
-                      {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-                      {settings.verticalWriting ? "縦書き" : "横書き"} · {settings.fontFamily}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-center h-full px-6">
+                  <p className="text-sm text-danger text-center">
+                    PDFプレビューを利用できません。アプリを再起動してください。
+                  </p>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full">

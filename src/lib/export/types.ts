@@ -42,7 +42,7 @@ export interface PdfGenerationOptions {
 }
 
 export type ExportFormat =
-  "pdf" | "epub" | "docx" | "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora";
+  "html" | "pdf" | "epub" | "docx" | "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora";
 
 export interface Chapter {
   title: string;

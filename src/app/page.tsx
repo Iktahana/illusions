@@ -8,6 +8,7 @@ import EditorLayout from "@/components/EditorLayout";
 import SettingsModal from "@/components/SettingsModal";
 import SettingsWindow from "@/components/SettingsWindow";
 import WelcomeScreen from "@/components/WelcomeScreen";
+import StartupRestoreScreen from "@/components/StartupRestoreScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
@@ -29,7 +30,7 @@ import { useExport } from "@/lib/export/use-export";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
-import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-export-types";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { UnifiedExportSettings } from "@/lib/export/export-settings";
@@ -835,18 +836,20 @@ function EditorPageContent() {
     setPrintDialogState({ content, metadata, fileType: activeFileTypeRef.current });
   }, []);
 
-  // TXT export 字下げ dialog. The export hook awaits the user's choice via a
-  // promise resolved when the dialog is confirmed (options) or cancelled (null).
+  // TXT export/copy 字下げ dialog. The export hook awaits the user's choice via
+  // a promise resolved when the dialog is confirmed (options) or cancelled (null).
   const [txtDialogFormat, setTxtDialogFormat] = useState<TxtExportFormat | null>(null);
+  const [txtDialogOperation, setTxtDialogOperation] = useState<"export" | "copy">("export");
   const txtOptionsResolverRef = useRef<((options: TxtIndentOptions | null) => void) | null>(null);
 
   const handleRequestTxtExportOptions = useCallback(
-    (format: TxtExportFormat): Promise<TxtIndentOptions | null> =>
+    (format: TxtExportFormat, operation: "export" | "copy"): Promise<TxtIndentOptions | null> =>
       new Promise<TxtIndentOptions | null>((resolve) => {
         // If a previous request is still pending (e.g. the dialog was re-opened
         // before being answered), cancel it so its awaiting export does not hang.
         txtOptionsResolverRef.current?.(null);
         txtOptionsResolverRef.current = resolve;
+        setTxtDialogOperation(operation);
         setTxtDialogFormat(format);
       }),
     [],
@@ -927,7 +930,7 @@ function EditorPageContent() {
       return;
     }
 
-    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
+    notificationManager.error("PDFエクスポート機能を利用できません。アプリを再起動してください");
   }, []);
 
   const handlePrintConfirm = useCallback(
@@ -974,7 +977,7 @@ function EditorPageContent() {
         return;
       }
 
-      notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
+      notificationManager.error("印刷機能を利用できません。アプリを再起動してください");
     },
     [printDialogState],
   );
@@ -1022,7 +1025,7 @@ function EditorPageContent() {
       return;
     }
 
-    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
+    notificationManager.error("DOCXエクスポート機能を利用できません。アプリを再起動してください");
   }, []);
 
   const handleEpubExportConfirm = useCallback(async (options: EpubExportOptions) => {
@@ -1066,10 +1069,10 @@ function EditorPageContent() {
       return;
     }
 
-    notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
+    notificationManager.error("EPUBエクスポート機能を利用できません。アプリを再起動してください");
   }, []);
 
-  const { exportAs, printDocument } = useExport({
+  const { exportAs, copyAs, printDocument } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
     getFileType: getExportFileType,
@@ -1109,6 +1112,7 @@ function EditorPageContent() {
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onToggleWritingMode: () => toggleWritingModeRef.current(),
     onExport: (format) => void exportAs(format),
+    onCopyExport: (format) => void copyAs(format),
     onPrint: () => printDocument(),
     editorView: editorViewInstance,
     fontScale,
@@ -1409,9 +1413,9 @@ function EditorPageContent() {
 
   // --- Routing: WelcomeScreen vs Editor ---
   if (editorMode === null) {
-    // Show blank screen while auto-restoring last project (avoid WelcomeScreen flash)
+    // Keep startup visibly responsive while auto-restoring the last project.
     if (isRestoring) {
-      return <div className="h-screen bg-background" />;
+      return <StartupRestoreScreen />;
     }
 
     return (
@@ -1740,6 +1744,7 @@ function EditorPageContent() {
       <TxtExportDialog
         isOpen={txtDialogFormat != null}
         format={txtDialogFormat ?? "txt"}
+        operation={txtDialogOperation}
         onConfirm={(options) => resolveTxtExportOptions(options)}
         onCancel={() => resolveTxtExportOptions(null)}
       />

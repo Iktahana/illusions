@@ -3,60 +3,99 @@ name: Code Quality
 on:
   pull_request:
     branches: [dev, beta, alpha, main]
+    paths-ignore:
+      - "assets/store/**"
+      - ".github/workflows/sync-ms-store-listing.yml"
+      - ".github/workflows/store-publish.yml"
   push:
     branches: [dev, beta, alpha, main]
+    paths-ignore:
+      - "assets/store/**"
+      - ".github/workflows/sync-ms-store-listing.yml"
+      - ".github/workflows/store-publish.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' }}
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
-          cache: "npm"
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run check:boundaries
-      - run: npm run type-check
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint source
+        run: npm run lint
+
+      - name: Check import boundaries
+        run: npm run check:boundaries
+
+      - name: Type check
+        run: npm run type-check
+
+  format-check:
+    name: Format Check
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm formatting passed
+        run: echo "Formatting is covered by the Lint job."
 
   test:
     name: Test & Coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
-          cache: "npm"
-      - run: npm ci
-      - run: npm run generate:credits
-      - run: npm run test:coverage
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate credits
+        run: npm run generate:credits
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage/lcov.info
+
       - name: Upload coverage report
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/
+          if-no-files-found: error
           retention-days: 7
-
-  format-check:
-    name: Format Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22"
-          cache: "npm"
-      - run: npm ci
-      - run: npm run format:check

@@ -396,6 +396,28 @@ describe("WEB_MENU_STRUCTURE", () => {
               { label: "カクヨム形式としてエクスポート...", action: "export-kakuyomu" },
               { label: "青空文庫形式としてエクスポート...", action: "export-aozora" },
               { type: "separator" },
+              {
+                label: "テキスト（プレーン）をクリップボードにコピー",
+                action: "copy-txt",
+              },
+              {
+                label: "テキスト（ルビ付き）をクリップボードにコピー",
+                action: "copy-txt-ruby",
+              },
+              {
+                label: "小説家になろう形式をクリップボードにコピー",
+                action: "copy-narou",
+              },
+              {
+                label: "カクヨム形式をクリップボードにコピー",
+                action: "copy-kakuyomu",
+              },
+              {
+                label: "青空文庫形式をクリップボードにコピー",
+                action: "copy-aozora",
+              },
+              { type: "separator" },
+              { label: "HTML としてエクスポート...", action: "export-html" },
               { label: "PDF としてエクスポート...", action: "export-pdf" },
               { label: "EPUB としてエクスポート...", action: "export-epub" },
               { label: "DOCX としてエクスポート...", action: "export-docx" },

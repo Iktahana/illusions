@@ -76,6 +76,9 @@ export interface AppState {
   // コンパクトUIモード
   compactMode?: boolean;
 
+  // macOS の Option キーによる特殊文字入力
+  allowOptionKeySpecialCharacterInput?: boolean;
+
   // リンティング設定
   lintingEnabled?: boolean;
   lintingRuleConfigs?: Record<

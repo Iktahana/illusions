@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { notificationManager } from "@/lib/services/notification-manager";
-import { saveBlobFile } from "./save-blob-file";
-import type { TxtExportFormat, TxtIndentOptions } from "./txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "./txt-export-types";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { ExportFormat, ExportMetadata } from "./types";
 
@@ -41,8 +39,27 @@ interface UseExportParams {
    * or `null` if the user cancelled (export is then aborted). When omitted,
    * TXT export runs directly with no indentation (legacy behavior).
    */
-  onRequestTxtExportOptions?: (format: TxtExportFormat) => Promise<TxtIndentOptions | null>;
+  onRequestTxtExportOptions?: (
+    format: TxtExportFormat,
+    operation: "export" | "copy",
+  ) => Promise<TxtIndentOptions | null>;
 }
+
+const TXT_EXPORT_FORMATS: readonly TxtExportFormat[] = [
+  "txt",
+  "txt-ruby",
+  "narou",
+  "kakuyomu",
+  "aozora",
+];
+
+const TXT_FORMAT_LABELS: Record<TxtExportFormat, string> = {
+  txt: "テキスト（プレーン）",
+  "txt-ruby": "テキスト（ルビ付き）",
+  narou: "小説家になろう形式",
+  kakuyomu: "カクヨム形式",
+  aozora: "青空文庫形式",
+};
 
 /**
  * Hook that provides export functionality and registers Electron menu handlers.
@@ -58,10 +75,9 @@ export function useExport({
   onRequestTxtExportOptions,
 }: UseExportParams): {
   exportAs: (format: ExportFormat) => Promise<void>;
+  copyAs: (format: TxtExportFormat) => Promise<void>;
   printDocument: () => void;
 } {
-  const isElectron = typeof window !== "undefined" && isElectronRenderer();
-
   const exportAs = useCallback(
     async (format: ExportFormat) => {
       // No-op when a non-editor tab (terminal, diff) is active
@@ -83,6 +99,7 @@ export function useExport({
       const fileType = getFileType();
 
       const formatLabels: Record<ExportFormat, string> = {
+        html: "HTML",
         pdf: "PDF",
         epub: "EPUB",
         docx: "DOCX",
@@ -94,13 +111,13 @@ export function useExport({
       };
       const label = formatLabels[format];
 
-      // TXT exports are client-side (no Electron IPC needed)
-      if (["txt", "txt-ruby", "narou", "kakuyomu", "aozora"].includes(format)) {
+      // TXT exports use the Rust renderer and native save dialog in Electron main.
+      if (TXT_EXPORT_FORMATS.includes(format as TxtExportFormat)) {
         // Ask the user whether to apply full-width-space 字下げ. A null result
         // means the dialog was cancelled — abort the export silently.
         let indentOptions: TxtIndentOptions | undefined;
         if (onRequestTxtExportOptions) {
-          const chosen = await onRequestTxtExportOptions(format as TxtExportFormat);
+          const chosen = await onRequestTxtExportOptions(format as TxtExportFormat, "export");
           if (chosen === null) return;
           indentOptions = chosen;
         }
@@ -110,27 +127,24 @@ export function useExport({
         });
 
         try {
-          if (!window.electronAPI?.renderMdiText) {
-            throw new Error("Web 版では Rust MDI エクスポートを利用できません");
+          if (!window.electronAPI?.exportMdiText) {
+            throw new Error("エクスポート機能を利用できません。アプリを再起動してください");
           }
-          const converted = await window.electronAPI.renderMdiText(
+          const result = await window.electronAPI.exportMdiText(
             content,
             format as TxtExportFormat,
             fileType,
             indentOptions,
+            title,
           );
-
-          const baseName = title.replace(/\.(mdi|md|txt)$/i, "");
-          const suffix = format === "txt" ? "" : `_${format.replace("txt-", "")}`;
-          const suggestedName = `${baseName}${suffix}.txt`;
-
-          const blob = new Blob([converted], { type: "text/plain;charset=utf-8" });
-          const saved = await saveBlobFile(blob, suggestedName, isElectron, ".txt");
           notificationManager.dismiss(progressId);
 
-          if (saved) {
-            notificationManager.success(`${label}をエクスポートしました`);
+          if (result === null || result === undefined) return;
+          if (typeof result === "object" && "success" in result && !result.success) {
+            notificationManager.error(`${label}のエクスポートに失敗しました: ${result.error}`);
+            return;
           }
+          notificationManager.success(`${label}をエクスポートしました`);
         } catch (error) {
           notificationManager.dismiss(progressId);
           const message = error instanceof Error ? error.message : "不明なエラー";
@@ -145,9 +159,8 @@ export function useExport({
         return;
       }
 
-      // --- Web mode: browser-side export ---
-      if (!isElectron || !window.electronAPI) {
-        await exportAsWeb(format, content, title, metadata, label, fileType);
+      if (!window.electronAPI) {
+        notificationManager.error("エクスポート機能を利用できません。アプリを再起動してください");
         return;
       }
 
@@ -160,6 +173,9 @@ export function useExport({
         let result: string | { success: false; error: string } | null | undefined;
 
         switch (format) {
+          case "html":
+            result = await window.electronAPI.exportHTML?.(content, fileType, title);
+            break;
           case "pdf":
             // Thread fileType so the HTML pipeline un-escapes MDI macros for
             // ".mdi" and preserves \[\[blank]] literals in ".md"/".txt".
@@ -205,10 +221,59 @@ export function useExport({
       getTitle,
       getFileType,
       getIsEditorTabActive,
-      isElectron,
       onExportDialogRequest,
       onRequestTxtExportOptions,
     ],
+  );
+
+  const copyAs = useCallback(
+    async (format: TxtExportFormat) => {
+      if (!getIsEditorTabActive()) return;
+
+      const content = getContent();
+      if (!content.trim()) {
+        notificationManager.warning("コピーするコンテンツがありません");
+        return;
+      }
+
+      let indentOptions: TxtIndentOptions | undefined;
+      if (onRequestTxtExportOptions) {
+        const chosen = await onRequestTxtExportOptions(format, "copy");
+        if (chosen === null) return;
+        indentOptions = chosen;
+      }
+
+      const label = TXT_FORMAT_LABELS[format];
+      const progressId = notificationManager.showProgress(`${label}を変換中...`, {
+        type: "info",
+      });
+
+      try {
+        if (!window.electronAPI?.copyMdiText) {
+          throw new Error("クリップボード機能を利用できません。アプリを再起動してください");
+        }
+        const result = await window.electronAPI.copyMdiText(
+          content,
+          format,
+          getFileType(),
+          indentOptions,
+        );
+        notificationManager.dismiss(progressId);
+
+        if (!result.success) {
+          notificationManager.error(
+            `${label}のクリップボードへのコピーに失敗しました: ${result.error}`,
+          );
+          return;
+        }
+        notificationManager.success(`${label}をクリップボードにコピーしました`);
+      } catch (error) {
+        notificationManager.dismiss(progressId);
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`${label}のクリップボードへのコピーに失敗しました: ${message}`);
+      }
+    },
+    [getContent, getFileType, getIsEditorTabActive, onRequestTxtExportOptions],
   );
 
   const printDocument = useCallback(() => {
@@ -225,7 +290,7 @@ export function useExport({
 
   // Register Electron menu event handlers
   useEffect(() => {
-    if (!isElectron || !window.electronAPI) return;
+    if (!window.electronAPI) return;
 
     const cleanups: Array<(() => void) | void> = [];
 
@@ -243,6 +308,24 @@ export function useExport({
     }
     if (window.electronAPI.onMenuExportAozora) {
       cleanups.push(window.electronAPI.onMenuExportAozora(() => void exportAs("aozora")));
+    }
+    if (window.electronAPI.onMenuExportHTML) {
+      cleanups.push(window.electronAPI.onMenuExportHTML(() => void exportAs("html")));
+    }
+    if (window.electronAPI.onMenuCopyTxt) {
+      cleanups.push(window.electronAPI.onMenuCopyTxt(() => void copyAs("txt")));
+    }
+    if (window.electronAPI.onMenuCopyTxtRuby) {
+      cleanups.push(window.electronAPI.onMenuCopyTxtRuby(() => void copyAs("txt-ruby")));
+    }
+    if (window.electronAPI.onMenuCopyNarou) {
+      cleanups.push(window.electronAPI.onMenuCopyNarou(() => void copyAs("narou")));
+    }
+    if (window.electronAPI.onMenuCopyKakuyomu) {
+      cleanups.push(window.electronAPI.onMenuCopyKakuyomu(() => void copyAs("kakuyomu")));
+    }
+    if (window.electronAPI.onMenuCopyAozora) {
+      cleanups.push(window.electronAPI.onMenuCopyAozora(() => void copyAs("aozora")));
     }
     if (window.electronAPI.onMenuExportPDF) {
       cleanups.push(window.electronAPI.onMenuExportPDF(() => void exportAs("pdf")));
@@ -262,33 +345,7 @@ export function useExport({
         cleanup?.();
       }
     };
-  }, [isElectron, exportAs, printDocument]);
+  }, [copyAs, exportAs, printDocument]);
 
-  return { exportAs, printDocument };
-}
-
-/**
- * Browser-side export for PDF, EPUB, DOCX.
- *
- * PDF: Opens a print dialog. window.open() is called synchronously within the
- * user gesture to avoid popup blocker. The popup closes automatically on afterprint.
- *
- * DOCX/EPUB: Uses dynamic imports to load the browser-compatible exporters,
- * then triggers a file download via saveBlobFile().
- */
-async function exportAsWeb(
-  format: ExportFormat,
-  content: string,
-  title: string,
-  metadata: ExportMetadata,
-  label: string,
-  fileType: string = ".mdi",
-): Promise<void> {
-  void format;
-  void content;
-  void title;
-  void metadata;
-  void label;
-  void fileType;
-  notificationManager.warning("Web 版では Rust MDI エクスポートを利用できません");
+  return { exportAs, copyAs, printDocument };
 }
