@@ -48,7 +48,7 @@ import {
   setScrollProgress,
 } from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import { getLayoutCharsPerLine } from "@/lib/editor-page/chars-per-line-layout";
-import { resolveVerticalWheelScrollDelta } from "@/lib/editor-page/vertical-wheel-scroll";
+import { applyVerticalWheelScroll } from "@/lib/editor-page/vertical-wheel-scroll";
 import type { LintIssue } from "@/lib/linting";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import {
@@ -503,17 +503,10 @@ export default function MilkdownEditor({
     if (!container || !isVertical) return;
 
     const handleWheel = (event: WheelEvent) => {
-      const scrollDelta = resolveVerticalWheelScrollDelta({
-        deltaX: event.deltaX,
-        deltaY: event.deltaY,
-        ctrlKey: event.ctrlKey,
+      applyVerticalWheelScroll(container, event, {
         behavior: verticalScrollBehavior,
         sensitivity: scrollSensitivity,
       });
-      if (scrollDelta === null) return;
-
-      container.scrollLeft += scrollDelta;
-      event.preventDefault();
     };
 
     container.addEventListener("wheel", handleWheel, { passive: false });
