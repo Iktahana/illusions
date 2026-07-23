@@ -42,7 +42,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@illusions-lab/mdi": "^2.0.13",
+    "@illusions-lab/mdi": "^2.0.14",
     "@illusions-lab/mdi-export-profile": "^2.0.18",
     "@illusions-lab/mdi-to-pdf": "^2.0.29",
     "@radix-ui/react-context-menu": "^2.3.4",

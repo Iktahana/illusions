@@ -9,6 +9,7 @@ describe("txtExportSuggestedName", () => {
     ["作品.txt", "narou", "作品_narou.txt"],
     ["作品", "kakuyomu", "作品_kakuyomu.txt"],
     ["作品", "aozora", "作品_aozora.txt"],
+    ["作品", "note", "作品_note.txt"],
   ] as const)("maps %s and %s to %s", (title, format, expected) => {
     expect(txtExportSuggestedName(title, format)).toBe(expected);
   });

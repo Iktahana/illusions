@@ -7,6 +7,7 @@ const FORMAT_SUFFIX: Record<TxtExportFormat, string> = {
   narou: "_narou",
   kakuyomu: "_kakuyomu",
   aozora: "_aozora",
+  note: "_note",
 };
 
 /** Build a cross-platform-safe default filename for native TXT export. */

@@ -69,6 +69,7 @@ describe("MDI official export format acceptance matrix", () => {
     ["narou", "｜東京《とうきょう》へ行った。"],
     ["kakuyomu", "｜東京《とうきょう》へ行った。"],
     ["aozora", "｜東京《とうきょう》へ行った。"],
+    ["note", "｜東京《とうきょう》へ行った。"],
   ])("exports the Rust-rendered %s text flavor", async (format, expectedBody) => {
     const text = await exportMdiText(source, format, ".mdi");
 
