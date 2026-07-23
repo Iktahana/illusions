@@ -176,6 +176,12 @@ const MENU_TEMPLATE = [
           },
           SEPARATOR,
           {
+            id: "export-html",
+            label: "HTML としてエクスポート...",
+            requiresActiveEditor: true,
+            electronChannel: "menu-export-html",
+          },
+          {
             id: "export-pdf",
             label: "PDF としてエクスポート...",
             requiresActiveEditor: true,

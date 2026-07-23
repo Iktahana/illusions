@@ -17,6 +17,8 @@ export interface JapaneseNovelOptions {
   enableKern?: boolean;
   /** 明示改行を有効化する（[[br]] 記法） */
   enableMdiBreak?: boolean;
+  /** YAML front matter を byte 0 の `---` ブロックとして保持する */
+  enableFrontmatter?: boolean;
   /**
    * プレーンテキスト（.txt）モード。`MilkdownEditor` が `remarkPlainTextPlugin`
    * を導入し、`*` `#` `**` 等を Markdown ではなくリテラル文字として扱う場合に
@@ -34,5 +36,6 @@ export const defaultJapaneseNovelOptions: Required<JapaneseNovelOptions> = {
   enableNoBreak: true,
   enableKern: true,
   enableMdiBreak: true,
+  enableFrontmatter: true,
   plainText: false,
 };

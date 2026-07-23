@@ -495,6 +495,38 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportHtml, async (_event, content, fileType, title) => {
+    if (typeof content !== "string") {
+      return { success: false, error: "Invalid HTML export request" };
+    }
+    if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+      return {
+        success: false,
+        error: "コンテンツが大きすぎてエクスポートできません（50 MB）",
+        code: "CONTENT_TOO_LARGE",
+      };
+    }
+
+    try {
+      const { safeExportBaseName } = require("../../src/lib/export/safe-export-filename");
+      const { filePath } = await dialog.showSaveDialog({
+        title: "HTMLとしてエクスポート",
+        defaultPath: `${safeExportBaseName(title)}.html`,
+        filters: [{ name: "HTMLファイル", extensions: ["html", "htm"] }],
+      });
+      if (!filePath) return null;
+
+      const { generateHtml } = require("../../src/lib/export/html-exporter");
+      const html = await generateHtml(content, fileType);
+      await writeBufferDurably(filePath, Buffer.from(html, "utf-8"));
+      log.info(`Exported HTML: ${filePath}`);
+      return filePath;
+    } catch (error) {
+      log.error("HTML export failed:", error);
+      return { success: false, error: error?.message || "HTML export failed" };
+    }
+  });
+
   ipcMain.handle(
     EXPORT_CHANNELS.invoke.exportMdiText,
     async (_event, content, format, fileType, indent, title) => {
