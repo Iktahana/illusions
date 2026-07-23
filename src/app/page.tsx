@@ -33,7 +33,7 @@ import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
 import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-export-types";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
-import type { UnifiedExportSettings } from "@/lib/export/export-settings";
+import { toPdfGenerationOptions, type UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { HtmlExportOptions } from "@/lib/export/html-shared";
 import { notificationManager } from "@/lib/services/notification-manager";
@@ -927,26 +927,10 @@ function EditorPageContent() {
       });
 
       try {
-        const result = await window.electronAPI.exportPDF(dialogState.content, {
-          metadata: dialogState.metadata,
-          verticalWriting: settings.verticalWriting,
-          pageSize: settings.pageSize,
-          landscape: settings.landscape,
-          margins: settings.margins,
-          charsPerLine: settings.charsPerLine,
-          linesPerPage: settings.linesPerPage,
-          fontFamily: settings.fontFamily,
-          showPageNumbers: settings.showPageNumbers,
-          pageNumberFormat: settings.pageNumberFormat,
-          pageNumberPosition: settings.pageNumberPosition,
-          textIndent: settings.textIndent,
-          fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
-          googleFontFamily: settings.googleFontFamily,
-          // Thread the active tab's snapshotted file type so the HTML pipeline
-          // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
-          // literals authored in ".md"/".txt".
-          fileType: dialogState.fileType,
-        });
+        const result = await window.electronAPI.exportPDF(
+          dialogState.content,
+          toPdfGenerationOptions(settings, dialogState.metadata, dialogState.fileType),
+        );
 
         notificationManager.dismiss(progressId);
 
@@ -978,25 +962,10 @@ function EditorPageContent() {
       // Electron path: use IPC
       if (window.electronAPI?.printDocument) {
         try {
-          const result = await window.electronAPI.printDocument(printDialogState.content, {
-            metadata: printDialogState.metadata,
-            verticalWriting: settings.verticalWriting,
-            pageSize: settings.pageSize,
-            landscape: settings.landscape,
-            margins: settings.margins,
-            charsPerLine: settings.charsPerLine,
-            linesPerPage: settings.linesPerPage,
-            fontFamily: settings.fontFamily,
-            showPageNumbers: settings.showPageNumbers,
-            pageNumberFormat: settings.pageNumberFormat,
-            pageNumberPosition: settings.pageNumberPosition,
-            textIndent: settings.textIndent,
-            fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
-            googleFontFamily: settings.googleFontFamily,
-            // Pass the snapshotted file type so the HTML pipeline correctly
-            // handles .md/.txt literals vs .mdi MDI macros (#1882).
-            fileType: printDialogState.fileType,
-          });
+          const result = await window.electronAPI.printDocument(
+            printDialogState.content,
+            toPdfGenerationOptions(settings, printDialogState.metadata, printDialogState.fileType),
+          );
           if (
             result !== null &&
             result !== undefined &&

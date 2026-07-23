@@ -17,7 +17,7 @@ import { resolvePrintProfile } from "@illusions-lab/mdi-export-profile";
 
 import type { PdfExportSettings } from "./pdf-export-settings";
 import type { ChapterSplitLevel, EpubExportOptions } from "./epub-shared";
-import type { ExportMetadata } from "./types";
+import type { ExportMetadata, PdfGenerationOptions } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -201,6 +201,22 @@ export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings
     textIndent: s.textIndent,
     fullwidthSpaceIndent: s.fullwidthSpaceIndent,
     googleFontFamily,
+  };
+}
+
+/**
+ * Build the single IPC payload shared by PDF preview, final export, and system
+ * print so every UI profile field reaches the same Chromium adapter.
+ */
+export function toPdfGenerationOptions(
+  settings: PdfExportSettings,
+  metadata: ExportMetadata,
+  fileType?: string,
+): PdfGenerationOptions {
+  return {
+    ...settings,
+    metadata,
+    fileType,
   };
 }
 

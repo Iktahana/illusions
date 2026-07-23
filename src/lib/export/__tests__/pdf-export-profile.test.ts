@@ -94,6 +94,14 @@ describe("PDF Chromium profile adapter", () => {
     });
   });
 
+  it("keeps preview and final export profile semantics identical", () => {
+    const content = "# 見出し\n\n本文。";
+
+    expect(preparePdfPreviewDocument(content, options, 32).prepared).toEqual(
+      preparePdfPrintDocument(content, options),
+    );
+  });
+
   it.each(["cancelled", "canceled", "Print job canceled", "Print job cancelled"])(
     "recognizes the system-print cancellation reason %s",
     (reason) => {
