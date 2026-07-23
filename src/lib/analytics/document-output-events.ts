@@ -3,9 +3,22 @@
 import type { ExportFormat } from "@/lib/export/types";
 import { trackUsageEvent } from "./usage-events";
 
-export type DocumentOutputOperation = "export" | "copy";
+export type OutputOperation = "export" | "copy";
+export type DocumentOutputOperation = OutputOperation;
+export type DocumentOutputFormat = Exclude<ExportFormat, "note">;
 
-type DocumentOutputResult = string | { success: boolean } | null | undefined;
+export type OutputResult = string | { success: boolean } | null | undefined;
+
+/**
+ * Reduce IPC output to its success state before analytics sees it. IPC return
+ * values can contain file paths or errors, neither of which is telemetry.
+ */
+export function isOutputCompleted(result: OutputResult): boolean {
+  return (
+    typeof result === "string" ||
+    (typeof result === "object" && result !== null && result.success === true)
+  );
+}
 
 /**
  * Records only completed file exports and formatted clipboard copies.
@@ -16,14 +29,10 @@ type DocumentOutputResult = string | { success: boolean } | null | undefined;
  */
 export function trackDocumentOutputResult(
   operation: DocumentOutputOperation,
-  format: ExportFormat,
-  result: DocumentOutputResult,
+  format: DocumentOutputFormat,
+  result: OutputResult,
 ): void {
-  const completed =
-    typeof result === "string" ||
-    (typeof result === "object" && result !== null && result.success === true);
-
-  if (!completed) return;
+  if (!isOutputCompleted(result)) return;
 
   trackUsageEvent("document_output_completed", { operation, format });
 }

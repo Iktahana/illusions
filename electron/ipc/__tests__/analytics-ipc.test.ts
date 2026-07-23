@@ -73,27 +73,29 @@ describe("registerAnalyticsHandlers", () => {
   });
 
   it.each([
-    ["export", "html"],
-    ["export", "pdf"],
-    ["export", "epub"],
-    ["export", "docx"],
-    ["export", "txt"],
-    ["export", "txt-ruby"],
-    ["export", "narou"],
-    ["export", "kakuyomu"],
-    ["export", "aozora"],
-    ["copy", "txt"],
-    ["copy", "txt-ruby"],
-    ["copy", "narou"],
-    ["copy", "kakuyomu"],
-    ["copy", "aozora"],
-  ] as const)("tracks approved %s output usage for %s", async (operation, format) => {
+    ["document_output_completed", "export", "html"],
+    ["document_output_completed", "export", "pdf"],
+    ["document_output_completed", "export", "epub"],
+    ["document_output_completed", "export", "docx"],
+    ["document_output_completed", "export", "txt"],
+    ["document_output_completed", "export", "txt-ruby"],
+    ["document_output_completed", "export", "narou"],
+    ["document_output_completed", "export", "kakuyomu"],
+    ["document_output_completed", "export", "aozora"],
+    ["document_output_completed", "copy", "txt"],
+    ["document_output_completed", "copy", "txt-ruby"],
+    ["document_output_completed", "copy", "narou"],
+    ["document_output_completed", "copy", "kakuyomu"],
+    ["document_output_completed", "copy", "aozora"],
+    ["note_output_completed", "export", "note"],
+    ["note_output_completed", "copy", "note"],
+  ] as const)("tracks approved %s %s output usage for %s", async (eventName, operation, format) => {
     const handler = await createHandler();
 
-    await handler({}, "document_output_completed", { operation, format });
+    await handler({}, eventName, { operation, format });
 
     expect(loadAppStateMock).toHaveBeenCalledOnce();
-    expect(trackEventMock).toHaveBeenCalledWith("document_output_completed", {
+    expect(trackEventMock).toHaveBeenCalledWith(eventName, {
       operation,
       format,
     });
@@ -118,6 +120,23 @@ describe("registerAnalyticsHandlers", () => {
       operation: "export",
       format: "epub",
       path: "/Users/alice/private/novel.epub",
+    });
+
+    expect(loadAppStateMock).not.toHaveBeenCalled();
+    expect(trackEventMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects Note output properties that could carry private data", async () => {
+    const handler = await createHandler();
+
+    await handler({}, "note_output_completed", {
+      operation: "copy",
+      format: "note",
+      path: "/Users/alice/private/作品_note.txt",
+      title: "非公開ノート",
+      content: "本文",
+      clipboardText: "コピー内容",
+      error: "private error",
     });
 
     expect(loadAppStateMock).not.toHaveBeenCalled();

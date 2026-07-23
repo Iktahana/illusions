@@ -31,8 +31,8 @@ describe("native MDI text export IPC", () => {
     expect(exportHandler).not.toContain("createObjectURL");
   });
 
-  it("validates all five formats and the shared 50 MB request ceiling", () => {
-    for (const format of ["txt", "txt-ruby", "narou", "kakuyomu", "aozora"]) {
+  it("validates all six formats and the shared 50 MB request ceiling", () => {
+    for (const format of ["txt", "txt-ruby", "narou", "kakuyomu", "aozora", "note"]) {
       expect(source).toContain(`"${format}"`);
     }
     expect(source).toContain("TEXT_EXPORT_FORMATS");
