@@ -143,6 +143,12 @@ const MENU_TEMPLATE = [
             requiresActiveEditor: true,
             electronChannel: "menu-export-aozora",
           },
+          {
+            id: "export-note",
+            label: "note形式としてエクスポート...",
+            requiresActiveEditor: true,
+            electronChannel: "menu-export-note",
+          },
           SEPARATOR,
           {
             id: "copy-txt",
@@ -173,6 +179,12 @@ const MENU_TEMPLATE = [
             label: "青空文庫形式をクリップボードにコピー",
             requiresActiveEditor: true,
             electronChannel: "menu-copy-aozora",
+          },
+          {
+            id: "copy-note",
+            label: "note形式をクリップボードにコピー",
+            requiresActiveEditor: true,
+            electronChannel: "menu-copy-note",
           },
           SEPARATOR,
           {

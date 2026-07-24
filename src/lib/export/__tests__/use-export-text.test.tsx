@@ -79,6 +79,31 @@ describe("useExport native text export", () => {
     expect(notifications.success).toHaveBeenCalledWith("小説家になろう形式をエクスポートしました");
   });
 
+  it("tracks one successful note export with its dedicated event", async () => {
+    exportMdiText.mockResolvedValue("/Users/alice/private/作品_note.txt");
+
+    await act(async () => api?.exportAs("note"));
+
+    expect(exportMdiText).toHaveBeenCalledWith("本文。", "note", ".mdi", indent, "作品.mdi");
+    expect(trackEvent).toHaveBeenCalledTimes(1);
+    expect(trackEvent).toHaveBeenCalledWith("note_output_completed", {
+      operation: "export",
+      format: "note",
+    });
+    expect(trackEvent).not.toHaveBeenCalledWith("document_output_completed", expect.anything());
+  });
+
+  it.each([
+    ["cancelled", null],
+    ["failed", { success: false, error: "private write failure" }],
+  ] as const)("does not track a %s note export", async (_label, result) => {
+    exportMdiText.mockResolvedValue(result);
+
+    await act(async () => api?.exportAs("note"));
+
+    expect(trackEvent).not.toHaveBeenCalled();
+  });
+
   it("does not report success when the native save dialog is cancelled", async () => {
     exportMdiText.mockResolvedValue(null);
 
@@ -175,6 +200,32 @@ describe("useExport native text clipboard copy", () => {
     });
     expect(notifications.dismiss).toHaveBeenCalledWith("progress-id");
     expect(notifications.success).toHaveBeenCalledWith(`${label}をクリップボードにコピーしました`);
+  });
+
+  it("tracks one successful formatted note copy with its dedicated event", async () => {
+    copyMdiText.mockResolvedValue({ success: true });
+
+    await act(async () => api?.copyAs("note"));
+
+    expect(copyMdiText).toHaveBeenCalledWith("本文。", "note", ".mdi", indent);
+    expect(trackEvent).toHaveBeenCalledTimes(1);
+    expect(trackEvent).toHaveBeenCalledWith("note_output_completed", {
+      operation: "copy",
+      format: "note",
+    });
+    expect(trackEvent).not.toHaveBeenCalledWith("document_output_completed", expect.anything());
+  });
+
+  it.each([
+    ["cancelled", null],
+    ["failed", { success: false, error: "private clipboard failure" }],
+  ] as const)("does not track a %s formatted note copy", async (_label, result) => {
+    if (result === null) requestTxtExportOptions.mockResolvedValueOnce(null);
+    else copyMdiText.mockResolvedValue(result);
+
+    await act(async () => api?.copyAs("note"));
+
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 
   it("does not render or notify when the indentation dialog is cancelled", async () => {

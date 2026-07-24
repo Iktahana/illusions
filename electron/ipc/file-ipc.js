@@ -12,7 +12,7 @@ const { FILE_CHANNELS, EXPORT_CHANNELS } = require("../lib/ipc-channels");
 const { readFileStrictUtf8 } = require("../lib/text-decode");
 const { addStandalonePath, hasStandalonePath } = require("../lib/standalone-files");
 
-const TEXT_EXPORT_FORMATS = new Set(["txt", "txt-ruby", "narou", "kakuyomu", "aozora"]);
+const TEXT_EXPORT_FORMATS = new Set(["txt", "txt-ruby", "narou", "kakuyomu", "aozora", "note"]);
 
 /**
  * Validate the Rust HTML renderer boundary and reject unsupported option keys.

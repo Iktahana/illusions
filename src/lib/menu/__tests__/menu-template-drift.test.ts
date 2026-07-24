@@ -395,6 +395,7 @@ describe("WEB_MENU_STRUCTURE", () => {
               { label: "小説家になろう形式としてエクスポート...", action: "export-narou" },
               { label: "カクヨム形式としてエクスポート...", action: "export-kakuyomu" },
               { label: "青空文庫形式としてエクスポート...", action: "export-aozora" },
+              { label: "note形式としてエクスポート...", action: "export-note" },
               { type: "separator" },
               {
                 label: "テキスト（プレーン）をクリップボードにコピー",
@@ -416,6 +417,7 @@ describe("WEB_MENU_STRUCTURE", () => {
                 label: "青空文庫形式をクリップボードにコピー",
                 action: "copy-aozora",
               },
+              { label: "note形式をクリップボードにコピー", action: "copy-note" },
               { type: "separator" },
               { label: "HTML としてエクスポート...", action: "export-html" },
               { label: "PDF としてエクスポート...", action: "export-pdf" },

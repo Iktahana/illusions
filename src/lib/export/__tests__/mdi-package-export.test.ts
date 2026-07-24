@@ -17,6 +17,7 @@ describe("@illusions-lab/mdi export boundary", () => {
     ["txt-ruby", "見出し\n　{漢字|かんじ}と12月。\n\n　次。"],
     ["narou", "見出し\n　｜漢字《かんじ》と12月。\n\n　次。"],
     ["kakuyomu", "見出し\n　｜漢字《かんじ》と12月。\n\n　次。"],
+    ["note", "## 見出し\n\n　｜漢字《かんじ》と12月。\n\n\n\n　次。"],
     [
       "aozora",
       "見出し［＃「見出し」は中見出し］\r\n　｜漢字《かんじ》と12［＃「12」は縦中横］月。\r\n\r\n　次。",

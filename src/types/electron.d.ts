@@ -169,11 +169,13 @@ declare global {
     onMenuExportNarou?: (callback: () => void) => (() => void) | void;
     onMenuExportKakuyomu?: (callback: () => void) => (() => void) | void;
     onMenuExportAozora?: (callback: () => void) => (() => void) | void;
+    onMenuExportNote?: (callback: () => void) => (() => void) | void;
     onMenuCopyTxt?: (callback: () => void) => (() => void) | void;
     onMenuCopyTxtRuby?: (callback: () => void) => (() => void) | void;
     onMenuCopyNarou?: (callback: () => void) => (() => void) | void;
     onMenuCopyKakuyomu?: (callback: () => void) => (() => void) | void;
     onMenuCopyAozora?: (callback: () => void) => (() => void) | void;
+    onMenuCopyNote?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;

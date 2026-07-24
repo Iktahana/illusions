@@ -57,6 +57,9 @@ function handleMenuAction(action: string, params: CommandGuardParams): void {
     case "export-aozora":
       if (isEditorTabActive) onExport("aozora");
       break;
+    case "export-note":
+      if (isEditorTabActive) onExport("note");
+      break;
     case "export-html":
       if (isEditorTabActive) onExport("html");
       break;
@@ -99,6 +102,7 @@ describe("command guards – export actions", () => {
     ["export-narou", "narou"],
     ["export-kakuyomu", "kakuyomu"],
     ["export-aozora", "aozora"],
+    ["export-note", "note"],
     ["export-html", "html"],
     ["export-pdf", "pdf"],
     ["export-epub", "epub"],
@@ -158,6 +162,7 @@ describe("isEditorTabActive flag semantics", () => {
       "export-narou",
       "export-kakuyomu",
       "export-aozora",
+      "export-note",
       "export-html",
       "export-pdf",
       "export-epub",
@@ -174,11 +179,12 @@ describe("isEditorTabActive flag semantics", () => {
       "export-narou",
       "export-kakuyomu",
       "export-aozora",
+      "export-note",
       "export-html",
       "export-pdf",
       "export-epub",
       "export-docx",
     ].forEach(dispatch);
-    expect(onExport).toHaveBeenCalledTimes(9);
+    expect(onExport).toHaveBeenCalledTimes(10);
   });
 });

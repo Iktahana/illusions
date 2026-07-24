@@ -82,4 +82,14 @@ describe("TxtExportDialog operation labels", () => {
     );
     expect(buttonLabels).toContain("エクスポート");
   });
+
+  it("labels the note output profile", async () => {
+    await act(async () => {
+      root.render(
+        <TxtExportDialog isOpen format="note" onConfirm={() => {}} onCancel={() => {}} />,
+      );
+    });
+
+    expect(container.textContent).toContain("note形式");
+  });
 });

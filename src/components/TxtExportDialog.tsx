@@ -95,7 +95,9 @@ export default function TxtExportDialog({
               ? "カクヨム形式"
               : format === "aozora"
                 ? "青空文庫形式"
-                : "テキスト（プレーン）"}
+                : format === "note"
+                  ? "note形式"
+                  : "テキスト（プレーン）"}
       </h2>
       <p className="text-xs text-foreground-tertiary mb-4">字下げの方法を選択してください。</p>
 

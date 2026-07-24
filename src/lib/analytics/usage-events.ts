@@ -44,7 +44,8 @@ export type UsageEventName =
   | "project_file_renamed"
   | "project_file_deleted"
   | "project_file_duplicated"
-  | "document_output_completed";
+  | "document_output_completed"
+  | "note_output_completed";
 
 export type TelemetryReason =
   | "cancelled"
