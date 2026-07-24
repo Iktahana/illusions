@@ -110,6 +110,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   exportEPUB: invokeChannel(EXPORT_CHANNELS.invoke.exportEpub, { arity: 2 }),
   exportDOCX: invokeChannel(EXPORT_CHANNELS.invoke.exportDocx, { arity: 2 }),
   printDocument: invokeChannel(EXPORT_CHANNELS.invoke.printDocument, { arity: 2 }),
+  openExportDialog: invokeChannel(EXPORT_CHANNELS.invoke.openExportDialog, { arity: 1 }),
+  getExportDialogRequest: invokeChannel(EXPORT_CHANNELS.invoke.getExportDialogRequest, {
+    arity: 0,
+  }),
+  confirmExportDialogDiscard: invokeChannel(EXPORT_CHANNELS.invoke.confirmExportDialogDiscard, {
+    arity: 0,
+  }),
+  completeExportDialog: invokeChannel(EXPORT_CHANNELS.invoke.completeExportDialog, { arity: 1 }),
   onMenuPrint: eventChannel(MENU_CHANNELS.event.print, { arity: 0 }),
   onMenuExportHTML: eventChannel(MENU_CHANNELS.event.exportHtml, { arity: 0 }),
   onMenuExportTxt: eventChannel(MENU_CHANNELS.event.exportTxt, { arity: 0 }),

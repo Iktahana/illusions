@@ -25,10 +25,10 @@ const exportHandler = getHandler("exportHtml");
 
 describe("native MDI HTML export IPC", () => {
   it("opens a native save dialog before invoking the Rust renderer", () => {
-    expect(exportHandler).toContain("dialog.showSaveDialog");
+    expect(exportHandler).toContain("showSaveDialogForEvent(event");
     expect(exportHandler).toContain("safeExportBaseName(title)");
     expect(exportHandler).toContain('extensions: ["html", "htm"]');
-    expect(exportHandler.indexOf("dialog.showSaveDialog")).toBeLessThan(
+    expect(exportHandler.indexOf("showSaveDialogForEvent(event")).toBeLessThan(
       exportHandler.indexOf("generateHtml(content, fileType"),
     );
     expect(exportHandler).toContain("if (!filePath) return null");

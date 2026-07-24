@@ -263,13 +263,6 @@ export function useExport({
         return;
       }
 
-      let indentOptions: TxtIndentOptions | undefined;
-      if (onRequestTxtExportOptions) {
-        const chosen = await onRequestTxtExportOptions(format, "copy");
-        if (chosen === null) return;
-        indentOptions = chosen;
-      }
-
       const label = TXT_FORMAT_LABELS[format];
       const progressId = notificationManager.showProgress(`${label}を変換中...`, {
         type: "info",
@@ -283,7 +276,7 @@ export function useExport({
           content,
           format,
           getFileType(),
-          indentOptions,
+          undefined,
         );
         trackOutputResult("copy", format, result);
         notificationManager.dismiss(progressId);
@@ -301,7 +294,7 @@ export function useExport({
         notificationManager.error(`${label}のクリップボードへのコピーに失敗しました: ${message}`);
       }
     },
-    [getContent, getFileType, getIsEditorTabActive, onRequestTxtExportOptions],
+    [getContent, getFileType, getIsEditorTabActive],
   );
 
   const printDocument = useCallback(() => {

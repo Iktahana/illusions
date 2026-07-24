@@ -162,6 +162,12 @@ declare global {
       content: string,
       options: PdfGenerationOptions,
     ) => Promise<{ success: boolean; error?: string }>;
+    openExportDialog?: (
+      request: Record<string, unknown>,
+    ) => Promise<Record<string, unknown> | null>;
+    getExportDialogRequest?: () => Promise<Record<string, unknown> | null>;
+    confirmExportDialogDiscard?: () => Promise<boolean>;
+    completeExportDialog?: (result: Record<string, unknown> | null) => Promise<boolean>;
     onMenuPrint?: (callback: () => void) => (() => void) | void;
     onMenuExportHTML?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;

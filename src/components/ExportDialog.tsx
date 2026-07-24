@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import clsx from "clsx";
 import GlassDialog from "@/shared/ui/GlassDialog";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import {
   DEFAULT_EXPORT_SETTINGS,
   loadExportSettings,
@@ -39,6 +40,9 @@ export type ExportDialogFormat = "html" | "pdf" | "docx" | "epub";
 
 interface ExportDialogProps {
   isOpen: boolean;
+  presentation?: "overlay" | "window";
+  /** Native-window confirmation hook; web overlays use ConfirmDialog instead. */
+  confirmDiscard?: () => Promise<boolean>;
   mode?: "export" | "print";
   initialFormat: ExportDialogFormat;
   onClose: () => void;
@@ -114,6 +118,8 @@ function clampFloat(raw: string, min: number, max: number): number {
  */
 export default function ExportDialog({
   isOpen,
+  presentation = "overlay",
+  confirmDiscard,
   mode = "export",
   initialFormat,
   onClose,
@@ -129,6 +135,8 @@ export default function ExportDialog({
   return (
     <ExportDialogInner
       mode={mode}
+      presentation={presentation}
+      confirmDiscard={confirmDiscard}
       initialFormat={initialFormat}
       onClose={onClose}
       onExportHtml={onExportHtml}
@@ -144,6 +152,8 @@ export default function ExportDialog({
 
 function ExportDialogInner({
   mode = "export",
+  presentation = "overlay",
+  confirmDiscard: confirmDiscardNative,
   initialFormat,
   onClose,
   onExportHtml,
@@ -155,6 +165,8 @@ function ExportDialogInner({
   fileType,
 }: Omit<ExportDialogProps, "isOpen">) {
   const [selectedFormat, setSelectedFormat] = useState<ExportDialogFormat>(initialFormat);
+  const [isDirty, setIsDirty] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [settings, setSettings] = useState<UnifiedExportSettings>(() => ({
     ...DEFAULT_EXPORT_SETTINGS,
   }));
@@ -223,6 +235,7 @@ function ExportDialogInner({
   const updateField = useCallback(
     <K extends keyof UnifiedExportSettings>(key: K, value: UnifiedExportSettings[K]) => {
       settingsEditedRef.current = true;
+      setIsDirty(true);
       setSettings((prev) => ({ ...prev, [key]: value }));
     },
     [],
@@ -230,6 +243,7 @@ function ExportDialogInner({
 
   const updateMargin = useCallback((side: "top" | "bottom" | "left" | "right", value: number) => {
     settingsEditedRef.current = true;
+    setIsDirty(true);
     setSettings((prev) => ({
       ...prev,
       margins: { ...prev.margins, [side]: value },
@@ -239,6 +253,7 @@ function ExportDialogInner({
   // --- Cover image handling ---
   const handleCoverFile = useCallback((file: File) => {
     if (!file.type.match(/^image\/(jpeg|png)$/)) return;
+    setIsDirty(true);
     coverReaderRef.current?.abort();
     const reader = new FileReader();
     coverReaderRef.current = reader;
@@ -263,6 +278,7 @@ function ExportDialogInner({
   }, []);
 
   const handleCoverRemove = useCallback(() => {
+    setIsDirty(true);
     coverReaderRef.current?.abort();
     coverReaderRef.current = null;
     setCoverImage(null);
@@ -499,18 +515,32 @@ function ExportDialogInner({
           : selectedFormat === "pdf"
             ? "PDFとしてエクスポート"
             : "DOCXとしてエクスポート";
+  const requestClose = async (): Promise<void> => {
+    if (!isDirty) {
+      onClose();
+      return;
+    }
+    if (confirmDiscardNative) {
+      if (await confirmDiscardNative()) onClose();
+      return;
+    }
+    setConfirmDiscard(true);
+  };
 
   return (
     <GlassDialog
       isOpen
-      onBackdropClick={onClose}
+      presentation={presentation}
+      onBackdropClick={requestClose}
       ariaLabel={mode === "print" ? "印刷設定" : "エクスポート設定"}
       panelClassName={clsx(
-        "mx-4 w-full p-0 overflow-hidden",
-        isEpub ? "max-w-2xl" : isHtml ? "max-w-5xl" : "max-w-7xl",
+        "w-full p-0 overflow-hidden",
+        presentation === "window"
+          ? "h-screen bg-background"
+          : clsx("mx-4", isEpub ? "max-w-2xl" : isHtml ? "max-w-5xl" : "max-w-7xl"),
       )}
     >
-      <div className="flex max-h-[85vh]">
+      <div className={clsx("flex", presentation === "window" ? "h-screen" : "max-h-[85vh]")}>
         {/* Left: Settings panel */}
         <div
           className={clsx(
@@ -535,7 +565,10 @@ function ExportDialogInner({
                         ? "bg-accent text-accent-foreground shadow-sm"
                         : "text-foreground-secondary hover:text-foreground",
                     )}
-                    onClick={() => setSelectedFormat(fmt)}
+                    onClick={() => {
+                      if (fmt !== selectedFormat) setIsDirty(true);
+                      setSelectedFormat(fmt);
+                    }}
                   >
                     {fmt.toUpperCase()}
                   </button>
@@ -657,7 +690,10 @@ function ExportDialogInner({
                     type="text"
                     className={inputClass}
                     value={epubTitle}
-                    onChange={(e) => setEpubTitle(e.target.value)}
+                    onChange={(e) => {
+                      setIsDirty(true);
+                      setEpubTitle(e.target.value);
+                    }}
                     placeholder={metadata.title || "タイトルを入力"}
                   />
                 </div>
@@ -669,7 +705,10 @@ function ExportDialogInner({
                     type="text"
                     className={inputClass}
                     value={epubAuthor}
-                    onChange={(e) => setEpubAuthor(e.target.value)}
+                    onChange={(e) => {
+                      setIsDirty(true);
+                      setEpubAuthor(e.target.value);
+                    }}
                     placeholder="著者名を入力"
                   />
                 </div>
@@ -1003,7 +1042,7 @@ function ExportDialogInner({
             <button
               type="button"
               className="w-full px-4 py-2 rounded-lg text-sm text-foreground-secondary hover:bg-hover transition-colors"
-              onClick={onClose}
+              onClick={requestClose}
             >
               キャンセル
             </button>
@@ -1098,6 +1137,18 @@ function ExportDialogInner({
           </div>
         )}
       </div>
+      {!confirmDiscardNative && (
+        <ConfirmDialog
+          isOpen={confirmDiscard}
+          title="エクスポートをキャンセルしますか？"
+          message="変更したエクスポート設定は適用されません。"
+          confirmLabel="キャンセルする"
+          cancelLabel="続ける"
+          dangerous
+          onConfirm={onClose}
+          onCancel={() => setConfirmDiscard(false)}
+        />
+      )}
     </GlassDialog>
   );
 }

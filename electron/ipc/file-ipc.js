@@ -1,6 +1,6 @@
 // File-related IPC handlers: open, save, export, and file security utilities
 
-const { ipcMain, dialog, app, clipboard } = require("electron");
+const { ipcMain, dialog, app, clipboard, BrowserWindow } = require("electron");
 const path = require("path");
 const fs = require("fs/promises");
 const os = require("os");
@@ -13,6 +13,28 @@ const { readFileStrictUtf8 } = require("../lib/text-decode");
 const { addStandalonePath, hasStandalonePath } = require("../lib/standalone-files");
 
 const TEXT_EXPORT_FORMATS = new Set(["txt", "txt-ruby", "narou", "kakuyomu", "aozora", "note"]);
+
+/**
+ * Keep native save panels attached to the IPC sender so they stay above and
+ * modal to the editor window. Fall back to an app-modal panel in headless
+ * tests or if the sender window disappeared between the click and the dialog.
+ * @param {Electron.IpcMainInvokeEvent} event
+ * @param {Electron.SaveDialogOptions} options
+ */
+function showSaveDialogForEvent(event, options) {
+  const parent = BrowserWindow?.fromWebContents?.(event.sender);
+  return parent && !parent.isDestroyed()
+    ? dialog.showSaveDialog(parent, options)
+    : dialog.showSaveDialog(options);
+}
+
+/** @param {Electron.IpcMainInvokeEvent} event @param {Electron.OpenDialogOptions} options */
+function showOpenDialogForEvent(event, options) {
+  const parent = BrowserWindow?.fromWebContents?.(event.sender);
+  return parent && !parent.isDestroyed()
+    ? dialog.showOpenDialog(parent, options)
+    : dialog.showOpenDialog(options);
+}
 
 /**
  * Validate the Rust HTML renderer boundary and reject unsupported option keys.
@@ -351,7 +373,7 @@ function setPendingFilePath(p) {
 
 function registerFileHandlers() {
   ipcMain.handle(FILE_CHANNELS.invoke.openFile, async (event) => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
+    const { canceled, filePaths } = await showOpenDialogForEvent(event, {
       properties: ["openFile"],
       filters: [
         { name: "illusions MDI Document", extensions: ["mdi"] },
@@ -459,7 +481,7 @@ function registerFileHandlers() {
           { name: "すべてのファイル", extensions: ["*"] },
         ];
       }
-      const result = await dialog.showSaveDialog({
+      const result = await showSaveDialogForEvent(event, {
         filters,
         defaultPath,
       });
@@ -560,13 +582,13 @@ function registerFileHandlers() {
 
   ipcMain.handle(
     EXPORT_CHANNELS.invoke.exportHtml,
-    async (_event, content, fileType, title, options) => {
+    async (event, content, fileType, title, options) => {
       const invalid = validateHtmlRenderRequest(content, options);
       if (invalid) return invalid;
 
       try {
         const { safeExportBaseName } = require("../../src/lib/export/safe-export-filename");
-        const { filePath } = await dialog.showSaveDialog({
+        const { filePath } = await showSaveDialogForEvent(event, {
           title: "HTMLとしてエクスポート",
           defaultPath: `${safeExportBaseName(title)}.html`,
           filters: [{ name: "HTMLファイル", extensions: ["html", "htm"] }],
@@ -587,13 +609,13 @@ function registerFileHandlers() {
 
   ipcMain.handle(
     EXPORT_CHANNELS.invoke.exportMdiText,
-    async (_event, content, format, fileType, indent, title) => {
+    async (event, content, format, fileType, indent, title) => {
       const invalid = validateTextExportRequest(content, format);
       if (invalid) return invalid;
 
       try {
         const { txtExportSuggestedName } = require("../../src/lib/export/txt-export-filename");
-        const { filePath } = await dialog.showSaveDialog({
+        const { filePath } = await showSaveDialogForEvent(event, {
           title: "テキストとしてエクスポート",
           defaultPath: txtExportSuggestedName(title, format),
           filters: [{ name: "テキストファイル", extensions: ["txt"] }],
@@ -697,7 +719,7 @@ function registerFileHandlers() {
    * Formal PDF export never crosses IPC. Preview stays a bounded in-memory
    * payload because Chromium's embedded PDF viewer needs the complete Blob.
    */
-  ipcMain.handle(EXPORT_CHANNELS.invoke.exportPdf, async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportPdf, async (event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -709,7 +731,7 @@ function registerFileHandlers() {
       };
     }
     try {
-      const { filePath } = await dialog.showSaveDialog({
+      const { filePath } = await showSaveDialogForEvent(event, {
         title: "PDFとしてエクスポート",
         defaultPath: `${options?.metadata?.title || "untitled"}.pdf`,
         filters: [{ name: "PDF", extensions: ["pdf"] }],
@@ -823,7 +845,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle(EXPORT_CHANNELS.invoke.exportEpub, async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportEpub, async (event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -863,7 +885,7 @@ function registerFileHandlers() {
       const rawTitle = epubOptions?.metadata?.title || "untitled";
       const safeTitle = rawTitle.replace(/[<>:"/\\|?*]/g, "_");
 
-      const { filePath } = await dialog.showSaveDialog({
+      const { filePath } = await showSaveDialogForEvent(event, {
         title: "EPUBとしてエクスポート",
         defaultPath: `${safeTitle}.epub`,
         filters: [{ name: "EPUB", extensions: ["epub"] }],
@@ -879,7 +901,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle(EXPORT_CHANNELS.invoke.exportDocx, async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportDocx, async (event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -894,7 +916,7 @@ function registerFileHandlers() {
       const { generateDocx } = require("../../src/lib/export/docx-exporter");
       const docxBuffer = await generateDocx(content, options || {});
 
-      const { filePath } = await dialog.showSaveDialog({
+      const { filePath } = await showSaveDialogForEvent(event, {
         title: "DOCXとしてエクスポート",
         defaultPath: `${options?.metadata?.title || "untitled"}.docx`,
         filters: [{ name: "Word Document", extensions: ["docx"] }],

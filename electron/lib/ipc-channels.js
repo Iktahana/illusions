@@ -99,6 +99,10 @@ const EXPORT_CHANNELS = Object.freeze({
     exportEpub: "export-epub",
     exportDocx: "export-docx",
     printDocument: "print-document",
+    openExportDialog: "open-export-dialog",
+    getExportDialogRequest: "get-export-dialog-request",
+    confirmExportDialogDiscard: "confirm-export-dialog-discard",
+    completeExportDialog: "complete-export-dialog",
   }),
   event: Object.freeze({}),
 });
