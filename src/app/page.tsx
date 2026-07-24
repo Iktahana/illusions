@@ -7,6 +7,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import EditorLayout from "@/components/EditorLayout";
 import SettingsModal from "@/components/SettingsModal";
 import SettingsWindow from "@/components/SettingsWindow";
+import ExportDialogWindow from "@/components/ExportDialogWindow";
+import CreateProjectWindow from "@/components/CreateProjectWindow";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import StartupRestoreScreen from "@/components/StartupRestoreScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
@@ -49,6 +51,7 @@ import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { IgnoredCorrectionsProvider } from "@/contexts/IgnoredCorrectionsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
+import { getProjectService } from "@/lib/project/project-service";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
 import { computeHistoryRestoreTabUpdate } from "@/lib/tab-manager/history-restore";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
@@ -847,6 +850,12 @@ function EditorPageContent() {
   const handleRequestTxtExportOptions = useCallback(
     (format: TxtExportFormat, operation: "export" | "copy"): Promise<TxtIndentOptions | null> =>
       new Promise<TxtIndentOptions | null>((resolve) => {
+        if (window.electronAPI?.openExportDialog) {
+          void window.electronAPI
+            .openExportDialog({ kind: "txt", format, operation })
+            .then((result) => resolve((result?.options as TxtIndentOptions | undefined) ?? null));
+          return;
+        }
         // If a previous request is still pending (e.g. the dialog was re-opened
         // before being answered), cancel it so its awaiting export does not hang.
         txtOptionsResolverRef.current?.(null);
@@ -873,6 +882,36 @@ function EditorPageContent() {
         fileType: activeFileTypeRef.current,
       };
       exportDialogStateRef.current = state;
+      if (window.electronAPI?.openExportDialog) {
+        void window.electronAPI.openExportDialog({ kind: "document", ...state }).then((result) => {
+          const options = result?.options;
+          if (!options) return;
+          if (format === "html")
+            void window.electronAPI?.exportHTML?.(
+              content,
+              state.fileType,
+              metadata.title,
+              options as HtmlExportOptions,
+            );
+          if (format === "pdf")
+            void window.electronAPI?.exportPDF?.(
+              content,
+              toPdfGenerationOptions(options as PdfExportSettings, metadata, state.fileType),
+            );
+          if (format === "docx")
+            void window.electronAPI?.exportDOCX?.(content, {
+              metadata,
+              settings: options as UnifiedExportSettings,
+              fileType: state.fileType,
+            });
+          if (format === "epub")
+            void window.electronAPI?.exportEPUB?.(content, {
+              ...(options as EpubExportOptions),
+              fileType: state.fileType,
+            });
+        });
+        return;
+      }
       setExportDialogState(state);
     },
     [],
@@ -1430,6 +1469,37 @@ function EditorPageContent() {
       return <StartupRestoreScreen />;
     }
 
+    const handleWelcomeCreateProject = async (): Promise<void> => {
+      const openNativeDialog = window.electronAPI?.openCreateProjectDialog;
+      if (!openNativeDialog) {
+        handleCreateProject();
+        return;
+      }
+
+      let selection;
+      try {
+        selection = await openNativeDialog();
+      } catch (error) {
+        // During Electron development the renderer/preload can reload before
+        // the long-lived main process has registered a newly-added handler.
+        // Preserve a usable create-project flow until the next full restart.
+        console.warn("[Create project] Native dialog unavailable; using web fallback:", error);
+        handleCreateProject();
+        return;
+      }
+      if (!selection) return;
+
+      try {
+        const { name, fileExtension } = selection;
+        const project = await getProjectService().createProject(name, fileExtension);
+        await handleProjectCreated(project);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        if (message.includes("cancelled by the user")) return;
+        notificationManager.error(`プロジェクトの作成に失敗しました: ${message}`);
+      }
+    };
+
     return (
       <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
         <IgnoredCorrectionsProvider value={ignoredCorrectionsContextValue}>
@@ -1447,7 +1517,7 @@ function EditorPageContent() {
             )}
 
             <WelcomeScreen
-              onCreateProject={handleCreateProject}
+              onCreateProject={() => void handleWelcomeCreateProject()}
               onOpenProject={() => void handleOpenProject()}
               onOpenStandaloneFile={() => void handleOpenStandaloneFile()}
               onOpenRecentProject={(id) => void handleOpenRecentProject(id)}
@@ -1788,12 +1858,31 @@ function EditorPageContent() {
  * load the dedicated Settings window from the same Next static export.
  */
 export default function EditorPage() {
-  const [route, setRoute] = useState<"pending" | "editor" | "settings">("pending");
+  const [route, setRoute] = useState<
+    "pending" | "editor" | "settings" | "export" | "create-project"
+  >("pending");
 
   useEffect(() => {
-    setRoute(new URLSearchParams(window.location.search).has("settings") ? "settings" : "editor");
+    const query = new URLSearchParams(window.location.search);
+    setRoute(
+      query.has("settings")
+        ? "settings"
+        : query.has("export-dialog")
+          ? "export"
+          : query.has("create-project")
+            ? "create-project"
+            : "editor",
+    );
   }, []);
 
   if (route === "pending") return <div className="h-screen bg-background" />;
-  return route === "settings" ? <SettingsWindow /> : <EditorPageContent />;
+  return route === "settings" ? (
+    <SettingsWindow />
+  ) : route === "export" ? (
+    <ExportDialogWindow />
+  ) : route === "create-project" ? (
+    <CreateProjectWindow />
+  ) : (
+    <EditorPageContent />
+  );
 }

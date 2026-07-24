@@ -1,9 +1,14 @@
 import type { MdiHtmlRenderOptions } from "@illusions-lab/mdi";
 
+export type HtmlWritingMode = "horizontal" | "vertical";
+
 /**
  * HTML options are owned by @illusions-lab/mdi.
  *
- * Keep this alias at the renderer/main-process boundary so Illusions does not
- * invent a second HTML configuration schema.
+ * `writingMode` is an Illusions-side source override. The MDI renderer owns
+ * document semantics, so the main process applies it to the MDI front matter
+ * before handing the source to the renderer.
  */
-export type HtmlExportOptions = MdiHtmlRenderOptions;
+export type HtmlExportOptions = MdiHtmlRenderOptions & {
+  writingMode?: HtmlWritingMode;
+};

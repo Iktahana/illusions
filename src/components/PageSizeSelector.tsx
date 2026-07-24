@@ -219,7 +219,7 @@ export function PageSizeSelector({ value, onChange }: PageSizeSelectorProps) {
                         {entry.label}
                       </span>
                       <span className="text-xs text-foreground-secondary">
-                        {entry.width}×{entry.height}
+                        {formatDimensions(entry.key)}
                       </span>
                     </button>
                   );

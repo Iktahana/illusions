@@ -109,6 +109,7 @@ describe("ExportDialog HTML options and iframe preview", () => {
 
     expect(generateHtmlPreview).toHaveBeenCalledWith("# 第一章\n\n本文。", ".mdi", {
       bodyOnly: false,
+      writingMode: "vertical",
     });
     const iframe = container.querySelector("iframe");
     expect(iframe?.title).toBe("HTMLプレビュー");
@@ -124,16 +125,32 @@ describe("ExportDialog HTML options and iframe preview", () => {
 
     expect(generateHtmlPreview).toHaveBeenLastCalledWith("# 第一章\n\n本文。", ".mdi", {
       bodyOnly: true,
+      writingMode: "vertical",
     });
     expect(container.querySelector("iframe")?.getAttribute("srcdoc")).toBe(
       "<h1>第一章</h1><p>本文。</p>",
     );
 
     await act(async () => button("HTMLとしてエクスポート").click());
-    expect(onExportHtml).toHaveBeenCalledWith({ bodyOnly: true });
+    expect(onExportHtml).toHaveBeenCalledWith({ bodyOnly: true, writingMode: "vertical" });
     expect(exportSettingsMocks.saveExportSettings).toHaveBeenCalledWith(
       expect.objectContaining({ htmlBodyOnly: true }),
     );
+  });
+
+  it("uses the selected writing direction for the preview and export", async () => {
+    expect(container.textContent).toContain("組方向");
+
+    await act(async () => button("横書き").click());
+    await flushPreview();
+
+    expect(generateHtmlPreview).toHaveBeenLastCalledWith("# 第一章\n\n本文。", ".mdi", {
+      bodyOnly: false,
+      writingMode: "horizontal",
+    });
+
+    await act(async () => button("HTMLとしてエクスポート").click());
+    expect(onExportHtml).toHaveBeenCalledWith({ bodyOnly: false, writingMode: "horizontal" });
   });
 
   it("ignores a stale preview result after the option changes", async () => {

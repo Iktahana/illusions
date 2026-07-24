@@ -120,6 +120,25 @@ export const LEGACY_PACKAGE_IMPORTS = new Map([
 ]);
 
 /**
+ * Exact browser-adapter imports that predate the Electron-only boundary.
+ * Entries may be removed as callers are migrated, but neither file paths nor
+ * specifiers may be broadened. The final target is empty.
+ */
+export const LEGACY_BROWSER_PLATFORM_IMPORTS = new Map([
+  [
+    "lib/editor-page/__tests__/project-search-vfs-integration.test.ts",
+    new Set(["@/platform/browser/vfs"]),
+  ],
+  ["lib/nlp-client/nlp-client.ts", new Set(["@/platform/browser/nlp-client"])],
+  ["lib/project/project-manager.ts", new Set(["@/platform/browser/storage"])],
+  ["lib/storage/__tests__/storage-service.test.ts", new Set(["@/platform/browser/storage"])],
+  ["lib/storage/storage-service.ts", new Set(["@/platform/browser/storage"])],
+  ["lib/vfs/index.ts", new Set(["@/platform/browser/vfs"])],
+  ["platform/browser/__tests__/storage.test.ts", new Set(["@/platform/browser/storage"])],
+  ["platform/browser/__tests__/vfs-exists.test.ts", new Set(["@/platform/browser/vfs"])],
+]);
+
+/**
  * Boundary rules are expressed against layout-agnostic prefixes (lib/, shared/,
  * packages/, …). Only a leading "src/" is stripped: application code lives under
  * src/ on disk, while packages/ stays at the repository root.
@@ -133,8 +152,9 @@ export function extractModuleSpecifiers(source) {
   const patterns = [
     /(?:import|export)[^;]*?from\s*["']([^"']+)["']/gs,
     /import\s*["']([^"']+)["']/g,
-    /import\(\s*["']([^"']+)["']\s*\)/g,
+    /import\(\s*(?:(?:\/\*[\s\S]*?\*\/|\/\/[^\r\n]*(?:\r?\n|$))\s*)*["']([^"']+)["']\s*\)/g,
     /require\(\s*["']([^"']+)["']\s*\)/g,
+    /(?:vi|jest)\.(?:doMock|mock)\(\s*["']([^"']+)["']/g,
   ];
 
   for (const pattern of patterns) {
@@ -149,11 +169,44 @@ function featureName(filePath) {
   return match?.[1] ?? null;
 }
 
+function importsBrowserPlatform(filePath, specifier) {
+  if (specifier.startsWith("@/")) {
+    const normalizedAlias = path.posix.normalize(specifier.slice(2));
+    if (normalizedAlias === "platform/browser" || normalizedAlias.startsWith("platform/browser/")) {
+      return true;
+    }
+  }
+
+  if (!specifier.startsWith(".")) return false;
+
+  const physicalFilePath =
+    filePath.startsWith("src/") || filePath.startsWith("packages/") ? filePath : `src/${filePath}`;
+  const resolved = normalizeSourcePath(
+    path.posix.normalize(path.posix.join(path.posix.dirname(physicalFilePath), specifier)),
+  );
+  return resolved === "platform/browser" || resolved.startsWith("platform/browser/");
+}
+
 export function validateImportBoundary(filePath, specifier) {
+  const importsBrowserAdapter = importsBrowserPlatform(filePath, specifier);
+  filePath = normalizeSourcePath(filePath);
+
   if (filePath.startsWith("packages/") && specifier.startsWith("@/")) {
     const allowed = LEGACY_PACKAGE_IMPORTS.get(filePath);
     if (!allowed?.has(specifier)) {
       return "package code must not import application-root aliases";
+    }
+  }
+
+  if (
+    /^(?:app|application|components|contexts|features|lib|packages|platform|shared)\//.test(
+      filePath,
+    ) &&
+    importsBrowserAdapter
+  ) {
+    const allowed = LEGACY_BROWSER_PLATFORM_IMPORTS.get(filePath);
+    if (!allowed?.has(specifier)) {
+      return "renderer/application code must not add browser-platform adapter imports";
     }
   }
 
@@ -233,6 +286,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       (count, entries) => count + entries.size,
       0,
     );
-    console.log(`Import boundaries valid (${legacyCount} explicit package exceptions remain).`);
+    const browserLegacyCount = [...LEGACY_BROWSER_PLATFORM_IMPORTS.values()].reduce(
+      (count, entries) => count + entries.size,
+      0,
+    );
+    console.log(
+      `Import boundaries valid (${legacyCount} explicit package exceptions and ${browserLegacyCount} browser-platform exceptions remain).`,
+    );
   }
 }
