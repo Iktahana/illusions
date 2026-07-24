@@ -5,7 +5,6 @@ import { AuthProvider } from "../contexts/AuthContext";
 import { KeymapProvider } from "../contexts/KeymapContext";
 import { NotificationContainer } from "@/components/NotificationContainer";
 import { ErrorReportingRuntime } from "@/components/ErrorReportingRuntime";
-import AnalyticsLoader from "@/components/AnalyticsLoader";
 
 export default function RootLayout({
   children,
@@ -20,11 +19,7 @@ export default function RootLayout({
         <link rel="icon" href="./favicon.png" sizes="any" />
         <link rel="icon" href="./icon/illusions-32.png" sizes="32x32" type="image/png" />
         <link rel="icon" href="./icon/illusions-16.png" sizes="16x16" type="image/png" />
-        <link rel="apple-touch-icon" href="./icon/illusions-180.png" />
-        <link rel="manifest" href="./site.webmanifest" />
         <meta name="theme-color" content="#0f172a" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         {/* External theme init script to avoid CSP unsafe-inline */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- intentionally synchronous to prevent theme FOUC */}
         <script src="./theme-init.js" />
@@ -39,8 +34,6 @@ export default function RootLayout({
         </ThemeProvider>
         <NotificationContainer />
         <ErrorReportingRuntime />
-        {/* Only load analytics in web environment (client-side check) */}
-        <AnalyticsLoader />
       </body>
     </html>
   );

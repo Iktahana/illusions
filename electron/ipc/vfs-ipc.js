@@ -27,6 +27,19 @@ const { createIndexLockManager } = require("../lib/index-lock");
 const { setVfsRoot, clearVfsRoot } = require("../lib/vfs-root-registry");
 // #1476: rehydration — end
 
+/**
+ * Attach native file/folder panels to the renderer window that requested
+ * them, so macOS cannot place the panel behind the welcome/editor window.
+ * @param {Electron.IpcMainInvokeEvent} event
+ * @param {Electron.OpenDialogOptions} options
+ */
+function showOpenDialogForEvent(event, options) {
+  const parent = BrowserWindow?.fromWebContents?.(event.sender);
+  return parent && !parent.isDestroyed()
+    ? dialog.showOpenDialog(parent, options)
+    : dialog.showOpenDialog(options);
+}
+
 function registerVFSHandlers() {
   // Track the opened root directory per window for path validation.
   // #1559: each entry stores both the lexical root (as seen by the renderer)
@@ -211,7 +224,7 @@ function registerVFSHandlers() {
 
   // Open directory picker
   ipcMain.handle(VFS_CHANNELS.invoke.openDirectory, async (event) => {
-    const result = await dialog.showOpenDialog({
+    const result = await showOpenDialogForEvent(event, {
       properties: ["openDirectory", "createDirectory"],
       securityScopedBookmarks: true,
     });
@@ -516,8 +529,7 @@ function registerVFSHandlers() {
       //    prompt the user with a native directory dialog for confirmation.
       //    This prevents a compromised renderer from escalating an arbitrary
       //    path to an allowed root (fixes security issue #1043).
-      const win = BrowserWindow.fromWebContents(event.sender);
-      const result = await dialog.showOpenDialog(win ?? undefined, {
+      const result = await showOpenDialogForEvent(event, {
         title: "プロジェクトフォルダへのアクセスを許可",
         defaultPath: resolved,
         properties: ["openDirectory"],
@@ -589,7 +601,7 @@ function registerVFSHandlers() {
   // Returns { path, name, buf } where buf is the raw file bytes (Buffer).
   // The caller is responsible for decoding (e.g., via text-codec.ts).
   ipcMain.handle(VFS_CHANNELS.invoke.openFile, async (event, opts) => {
-    const result = await dialog.showOpenDialog({
+    const result = await showOpenDialogForEvent(event, {
       properties: ["openFile"],
       securityScopedBookmarks: true,
       filters: opts?.filters ?? [{ name: "テキスト", extensions: ["txt"] }],

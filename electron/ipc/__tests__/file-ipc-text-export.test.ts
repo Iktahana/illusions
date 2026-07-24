@@ -16,9 +16,9 @@ const copyHandler =
 
 describe("native MDI text export IPC", () => {
   it("uses the native save dialog before rendering", () => {
-    expect(exportHandler).toContain("dialog.showSaveDialog");
+    expect(exportHandler).toContain("showSaveDialogForEvent(event");
     expect(exportHandler).toContain("txtExportSuggestedName(title, format)");
-    expect(exportHandler.indexOf("dialog.showSaveDialog")).toBeLessThan(
+    expect(exportHandler.indexOf("showSaveDialogForEvent(event")).toBeLessThan(
       exportHandler.indexOf("renderMdiText(content, format, fileType, indent)"),
     );
   });
@@ -46,7 +46,7 @@ describe("native MDI text export IPC", () => {
     expect(copyHandler).toContain("renderMdiText(content, format, fileType, indent)");
     expect(copyHandler).toContain("clipboard.writeText(converted)");
     expect(copyHandler).toContain("return { success: true }");
-    expect(copyHandler).not.toContain("dialog.showSaveDialog");
+    expect(copyHandler).not.toContain("showSaveDialogForEvent");
     expect(copyHandler).not.toContain("writeBufferDurably");
   });
 });

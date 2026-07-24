@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { PAGE_SIZE_CATEGORIES } from "@/lib/export/page-sizes";
+import { formatDimensions, PAGE_SIZE_CATEGORIES } from "@/lib/export/page-sizes";
 import { filterPageSizes, findEntry } from "../PageSizeSelector";
 
 // ---------------------------------------------------------------------------
@@ -78,5 +78,9 @@ describe("findEntry", () => {
 
   it("returns undefined for unknown key", () => {
     expect(findEntry("NONEXISTENT_SIZE")).toBeUndefined();
+  });
+
+  it("formats dropdown dimensions with millimetre units", () => {
+    expect(formatDimensions("A4")).toBe("210×297 mm");
   });
 });

@@ -6,6 +6,22 @@
  */
 
 import type { INlpClient, Token, TokenizeProgress, WordEntry } from "@/lib/nlp-client/types";
+import { getElectronAPI } from "@/platform/electron-renderer/electron-api";
+
+type ElectronNlpAPI = NonNullable<Window["electronAPI"]>["nlp"];
+
+function requireElectronNlpAPI(): NonNullable<ElectronNlpAPI> {
+  const nlp = getElectronAPI()?.nlp;
+
+  if (!nlp) {
+    throw new Error(
+      "Electron NLP API is unavailable: window.electronAPI.nlp was not exposed. " +
+        "Ensure the Electron preload script exposes the NLP IPC bridge.",
+    );
+  }
+
+  return nlp;
+}
 
 export class ElectronNlpClient implements INlpClient {
   /**
@@ -16,11 +32,7 @@ export class ElectronNlpClient implements INlpClient {
    * @throws Error if Electron NLP API is not available
    */
   async tokenizeParagraph(text: string): Promise<Token[]> {
-    if (!window.electronAPI?.nlp) {
-      throw new Error("Electron NLP API not available");
-    }
-
-    return window.electronAPI.nlp.tokenizeParagraph(text);
+    return requireElectronNlpAPI().tokenizeParagraph(text);
   }
 
   /**
@@ -35,11 +47,7 @@ export class ElectronNlpClient implements INlpClient {
     paragraphs: Array<{ pos: number; text: string }>,
     onProgress?: (progress: TokenizeProgress) => void,
   ): Promise<Array<{ pos: number; tokens: Token[] }>> {
-    if (!window.electronAPI?.nlp) {
-      throw new Error("Electron NLP API not available");
-    }
-
-    return window.electronAPI.nlp.tokenizeDocument(paragraphs, onProgress);
+    return requireElectronNlpAPI().tokenizeDocument(paragraphs, onProgress);
   }
 
   /**
@@ -50,10 +58,6 @@ export class ElectronNlpClient implements INlpClient {
    * @throws Error if Electron NLP API is not available
    */
   async analyzeWordFrequency(text: string): Promise<WordEntry[]> {
-    if (!window.electronAPI?.nlp) {
-      throw new Error("Electron NLP API not available");
-    }
-
-    return window.electronAPI.nlp.analyzeWordFrequency(text);
+    return requireElectronNlpAPI().analyzeWordFrequency(text);
   }
 }

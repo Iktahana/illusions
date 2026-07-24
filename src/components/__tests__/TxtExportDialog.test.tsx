@@ -92,4 +92,49 @@ describe("TxtExportDialog operation labels", () => {
 
     expect(container.textContent).toContain("note形式");
   });
+
+  it("asks before discarding changed settings", async () => {
+    const onCancel = vi.fn();
+    await act(async () => {
+      root.render(<TxtExportDialog isOpen format="txt" onConfirm={() => {}} onCancel={onCancel} />);
+    });
+
+    const toggle = container.querySelector('[role="switch"]') as HTMLButtonElement;
+    await act(async () => toggle.click());
+    const cancel = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "キャンセル",
+    ) as HTMLButtonElement;
+    await act(async () => cancel.click());
+
+    expect(container.textContent).toContain("エクスポートをキャンセルしますか？");
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("uses the native confirmation hook in a system export window", async () => {
+    const onCancel = vi.fn();
+    const confirmDiscard = vi.fn().mockResolvedValue(true);
+    await act(async () => {
+      root.render(
+        <TxtExportDialog
+          isOpen
+          presentation="window"
+          format="txt"
+          confirmDiscard={confirmDiscard}
+          onConfirm={() => {}}
+          onCancel={onCancel}
+        />,
+      );
+    });
+
+    const toggle = container.querySelector('[role="switch"]') as HTMLButtonElement;
+    await act(async () => toggle.click());
+    const cancel = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "キャンセル",
+    ) as HTMLButtonElement;
+    await act(async () => cancel.click());
+
+    expect(confirmDiscard).toHaveBeenCalledOnce();
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(container.textContent).not.toContain("エクスポートをキャンセルしますか？");
+  });
 });

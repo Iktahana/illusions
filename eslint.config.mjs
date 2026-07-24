@@ -71,6 +71,8 @@ const config = [
       "build/**",
       "coverage/**",
       "public/**",
+      ".worktrees/**",
+      ".claude/worktrees/**",
     ],
   },
 ];

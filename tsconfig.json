@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "types": ["@serwist/next/typings"],
     "lib": ["dom", "dom.iterable", "esnext", "webworker"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -31,5 +30,5 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "public/sw.js", "out", "dist-main", "dist-electron"]
+  "exclude": ["node_modules", "out", "dist-main", "dist-electron"]
 }

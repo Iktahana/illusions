@@ -16,6 +16,7 @@ import type {
   VirtualFileSystem,
 } from "@/lib/vfs/types";
 import { basename, dirname, joinPath } from "@/lib/vfs/path-utils";
+import { getElectronAPI } from "@/platform/electron-renderer/electron-api";
 
 // -----------------------------------------------------------------------
 // Type declarations for the Electron VFS IPC bridge
@@ -61,19 +62,14 @@ interface ElectronVFSBridge {
  * @throws Error if the bridge is not available
  */
 function getVFSBridge(): ElectronVFSBridge {
-  const api = window.electronAPI;
-  if (!api) {
-    throw new Error("Electron API is not available (window.electronAPI is undefined).");
-  }
-
   // Access the vfs sub-object on electronAPI.
   // electronAPI is typed by electron.d.ts but its vfs shape differs from
   // ElectronVFSBridge, so we cast through unknown to get the stricter type.
-  const vfsBridge = (api as unknown as { vfs?: ElectronVFSBridge }).vfs;
+  const vfsBridge = (getElectronAPI() as unknown as { vfs?: ElectronVFSBridge } | null)?.vfs;
   if (!vfsBridge) {
     throw new Error(
-      "Electron VFS API is not available (window.electronAPI.vfs is undefined). " +
-        "Ensure the preload script exposes VFS IPC methods.",
+      "Electron VFS API is unavailable: window.electronAPI.vfs was not exposed. " +
+        "Ensure the Electron preload script exposes the VFS IPC bridge.",
     );
   }
   return vfsBridge;
@@ -418,22 +414,13 @@ export class ElectronVFS implements VirtualFileSystem {
   async setRootPath(rootPath: string, projectId?: string): Promise<void> {
     // Await the main process root update before updating local state,
     // so this.rootPath is never set to a value the main process rejected.
-    try {
-      const bridge = getVFSBridge();
-      if ("setRoot" in bridge) {
-        // #1476: rehydration — pass projectId for project-scoped persistence
-        await (bridge as { setRoot: (p: string, projectId?: string) => Promise<unknown> }).setRoot(
-          rootPath,
-          projectId,
-        );
-      }
-    } catch (error: unknown) {
-      // Bridge may not be available during early initialization — that's expected.
-      // But security/validation errors from the main process must propagate.
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes("bridge") && !message.includes("not available")) {
-        throw error;
-      }
+    const bridge = getVFSBridge();
+    if ("setRoot" in bridge) {
+      // #1476: rehydration — pass projectId for project-scoped persistence
+      await (bridge as { setRoot: (p: string, projectId?: string) => Promise<unknown> }).setRoot(
+        rootPath,
+        projectId,
+      );
     }
     // Only update local rootPath after the main process has accepted it.
     this.rootPath = rootPath;

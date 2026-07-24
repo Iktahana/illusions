@@ -25,20 +25,21 @@ const exportHandler = getHandler("exportHtml");
 
 describe("native MDI HTML export IPC", () => {
   it("opens a native save dialog before invoking the Rust renderer", () => {
-    expect(exportHandler).toContain("dialog.showSaveDialog");
+    expect(exportHandler).toContain("showSaveDialogForEvent(event");
     expect(exportHandler).toContain("safeExportBaseName(title)");
     expect(exportHandler).toContain('extensions: ["html", "htm"]');
-    expect(exportHandler.indexOf("dialog.showSaveDialog")).toBeLessThan(
+    expect(exportHandler.indexOf("showSaveDialogForEvent(event")).toBeLessThan(
       exportHandler.indexOf("generateHtml(content, fileType"),
     );
     expect(exportHandler).toContain("if (!filePath) return null");
   });
 
-  it("validates the shared 50 MB ceiling and the upstream bodyOnly option", () => {
+  it("validates the shared 50 MB ceiling and HTML render options", () => {
     expect(validation).toContain("MAX_CONTENT_BYTES");
     expect(validation).toContain('code: "CONTENT_TOO_LARGE"');
-    expect(validation).toContain('key !== "bodyOnly"');
+    expect(validation).toContain('key !== "bodyOnly" && key !== "writingMode"');
     expect(validation).toContain('typeof options.bodyOnly !== "boolean"');
+    expect(validation).toContain('options.writingMode !== "horizontal"');
   });
 
   it("renders previews and durable files through the same Rust HTML options", () => {

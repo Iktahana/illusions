@@ -34,6 +34,7 @@ const {
   DICT_CHANNELS,
   FILE_CHANNELS,
   EXPORT_CHANNELS,
+  PROJECT_DIALOG_CHANNELS,
   SHELL_CHANNELS,
   SYSTEM_CHANNELS,
   MENU_CHANNELS,
@@ -143,8 +144,20 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       exportEpub: "export-epub",
       exportDocx: "export-docx",
       printDocument: "print-document",
+      openExportDialog: "open-export-dialog",
+      getExportDialogRequest: "get-export-dialog-request",
+      confirmExportDialogDiscard: "confirm-export-dialog-discard",
+      completeExportDialog: "complete-export-dialog",
     });
     expect(EXPORT_CHANNELS.event).toEqual({});
+  });
+
+  it("project dialog invoke channels keep their string values", () => {
+    expect(PROJECT_DIALOG_CHANNELS.invoke).toEqual({
+      open: "project-dialog:open",
+      complete: "project-dialog:complete",
+    });
+    expect(PROJECT_DIALOG_CHANNELS.event).toEqual({});
   });
 
   it("shell invoke channels keep their historical string values", () => {
@@ -349,7 +362,22 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
     { constName: "STORAGE_CHANNELS", group: STORAGE_CHANNELS, mainFile: "ipc/storage-ipc.js" },
     { constName: "DICT_CHANNELS", group: DICT_CHANNELS, mainFile: "ipc/dict-ipc.js" },
     { constName: "FILE_CHANNELS", group: FILE_CHANNELS, mainFile: "ipc/file-ipc.js" },
-    { constName: "EXPORT_CHANNELS", group: EXPORT_CHANNELS, mainFile: "ipc/file-ipc.js" },
+    {
+      constName: "EXPORT_CHANNELS",
+      group: EXPORT_CHANNELS,
+      mainFile: "ipc/file-ipc.js",
+      overrides: {
+        openExportDialog: "ipc/export-dialog-ipc.js",
+        getExportDialogRequest: "ipc/export-dialog-ipc.js",
+        confirmExportDialogDiscard: "ipc/export-dialog-ipc.js",
+        completeExportDialog: "ipc/export-dialog-ipc.js",
+      },
+    },
+    {
+      constName: "PROJECT_DIALOG_CHANNELS",
+      group: PROJECT_DIALOG_CHANNELS,
+      mainFile: "ipc/project-dialog-ipc.js",
+    },
     { constName: "SHELL_CHANNELS", group: SHELL_CHANNELS, mainFile: "ipc/shell-ipc.js" },
     { constName: "SYSTEM_CHANNELS", group: SYSTEM_CHANNELS, mainFile: "ipc/system-ipc.js" },
     { constName: "MENU_CHANNELS", group: MENU_CHANNELS, mainFile: "ipc/system-ipc.js" },
@@ -369,9 +397,9 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
 
   it.each(invokeRegistrations)(
     "$constName: every invoke channel bridged in preload is registered via ipcMain.handle($constName.invoke.*)",
-    ({ constName, group, mainFile }) => {
-      const mainSrc = readSource(mainFile);
+    ({ constName, group, mainFile, overrides }) => {
       for (const key of Object.keys(group.invoke)) {
+        const mainSrc = readSource(overrides?.[key] ?? mainFile);
         // preload bridges the channel…
         expect(preloadSrc).toContain(`${constName}.invoke.${key}`);
         // …and main registers a handler for the same constant

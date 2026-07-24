@@ -54,6 +54,22 @@ describe("GlassDialog – accessible dialog focus trap (#1881)", () => {
     expect(dialog?.getAttribute("aria-label")).toBe("テストダイアログ");
   });
 
+  it("uses a single full-window shell without an overlay in native window presentation", async () => {
+    await act(async () => {
+      root.render(
+        <GlassDialog isOpen presentation="window" ariaLabel="ネイティブウィンドウ">
+          <button>OK</button>
+        </GlassDialog>,
+      );
+    });
+
+    expect(document.querySelector("[data-glass-dialog-window]")).not.toBeNull();
+    expect(document.querySelector("[data-glass-dialog-overlay]")).toBeNull();
+    expect(document.querySelector("[role='dialog']")?.getAttribute("aria-label")).toBe(
+      "ネイティブウィンドウ",
+    );
+  });
+
   it("renders nothing when isOpen is false", async () => {
     await act(async () => {
       root.render(

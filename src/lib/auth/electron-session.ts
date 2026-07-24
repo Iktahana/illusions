@@ -24,6 +24,7 @@ import { clearTokens, loadTokens, saveTokens } from "./token-storage";
 import { toAuthUser } from "./auth-user";
 import type { AuthUser } from "./auth-user";
 import type { StoredTokens } from "./token-storage";
+import { getElectronAPI } from "@/platform/electron-renderer/electron-api";
 
 /** The Electron auth IPC surface exposed by the preload script. */
 export type ElectronAuthApi = NonNullable<ElectronAPI["auth"]>;
@@ -35,7 +36,20 @@ export interface ElectronSession {
 }
 
 export function getElectronAuthApi(): ElectronAuthApi | null {
-  return window.electronAPI?.auth ?? null;
+  return getElectronAPI()?.auth ?? null;
+}
+
+export function requireElectronAuthApi(): ElectronAuthApi {
+  const auth = getElectronAuthApi();
+
+  if (!auth) {
+    throw new Error(
+      "Electron auth API is unavailable: window.electronAPI.auth was not exposed. " +
+        "Ensure the Electron preload script exposes the auth IPC bridge.",
+    );
+  }
+
+  return auth;
 }
 
 /**
@@ -111,11 +125,12 @@ async function refreshOrClear(
 export async function restoreElectronSession(
   sessionEpoch?: number,
 ): Promise<ElectronSession | null> {
+  // This function is an Electron-only operation boundary. Probe callers may
+  // use getElectronAuthApi(), but an explicit restore must expose a broken
+  // preload configuration rather than silently behaving like the Web path.
+  const authApi = requireElectronAuthApi();
   const tokens = await loadTokens();
   if (!tokens) return null;
-
-  const authApi = getElectronAuthApi();
-  if (!authApi) return null;
 
   const { accessToken, refreshToken, expiresAt } = tokens;
 
