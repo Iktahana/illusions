@@ -34,11 +34,12 @@ describe("native MDI HTML export IPC", () => {
     expect(exportHandler).toContain("if (!filePath) return null");
   });
 
-  it("validates the shared 50 MB ceiling and the upstream bodyOnly option", () => {
+  it("validates the shared 50 MB ceiling and HTML render options", () => {
     expect(validation).toContain("MAX_CONTENT_BYTES");
     expect(validation).toContain('code: "CONTENT_TOO_LARGE"');
-    expect(validation).toContain('key !== "bodyOnly"');
+    expect(validation).toContain('key !== "bodyOnly" && key !== "writingMode"');
     expect(validation).toContain('typeof options.bodyOnly !== "boolean"');
+    expect(validation).toContain('options.writingMode !== "horizontal"');
   });
 
   it("renders previews and durable files through the same Rust HTML options", () => {

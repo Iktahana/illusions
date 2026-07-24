@@ -35,10 +35,14 @@ function validateHtmlRenderRequest(content, options) {
     options != null &&
     (typeof options !== "object" ||
       Array.isArray(options) ||
-      Object.keys(options).some((key) => key !== "bodyOnly") ||
+      Object.keys(options).some((key) => key !== "bodyOnly" && key !== "writingMode") ||
       ("bodyOnly" in options &&
         options.bodyOnly !== undefined &&
-        typeof options.bodyOnly !== "boolean"))
+        typeof options.bodyOnly !== "boolean") ||
+      ("writingMode" in options &&
+        options.writingMode !== undefined &&
+        options.writingMode !== "horizontal" &&
+        options.writingMode !== "vertical"))
   ) {
     return { success: false, error: "Invalid HTML render options" };
   }
@@ -47,9 +51,13 @@ function validateHtmlRenderRequest(content, options) {
 
 /** @param {unknown} options */
 function normalizeHtmlRenderOptions(options) {
-  return options && typeof options === "object" && options.bodyOnly === true
-    ? { bodyOnly: true }
-    : {};
+  if (!options || typeof options !== "object") return {};
+  const normalized = {};
+  if (options.bodyOnly === true) normalized.bodyOnly = true;
+  if (options.writingMode === "horizontal" || options.writingMode === "vertical") {
+    normalized.writingMode = options.writingMode;
+  }
+  return normalized;
 }
 
 /**

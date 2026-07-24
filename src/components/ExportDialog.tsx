@@ -289,7 +289,10 @@ function ExportDialogInner({
     void saveExportSettings(settings);
 
     if (isHtml && onExportHtml) {
-      onExportHtml({ bodyOnly: settings.htmlBodyOnly });
+      onExportHtml({
+        bodyOnly: settings.htmlBodyOnly,
+        writingMode: settings.verticalWriting ? "vertical" : "horizontal",
+      });
       return;
     }
 
@@ -437,6 +440,7 @@ function ExportDialogInner({
 
     void window.electronAPI!.generateHtmlPreview!(content, fileType, {
       bodyOnly: settings.htmlBodyOnly,
+      writingMode: settings.verticalWriting ? "vertical" : "horizontal",
     })
       .then((result) => {
         if (id !== htmlGenerationIdRef.current) return;
@@ -461,7 +465,14 @@ function ExportDialogInner({
     return () => {
       if (htmlGenerationIdRef.current === id) htmlGenerationIdRef.current += 1;
     };
-  }, [isHtml, hasHtmlPreviewApi, content, fileType, settings.htmlBodyOnly]);
+  }, [
+    isHtml,
+    hasHtmlPreviewApi,
+    content,
+    fileType,
+    settings.htmlBodyOnly,
+    settings.verticalWriting,
+  ]);
 
   // Cleanup blob URLs on unmount (refs always hold the latest values)
   useEffect(() => {
@@ -494,7 +505,10 @@ function ExportDialogInner({
       isOpen
       onBackdropClick={onClose}
       ariaLabel={mode === "print" ? "印刷設定" : "エクスポート設定"}
-      panelClassName={clsx("mx-4 w-full p-0 overflow-hidden", isEpub ? "max-w-2xl" : "max-w-7xl")}
+      panelClassName={clsx(
+        "mx-4 w-full p-0 overflow-hidden",
+        isEpub ? "max-w-2xl" : isHtml ? "max-w-5xl" : "max-w-7xl",
+      )}
     >
       <div className="flex max-h-[85vh]">
         {/* Left: Settings panel */}
@@ -577,7 +591,7 @@ function ExportDialogInner({
                   </div>
                 </div>
                 <p className="text-xs text-foreground-tertiary leading-relaxed">
-                  言語、書名、組方向はMDIフロントマターの設定を使用します。
+                  言語と書名はMDIフロントマターの設定を使用します。
                 </p>
               </>
             )}
@@ -753,8 +767,8 @@ function ExportDialogInner({
               </>
             )}
 
-            {/* Writing direction (shared: PDF/DOCX/EPUB) */}
-            {!isHtml && (
+            {/* Writing direction */}
+            {
               <div>
                 <label className={labelClass}>組方向</label>
                 {isEpub && (
@@ -789,7 +803,7 @@ function ExportDialogInner({
                   </button>
                 </div>
               </div>
-            )}
+            }
 
             {!isHtml && <hr className="border-border" />}
 
