@@ -1,17 +1,7 @@
 import type { NextConfig } from "next";
-import withSerwistInit from "@serwist/next";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import packageJson from "./package.json";
-
-const revision = crypto.randomUUID();
-
-const withSerwist = withSerwistInit({
-  swSrc: "src/app/sw.ts",
-  swDest: "public/sw.js",
-  additionalPrecacheEntries: [{ url: "/~offline", revision }],
-  disable: process.env.NODE_ENV !== "production",
-});
 
 // Electron build: static export (API routes are handled via IPC, not HTTP)
 const isElectronBuild = process.env.ELECTRON_BUILD === "1";
@@ -34,4 +24,4 @@ const nextConfig: NextConfig = {
   // No browser polyfills needed for frontend anymore
 };
 
-export default withSerwist(nextConfig);
+export default nextConfig;

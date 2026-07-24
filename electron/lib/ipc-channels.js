@@ -99,6 +99,18 @@ const EXPORT_CHANNELS = Object.freeze({
     exportEpub: "export-epub",
     exportDocx: "export-docx",
     printDocument: "print-document",
+    openExportDialog: "open-export-dialog",
+    getExportDialogRequest: "get-export-dialog-request",
+    confirmExportDialogDiscard: "confirm-export-dialog-discard",
+    completeExportDialog: "complete-export-dialog",
+  }),
+  event: Object.freeze({}),
+});
+
+const PROJECT_DIALOG_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    open: "project-dialog:open",
+    complete: "project-dialog:complete",
   }),
   event: Object.freeze({}),
 });
@@ -332,6 +344,7 @@ module.exports = {
   DICT_CHANNELS,
   FILE_CHANNELS,
   EXPORT_CHANNELS,
+  PROJECT_DIALOG_CHANNELS,
   SHELL_CHANNELS,
   SYSTEM_CHANNELS,
   MENU_CHANNELS,

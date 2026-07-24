@@ -28,6 +28,28 @@ function installBridge() {
 describe("ElectronVFS", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    Reflect.deleteProperty(window, "electronAPI");
+  });
+
+  it("fails setRootPath when the VFS preload bridge is absent", async () => {
+    const vfs = new ElectronVFS();
+
+    await expect(vfs.setRootPath("/project")).rejects.toThrow(
+      "window.electronAPI.vfs was not exposed",
+    );
+    expect(vfs.getRootPath()).toBeNull();
+  });
+
+  it("identifies a missing VFS sub-bridge", async () => {
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: { isElectron: true },
+    });
+    const vfs = new ElectronVFS();
+
+    await expect(vfs.readFile("/chapter.mdi")).rejects.toThrow(
+      "Ensure the Electron preload script exposes the VFS IPC bridge.",
+    );
   });
 
   it("writes relative paths through mkdir(parent) then writeFile(absolute)", async () => {

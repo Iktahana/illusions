@@ -192,8 +192,8 @@ describe("useExport native text clipboard copy", () => {
 
     await act(async () => api?.copyAs(format));
 
-    expect(requestTxtExportOptions).toHaveBeenCalledWith(format, "copy");
-    expect(copyMdiText).toHaveBeenCalledWith("本文。", format, ".mdi", indent);
+    expect(requestTxtExportOptions).not.toHaveBeenCalled();
+    expect(copyMdiText).toHaveBeenCalledWith("本文。", format, ".mdi", undefined);
     expect(trackEvent).toHaveBeenCalledWith("document_output_completed", {
       operation: "copy",
       format,
@@ -207,7 +207,8 @@ describe("useExport native text clipboard copy", () => {
 
     await act(async () => api?.copyAs("note"));
 
-    expect(copyMdiText).toHaveBeenCalledWith("本文。", "note", ".mdi", indent);
+    expect(requestTxtExportOptions).not.toHaveBeenCalled();
+    expect(copyMdiText).toHaveBeenCalledWith("本文。", "note", ".mdi", undefined);
     expect(trackEvent).toHaveBeenCalledTimes(1);
     expect(trackEvent).toHaveBeenCalledWith("note_output_completed", {
       operation: "copy",
@@ -216,27 +217,25 @@ describe("useExport native text clipboard copy", () => {
     expect(trackEvent).not.toHaveBeenCalledWith("document_output_completed", expect.anything());
   });
 
-  it.each([
-    ["cancelled", null],
-    ["failed", { success: false, error: "private clipboard failure" }],
-  ] as const)("does not track a %s formatted note copy", async (_label, result) => {
-    if (result === null) requestTxtExportOptions.mockResolvedValueOnce(null);
-    else copyMdiText.mockResolvedValue(result);
+  it("does not track a failed formatted note copy", async () => {
+    copyMdiText.mockResolvedValue({ success: false, error: "private clipboard failure" });
 
     await act(async () => api?.copyAs("note"));
 
     expect(trackEvent).not.toHaveBeenCalled();
   });
 
-  it("does not render or notify when the indentation dialog is cancelled", async () => {
+  it("copies immediately even when the export indentation dialog would cancel", async () => {
     requestTxtExportOptions.mockResolvedValueOnce(null);
+    copyMdiText.mockResolvedValue({ success: true });
 
     await act(async () => api?.copyAs("narou"));
 
-    expect(copyMdiText).not.toHaveBeenCalled();
-    expect(notifications.showProgress).not.toHaveBeenCalled();
-    expect(notifications.success).not.toHaveBeenCalled();
-    expect(trackEvent).not.toHaveBeenCalled();
+    expect(requestTxtExportOptions).not.toHaveBeenCalled();
+    expect(copyMdiText).toHaveBeenCalledWith("本文。", "narou", ".mdi", undefined);
+    expect(notifications.success).toHaveBeenCalledWith(
+      "小説家になろう形式をクリップボードにコピーしました",
+    );
   });
 
   it("reports a structured clipboard failure", async () => {

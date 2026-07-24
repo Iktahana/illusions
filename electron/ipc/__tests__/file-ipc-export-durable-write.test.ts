@@ -57,6 +57,14 @@ describe("file-ipc.js export handlers — durable binary writes (#2147)", () => 
     expect(exportDocxHandler).toContain("await writeBufferDurably(filePath, docxBuffer)");
   });
 
+  it("attaches every generated-export save panel to its sender window", () => {
+    for (const handler of [exportPdfHandler, exportEpubHandler, exportDocxHandler]) {
+      expect(handler).toContain("showSaveDialogForEvent(event");
+    }
+    expect(source).toContain("BrowserWindow?.fromWebContents?.(event.sender)");
+    expect(source).toContain("dialog.showSaveDialog(parent, options)");
+  });
+
   it("does not use direct fs.writeFile in binary export handlers", () => {
     for (const handler of [exportPdfHandler, exportEpubHandler, exportDocxHandler]) {
       expect(handler).not.toMatch(/fs\.writeFile\(\s*filePath\s*,/);
