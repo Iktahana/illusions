@@ -34,6 +34,7 @@ const {
   DICT_CHANNELS,
   FILE_CHANNELS,
   EXPORT_CHANNELS,
+  PROJECT_DIALOG_CHANNELS,
   SHELL_CHANNELS,
   SYSTEM_CHANNELS,
   MENU_CHANNELS,
@@ -149,6 +150,14 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       completeExportDialog: "complete-export-dialog",
     });
     expect(EXPORT_CHANNELS.event).toEqual({});
+  });
+
+  it("project dialog invoke channels keep their string values", () => {
+    expect(PROJECT_DIALOG_CHANNELS.invoke).toEqual({
+      open: "project-dialog:open",
+      complete: "project-dialog:complete",
+    });
+    expect(PROJECT_DIALOG_CHANNELS.event).toEqual({});
   });
 
   it("shell invoke channels keep their historical string values", () => {
@@ -363,6 +372,11 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
         confirmExportDialogDiscard: "ipc/export-dialog-ipc.js",
         completeExportDialog: "ipc/export-dialog-ipc.js",
       },
+    },
+    {
+      constName: "PROJECT_DIALOG_CHANNELS",
+      group: PROJECT_DIALOG_CHANNELS,
+      mainFile: "ipc/project-dialog-ipc.js",
     },
     { constName: "SHELL_CHANNELS", group: SHELL_CHANNELS, mainFile: "ipc/shell-ipc.js" },
     { constName: "SYSTEM_CHANNELS", group: SYSTEM_CHANNELS, mainFile: "ipc/system-ipc.js" },

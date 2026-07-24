@@ -8,8 +8,12 @@ const source = readFileSync(path.resolve(here, "../export-dialog-ipc.js"), "utf8
 
 describe("native export dialog window smoke contract", () => {
   it("creates an OS modal child window that blocks its opener", () => {
-    expect(source).toContain("parent,");
-    expect(source).toContain("modal: true");
+    expect(source).toContain("getCenteredWindowPosition(parent, width, height)");
+    expect(source).toContain("...macWindowOptions");
+    expect(source).toContain("alwaysOnTop: true");
+    expect(source).toContain('win.setAlwaysOnTop(true, "modal-panel")');
+    expect(source).toContain("parent.setFocusable(false)");
+    expect(source).toContain(": { parent, modal: true }");
     expect(source).toContain('preload: path.join(__dirname, "preload.js")');
     expect(source).not.toContain('path.join(__dirname, "../preload.js")');
     expect(source).toContain("backgroundColor:");
@@ -19,18 +23,25 @@ describe("native export dialog window smoke contract", () => {
 
   it("uses a compact native window for EPUB, which has no preview pane", () => {
     expect(source).toContain('request.format === "epub"');
-    expect(source).toContain("width: isTxt ? 520 : isEpub ? 760 : 1280");
+    expect(source).toContain("const width = isTxt ? 520 : isEpub ? 760 : 1280");
+    expect(source).toContain("width,");
     expect(source).toContain("minWidth: isTxt ? 420 : isEpub ? 640 : 960");
   });
 
   it("returns confirmation data and resolves cancellation when the child closes", () => {
     expect(source).toContain("completeExportDialog");
-    expect(source).toContain("entry.resolve(result ?? null)");
-    expect(source).toContain("entry.resolve(null)");
+    expect(source).toContain("entry.result = result ?? null");
+    expect(source).toContain("entry.resolve(entry.completed ? entry.result : null)");
   });
 
   it("restores the parent editor menu state after the modal closes", () => {
+    expect(source).toContain("restoreParentAfterModal(parent, () =>");
+    expect(source).toContain("parent.setFocusable(true)");
     expect(source).toContain("parent.focus()");
+    expect(source).toContain("setImmediate(callback)");
+    expect(source.indexOf("parent.setFocusable(true)")).toBeLessThan(
+      source.indexOf("entry.resolve(entry.completed ? entry.result : null)"),
+    );
     expect(source).toContain("setActiveWindowId(parent.id)");
     expect(source).toContain("rebuildApplicationMenu()");
   });

@@ -8,6 +8,7 @@ import EditorLayout from "@/components/EditorLayout";
 import SettingsModal from "@/components/SettingsModal";
 import SettingsWindow from "@/components/SettingsWindow";
 import ExportDialogWindow from "@/components/ExportDialogWindow";
+import CreateProjectWindow from "@/components/CreateProjectWindow";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import StartupRestoreScreen from "@/components/StartupRestoreScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
@@ -50,6 +51,7 @@ import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { IgnoredCorrectionsProvider } from "@/contexts/IgnoredCorrectionsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
+import { getProjectService } from "@/lib/project/project-service";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
 import { computeHistoryRestoreTabUpdate } from "@/lib/tab-manager/history-restore";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
@@ -1467,6 +1469,37 @@ function EditorPageContent() {
       return <StartupRestoreScreen />;
     }
 
+    const handleWelcomeCreateProject = async (): Promise<void> => {
+      const openNativeDialog = window.electronAPI?.openCreateProjectDialog;
+      if (!openNativeDialog) {
+        handleCreateProject();
+        return;
+      }
+
+      let selection;
+      try {
+        selection = await openNativeDialog();
+      } catch (error) {
+        // During Electron development the renderer/preload can reload before
+        // the long-lived main process has registered a newly-added handler.
+        // Preserve a usable create-project flow until the next full restart.
+        console.warn("[Create project] Native dialog unavailable; using web fallback:", error);
+        handleCreateProject();
+        return;
+      }
+      if (!selection) return;
+
+      try {
+        const { name, fileExtension } = selection;
+        const project = await getProjectService().createProject(name, fileExtension);
+        await handleProjectCreated(project);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        if (message.includes("cancelled by the user")) return;
+        notificationManager.error(`プロジェクトの作成に失敗しました: ${message}`);
+      }
+    };
+
     return (
       <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
         <IgnoredCorrectionsProvider value={ignoredCorrectionsContextValue}>
@@ -1484,7 +1517,7 @@ function EditorPageContent() {
             )}
 
             <WelcomeScreen
-              onCreateProject={handleCreateProject}
+              onCreateProject={() => void handleWelcomeCreateProject()}
               onOpenProject={() => void handleOpenProject()}
               onOpenStandaloneFile={() => void handleOpenStandaloneFile()}
               onOpenRecentProject={(id) => void handleOpenRecentProject(id)}
@@ -1825,11 +1858,21 @@ function EditorPageContent() {
  * load the dedicated Settings window from the same Next static export.
  */
 export default function EditorPage() {
-  const [route, setRoute] = useState<"pending" | "editor" | "settings" | "export">("pending");
+  const [route, setRoute] = useState<
+    "pending" | "editor" | "settings" | "export" | "create-project"
+  >("pending");
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
-    setRoute(query.has("settings") ? "settings" : query.has("export-dialog") ? "export" : "editor");
+    setRoute(
+      query.has("settings")
+        ? "settings"
+        : query.has("export-dialog")
+          ? "export"
+          : query.has("create-project")
+            ? "create-project"
+            : "editor",
+    );
   }, []);
 
   if (route === "pending") return <div className="h-screen bg-background" />;
@@ -1837,6 +1880,8 @@ export default function EditorPage() {
     <SettingsWindow />
   ) : route === "export" ? (
     <ExportDialogWindow />
+  ) : route === "create-project" ? (
+    <CreateProjectWindow />
   ) : (
     <EditorPageContent />
   );

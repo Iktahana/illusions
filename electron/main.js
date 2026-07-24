@@ -47,6 +47,7 @@ const { getRulesetsManager } = require("./rulesets-manager");
 const { registerAnalyticsHandlers } = require("./ipc/analytics-ipc");
 const { registerErrorReportingHandlers } = require("./ipc/error-reporting-ipc");
 const { registerExportDialogHandlers } = require("./ipc/export-dialog-ipc");
+const { registerProjectDialogHandlers } = require("./ipc/project-dialog-ipc");
 const {
   initializeErrorReporting,
   captureMainError,
@@ -254,6 +255,7 @@ app.whenReady().then(async () => {
   registerAnalyticsHandlers({ hasAppKey: () => Boolean(APTABASE_APP_KEY) });
   registerErrorReportingHandlers({ captureRendererError });
   registerExportDialogHandlers();
+  registerProjectDialogHandlers();
 
   // 匿名使用統計：起動イベント（同意フラグ未設定時はデフォルト ON）
   if (APTABASE_APP_KEY) {

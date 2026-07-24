@@ -168,6 +168,16 @@ declare global {
     getExportDialogRequest?: () => Promise<Record<string, unknown> | null>;
     confirmExportDialogDiscard?: () => Promise<boolean>;
     completeExportDialog?: (result: Record<string, unknown> | null) => Promise<boolean>;
+    openCreateProjectDialog?: () => Promise<{
+      name: string;
+      fileExtension: import("@/lib/project/project-types").SupportedFileExtension;
+    } | null>;
+    completeCreateProjectDialog?: (
+      result: {
+        name: string;
+        fileExtension: import("@/lib/project/project-types").SupportedFileExtension;
+      } | null,
+    ) => Promise<boolean>;
     onMenuPrint?: (callback: () => void) => (() => void) | void;
     onMenuExportHTML?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;

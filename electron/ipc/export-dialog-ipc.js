@@ -1,9 +1,33 @@
-const { BrowserWindow, ipcMain, app, dialog, nativeTheme } = require("electron");
+const { BrowserWindow, ipcMain, app, dialog, nativeTheme, screen } = require("electron");
 const path = require("path");
 const { EXPORT_CHANNELS } = require("../lib/ipc-channels");
 const { isDev } = require("../app-constants");
 
 const requests = new Map();
+
+function getCenteredWindowPosition(parent, width, height) {
+  const parentBounds = parent.getBounds();
+  const workArea = screen.getDisplayMatching(parentBounds).workArea;
+  const preferredX = Math.round(parentBounds.x + (parentBounds.width - width) / 2);
+  const preferredY = Math.round(parentBounds.y + (parentBounds.height - height) / 2);
+  return {
+    x: Math.max(workArea.x, Math.min(preferredX, workArea.x + workArea.width - width)),
+    y: Math.max(workArea.y, Math.min(preferredY, workArea.y + workArea.height - height)),
+  };
+}
+
+function restoreParentAfterModal(parent, callback) {
+  if (parent.isDestroyed()) {
+    callback();
+    return;
+  }
+
+  parent.setFocusable(true);
+  if (parent.isMinimized()) parent.restore();
+  parent.show();
+  parent.focus();
+  setImmediate(callback);
+}
 
 function registerExportDialogHandlers() {
   ipcMain.handle(EXPORT_CHANNELS.invoke.openExportDialog, (event, request) => {
@@ -12,11 +36,21 @@ function registerExportDialogHandlers() {
     return new Promise((resolve) => {
       const isTxt = request.kind === "txt";
       const isEpub = request.kind === "document" && request.format === "epub";
+      const width = isTxt ? 520 : isEpub ? 760 : 1280;
+      const height = isTxt ? 480 : 820;
+      const macWindowOptions =
+        process.platform === "darwin"
+          ? {
+              ...getCenteredWindowPosition(parent, width, height),
+              modal: false,
+              alwaysOnTop: true,
+              skipTaskbar: true,
+            }
+          : { parent, modal: true };
       const win = new BrowserWindow({
-        parent,
-        modal: true,
-        width: isTxt ? 520 : isEpub ? 760 : 1280,
-        height: isTxt ? 480 : 820,
+        ...macWindowOptions,
+        width,
+        height,
         minWidth: isTxt ? 420 : isEpub ? 640 : 960,
         minHeight: isTxt ? 380 : isEpub ? 640 : 620,
         show: false,
@@ -34,8 +68,12 @@ function registerExportDialogHandlers() {
           sandbox: true,
         },
       });
+      if (process.platform === "darwin") {
+        parent.setFocusable(false);
+        win.setAlwaysOnTop(true, "modal-panel");
+      }
       const webContentsId = win.webContents.id;
-      requests.set(webContentsId, { request, resolve, settled: false });
+      requests.set(webContentsId, { request, resolve, completed: false, result: null });
       win.webContents.on("preload-error", (_event, preloadPath, error) => {
         console.error("[Export dialog] Preload error:", preloadPath, error);
       });
@@ -45,21 +83,25 @@ function registerExportDialogHandlers() {
       win.webContents.on("console-message", (_event, level, message) => {
         console.error(`[Export dialog] renderer console (${level}):`, message);
       });
-      win.once("ready-to-show", () => win.show());
+      win.once("ready-to-show", () => {
+        win.show();
+        win.focus();
+      });
       win.on("closed", () => {
         const entry = requests.get(webContentsId);
-        if (entry && !entry.settled) entry.resolve(null);
         requests.delete(webContentsId);
         // Focusing the modal temporarily makes it the active menu window.
         // Restore the editor's retained menu state explicitly when the modal
         // closes; macOS does not consistently emit browser-window-focus for
         // the parent again after dismissing a child sheet/window.
         if (!parent.isDestroyed()) {
-          parent.focus();
           const { setActiveWindowId, rebuildApplicationMenu } = require("../menu");
           setActiveWindowId(parent.id);
           void rebuildApplicationMenu();
         }
+        restoreParentAfterModal(parent, () => {
+          if (entry) entry.resolve(entry.completed ? entry.result : null);
+        });
       });
       const url = isDev
         ? "http://localhost:3020?export-dialog"
@@ -90,9 +132,9 @@ function registerExportDialogHandlers() {
   });
   ipcMain.handle(EXPORT_CHANNELS.invoke.completeExportDialog, (event, result) => {
     const entry = requests.get(event.sender.id);
-    if (!entry || entry.settled) return false;
-    entry.settled = true;
-    entry.resolve(result ?? null);
+    if (!entry || entry.completed) return false;
+    entry.completed = true;
+    entry.result = result ?? null;
     BrowserWindow.fromWebContents(event.sender)?.close();
     return true;
   });

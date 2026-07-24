@@ -107,6 +107,14 @@ const EXPORT_CHANNELS = Object.freeze({
   event: Object.freeze({}),
 });
 
+const PROJECT_DIALOG_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    open: "project-dialog:open",
+    complete: "project-dialog:complete",
+  }),
+  event: Object.freeze({}),
+});
+
 // Shell / OS integration (electron/ipc/shell-ipc.js)
 const SHELL_CHANNELS = Object.freeze({
   invoke: Object.freeze({
@@ -336,6 +344,7 @@ module.exports = {
   DICT_CHANNELS,
   FILE_CHANNELS,
   EXPORT_CHANNELS,
+  PROJECT_DIALOG_CHANNELS,
   SHELL_CHANNELS,
   SYSTEM_CHANNELS,
   MENU_CHANNELS,
