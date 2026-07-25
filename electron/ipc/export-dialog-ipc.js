@@ -54,9 +54,12 @@ function registerExportDialogHandlers() {
         minWidth: isTxt ? 420 : isEpub ? 640 : 960,
         minHeight: isTxt ? 380 : isEpub ? 640 : 620,
         show: false,
+        frame: false,
+        transparent: true,
+        hasShadow: true,
         // Prevent the native compositor from flashing its default white
         // surface while the renderer catches up during live resize.
-        backgroundColor: nativeTheme.shouldUseDarkColors ? "#080808" : "#fcfcfc",
+        backgroundColor: "#00000000",
         title: "エクスポート設定",
         webPreferences: {
           // The Electron main process is bundled into dist-main/main.js, so

@@ -107,7 +107,7 @@ export default function TxtExportDialog({
       ariaLabel="テキスト出力設定"
       panelClassName={
         presentation === "window"
-          ? "h-screen w-screen overflow-y-auto bg-background p-8"
+          ? "h-screen w-screen overflow-y-auto rounded-xl border border-border bg-background-elevated/95 p-8 shadow-2xl"
           : "mx-4 w-full max-w-md p-6"
       }
     >
