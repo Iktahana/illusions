@@ -168,7 +168,10 @@ export default function GlassDialog({
         aria-modal="true"
         aria-label={ariaLabel}
         tabIndex={-1}
-        className={panelClassName ?? "h-screen w-screen overflow-auto bg-background p-6"}
+        className={
+          panelClassName ??
+          "h-screen w-screen overflow-auto rounded-xl bg-background-elevated/95 p-6 shadow-2xl"
+        }
       >
         {children}
       </div>

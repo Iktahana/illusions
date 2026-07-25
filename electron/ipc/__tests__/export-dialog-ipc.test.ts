@@ -17,7 +17,7 @@ describe("native export dialog window smoke contract", () => {
     expect(source).toContain('preload: path.join(__dirname, "preload.js")');
     expect(source).not.toContain('path.join(__dirname, "../preload.js")');
     expect(source).toContain("backgroundColor:");
-    expect(source).toContain("nativeTheme.shouldUseDarkColors");
+    expect(source).toContain('backgroundColor: "#00000000"');
     expect(source).toContain('"?export-dialog"');
   });
 

@@ -536,7 +536,7 @@ function ExportDialogInner({
       panelClassName={clsx(
         "w-full p-0 overflow-hidden",
         presentation === "window"
-          ? "h-screen bg-background"
+          ? "h-screen rounded-xl border border-border bg-background-elevated/95 shadow-2xl"
           : clsx("mx-4", isEpub ? "max-w-2xl" : isHtml ? "max-w-5xl" : "max-w-7xl"),
       )}
     >
