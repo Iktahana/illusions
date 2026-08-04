@@ -3,18 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import GlassDialog from "@/shared/ui/GlassDialog";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import {
   loadExportSettings,
   saveExportSettings,
   DEFAULT_EXPORT_SETTINGS,
 } from "@/lib/export/export-settings";
 import type { UnifiedExportSettings } from "@/lib/export/export-settings";
-import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-export-types";
 
 interface TxtExportDialogProps {
   isOpen: boolean;
+  presentation?: "overlay" | "window";
   /** Which TXT variant is being exported (affects only the heading). */
-  format: "txt" | "txt-ruby";
+  format: TxtExportFormat;
+  /** Whether the converted text will be saved to a file or copied. */
+  operation?: "export" | "copy";
+  /** Native-window confirmation hook; web overlays use ConfirmDialog instead. */
+  confirmDiscard?: () => Promise<boolean>;
   /** Called with the chosen 字下げ options when the user confirms. */
   onConfirm: (options: TxtIndentOptions) => void;
   /** Called when the user cancels or dismisses the dialog. */
@@ -36,7 +42,10 @@ function clampCount(value: number): number {
  */
 export default function TxtExportDialog({
   isOpen,
+  presentation = "overlay",
   format,
+  operation = "export",
+  confirmDiscard: confirmDiscardNative,
   onConfirm,
   onCancel,
 }: TxtExportDialogProps): React.ReactNode {
@@ -44,6 +53,8 @@ export default function TxtExportDialog({
     DEFAULT_EXPORT_SETTINGS.txtFullwidthSpaceIndent,
   );
   const [count, setCount] = useState<number>(DEFAULT_EXPORT_SETTINGS.txtIndentCount);
+  const [isDirty, setIsDirty] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   // Snapshot of the full settings object so confirm-time persistence does not
   // clobber unrelated (PDF/DOCX/EPUB) fields.
   const loadedRef = useRef<UnifiedExportSettings>(DEFAULT_EXPORT_SETTINGS);
@@ -56,6 +67,7 @@ export default function TxtExportDialog({
       loadedRef.current = loaded;
       setFullwidth(loaded.txtFullwidthSpaceIndent);
       setCount(clampCount(loaded.txtIndentCount));
+      setIsDirty(false);
     });
     return () => {
       cancelled = true;
@@ -73,18 +85,44 @@ export default function TxtExportDialog({
     });
     onConfirm({ fullwidthSpaceIndent: fullwidth, indentCount });
   };
+  const requestCancel = async (): Promise<void> => {
+    if (!isDirty) {
+      onCancel();
+      return;
+    }
+    if (confirmDiscardNative) {
+      if (await confirmDiscardNative()) onCancel();
+      return;
+    }
+    setConfirmDiscard(true);
+  };
 
   const labelClass = "block text-sm font-medium text-foreground-secondary mb-1";
 
   return (
     <GlassDialog
       isOpen
-      onBackdropClick={onCancel}
-      ariaLabel="テキストエクスポート設定"
-      panelClassName="mx-4 w-full max-w-md p-6"
+      presentation={presentation}
+      onBackdropClick={requestCancel}
+      ariaLabel="テキスト出力設定"
+      panelClassName={
+        presentation === "window"
+          ? "h-screen w-screen overflow-y-auto rounded-xl border border-border bg-background-elevated/95 p-8 shadow-2xl"
+          : "mx-4 w-full max-w-md p-6"
+      }
     >
       <h2 className="text-lg font-semibold text-foreground mb-1">
-        {format === "txt-ruby" ? "テキスト（ルビ付き）エクスポート" : "テキストエクスポート"}
+        {format === "txt-ruby"
+          ? "テキスト（ルビ付き）"
+          : format === "narou"
+            ? "小説家になろう形式"
+            : format === "kakuyomu"
+              ? "カクヨム形式"
+              : format === "aozora"
+                ? "青空文庫形式"
+                : format === "note"
+                  ? "note形式"
+                  : "テキスト（プレーン）"}
       </h2>
       <p className="text-xs text-foreground-tertiary mb-4">字下げの方法を選択してください。</p>
 
@@ -96,7 +134,10 @@ export default function TxtExportDialog({
             type="button"
             role="switch"
             aria-checked={fullwidth}
-            onClick={() => setFullwidth((v) => !v)}
+            onClick={() => {
+              setIsDirty(true);
+              setFullwidth((v) => !v);
+            }}
             className={clsx(
               "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors",
               fullwidth ? "bg-accent" : "bg-border-secondary",
@@ -122,7 +163,10 @@ export default function TxtExportDialog({
               max={MAX_COUNT}
               step={1}
               value={count}
-              onChange={(e) => setCount(clampCount(Number(e.target.value)))}
+              onChange={(e) => {
+                setIsDirty(true);
+                setCount(clampCount(Number(e.target.value)));
+              }}
             />
             <p className="text-xs text-foreground-tertiary mt-1">
               各段落の先頭に全角スペース（U+3000）を{clampCount(count)}個挿入します。
@@ -137,16 +181,28 @@ export default function TxtExportDialog({
           className="w-full px-4 py-2 rounded-lg text-sm bg-accent text-accent-foreground hover:bg-accent-hover transition-colors"
           onClick={handleConfirm}
         >
-          エクスポート
+          {operation === "copy" ? "クリップボードにコピー" : "エクスポート"}
         </button>
         <button
           type="button"
           className="w-full px-4 py-2 rounded-lg text-sm text-foreground-secondary hover:bg-hover transition-colors"
-          onClick={onCancel}
+          onClick={requestCancel}
         >
           キャンセル
         </button>
       </div>
+      {!confirmDiscardNative && (
+        <ConfirmDialog
+          isOpen={confirmDiscard}
+          title="エクスポートをキャンセルしますか？"
+          message="変更したエクスポート設定は適用されません。"
+          confirmLabel="キャンセルする"
+          cancelLabel="続ける"
+          dangerous
+          onConfirm={onCancel}
+          onCancel={() => setConfirmDiscard(false)}
+        />
+      )}
     </GlassDialog>
   );
 }

@@ -83,8 +83,11 @@ async function createSettingsWindow() {
     minWidth: 680,
     minHeight: 520,
     show: false,
+    frame: false,
+    transparent: true,
+    hasShadow: true,
     title: "設定",
-    backgroundColor: "#0f172a",
+    backgroundColor: "#00000000",
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

@@ -7,6 +7,12 @@ interface GlassDialogProps {
   onBackdropClick?: () => void;
   ariaLabel?: string;
   /**
+   * "overlay" draws the web modal backdrop and panel used inside the editor.
+   * "window" renders the panel as the entire document for an OS modal
+   * BrowserWindow, avoiding a second dialog shell inside the native window.
+   */
+  presentation?: "overlay" | "window";
+  /**
    * Layout classes for the dialog panel (width, padding, etc.).
    * Defaults to "mx-4 w-full max-w-md p-6".
    * Glass effect classes (blur, border, shadow, rounded) are always applied.
@@ -46,6 +52,7 @@ export default function GlassDialog({
   isOpen,
   onBackdropClick,
   ariaLabel,
+  presentation = "overlay",
   panelClassName,
   children,
 }: GlassDialogProps) {
@@ -150,6 +157,25 @@ export default function GlassDialog({
     if (e.target === e.currentTarget && onBackdropClick) {
       onBackdropClick();
     }
+  }
+
+  if (presentation === "window") {
+    return (
+      <div
+        data-glass-dialog-window=""
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        tabIndex={-1}
+        className={
+          panelClassName ??
+          "h-screen w-screen overflow-auto rounded-xl bg-background-elevated/95 p-6 shadow-2xl"
+        }
+      >
+        {children}
+      </div>
+    );
   }
 
   return (

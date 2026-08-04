@@ -12,13 +12,21 @@ describe("import boundary checker", () => {
       import value from "@/shared/value";
       export { other } from "@/features/editor";
       const lazy = import("@/features/search");
+      const chunk = import(/* webpackChunkName: "browser-storage" */ "@/platform/browser/storage");
+      const lineCommentChunk = import(
+        // webpackChunkName: "browser-vfs"
+        "@/platform/browser/vfs"
+      );
       const legacy = require("@/lib/legacy");
+      vi.mock("@/platform/browser/storage", () => ({}));
     `;
 
     expect(extractModuleSpecifiers(source)).toEqual([
       "@/shared/value",
       "@/features/editor",
       "@/features/search",
+      "@/platform/browser/storage",
+      "@/platform/browser/vfs",
       "@/lib/legacy",
     ]);
   });
@@ -58,6 +66,15 @@ describe("import boundary checker", () => {
       expect(
         validateImportBoundary(normalizeSourcePath("src/lib/utils/index.ts"), "@/shared/lib/text"),
       ).toBeNull();
+    });
+
+    it("normalizes src paths before matching exact browser-platform exceptions", () => {
+      expect(
+        validateImportBoundary("src/lib/storage/storage-service.ts", "@/platform/browser/storage"),
+      ).toBeNull();
+      expect(
+        validateImportBoundary("src/lib/storage/another-service.ts", "@/platform/browser/storage"),
+      ).toContain("browser-platform");
     });
   });
 
@@ -104,5 +121,55 @@ describe("import boundary checker", () => {
     expect(
       validateImportBoundary("features/editor/model/controller.ts", "@/features/search"),
     ).toBeNull();
+  });
+
+  describe("browser-platform imports", () => {
+    it("allows only exact inherited file and specifier pairs", () => {
+      expect(
+        validateImportBoundary("lib/project/project-manager.ts", "@/platform/browser/storage"),
+      ).toBeNull();
+      expect(
+        validateImportBoundary("lib/project/project-manager.ts", "@/platform/browser/vfs"),
+      ).toContain("browser-platform");
+    });
+
+    it("rejects browser-platform aliases from new renderer callers", () => {
+      expect(
+        validateImportBoundary("features/editor/model/controller.ts", "@/platform/browser/storage"),
+      ).toContain("browser-platform");
+      expect(validateImportBoundary("application/bootstrap.ts", "@/platform/browser")).toContain(
+        "browser-platform",
+      );
+      expect(
+        validateImportBoundary(
+          "features/editor/model/controller.ts",
+          "@/platform/./browser/storage",
+        ),
+      ).toContain("browser-platform");
+    });
+
+    it("rejects equivalent relative browser-platform imports", () => {
+      expect(
+        validateImportBoundary(
+          "lib/storage/new-storage-service.ts",
+          "../../platform/browser/storage",
+        ),
+      ).toContain("browser-platform");
+      expect(
+        validateImportBoundary(
+          "features/editor/model/controller.ts",
+          "../../../platform/browser/vfs",
+        ),
+      ).toContain("browser-platform");
+    });
+
+    it("resolves relative imports against physical src paths before normalization", () => {
+      expect(
+        validateImportBoundary("src/lib/example.ts", "../../src/platform/browser/storage"),
+      ).toContain("browser-platform");
+      expect(
+        validateImportBoundary("packages/example/index.ts", "../../src/platform/browser/storage"),
+      ).toContain("browser-platform");
+    });
   });
 });

@@ -3,6 +3,7 @@ const {
   scrubRendererErrorPayload,
   scrubSentryEvent,
 } = require("../src/lib/error-reporting/scrub-error-event");
+const { deriveReleaseEnvironment } = require("../src/lib/error-reporting/release-environment");
 
 let sentryMain = null;
 let captureException = null;
@@ -17,23 +18,18 @@ function sanitizeError(error) {
   return sanitized;
 }
 
-function initializeErrorReporting({
-  dsn,
-  getStorageManager,
-  getRelease,
-  environment,
-  sentryMainModule,
-}) {
+function initializeErrorReporting({ dsn, getStorageManager, getRelease, sentryMainModule }) {
   if (!dsn) return false;
 
   sentryMain = sentryMainModule || require("@sentry/electron/main");
   captureException = sentryMain.captureException;
   getStorageManagerRef = getStorageManager;
 
+  const release = getRelease();
   sentryMain.init({
     dsn,
-    release: getRelease(),
-    environment,
+    release,
+    environment: deriveReleaseEnvironment(release),
     defaultIntegrations: false,
     sendDefaultPii: false,
     tracesSampleRate: 0,

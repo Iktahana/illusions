@@ -11,44 +11,35 @@ import type {
   RecentProject,
   EditorBuffer,
 } from "@/lib/storage/storage-types";
+import { getElectronAPI } from "@/platform/electron-renderer/electron-api";
+
+type ElectronStorageAPI = NonNullable<Window["electronAPI"]>["storage"];
+
+function requireElectronStorageAPI(): NonNullable<ElectronStorageAPI> {
+  const storage = getElectronAPI()?.storage;
+
+  if (!storage) {
+    throw new Error(
+      "Electron storage API is unavailable: window.electronAPI.storage was not exposed. " +
+        "Ensure the Electron preload script exposes the storage IPC bridge.",
+    );
+  }
+
+  return storage;
+}
 
 export class ElectronStorageProvider implements IStorageService {
   private initialized = false;
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    requireElectronStorageAPI();
     // IPC 経由のため、明示的な初期化は不要（DB準備はメインプロセス側で行う）
     this.initialized = true;
   }
 
-  private getElectronAPI() {
-    const electronAPI = (window as Window & { electronAPI?: { storage?: unknown } }).electronAPI;
-    if (!electronAPI?.storage) {
-      throw new Error("Electron の storage API が利用できません");
-    }
-    return electronAPI.storage as {
-      saveSession: (session: StorageSession) => Promise<void>;
-      loadSession: () => Promise<StorageSession | null>;
-      saveAppState: (appState: AppState) => Promise<void>;
-      loadAppState: () => Promise<AppState | null>;
-      updateAppState: (updates: Partial<AppState>) => Promise<AppState>;
-      onAppStateUpdated: (callback: (appState: AppState) => void) => () => void;
-      addToRecent: (file: RecentFile) => Promise<void>;
-      getRecentFiles: () => Promise<RecentFile[]>;
-      removeFromRecent: (path: string) => Promise<void>;
-      clearRecent: () => Promise<void>;
-      saveEditorBuffer: (buffer: EditorBuffer) => Promise<void>;
-      loadEditorBuffer: () => Promise<EditorBuffer | null>;
-      clearEditorBuffer: () => Promise<void>;
-      clearAll: () => Promise<void>;
-      addRecentProject: (project: RecentProject) => Promise<void>;
-      getRecentProjects: () => Promise<RecentProject[]>;
-      removeRecentProject: (projectId: string) => Promise<void>;
-      setItem: (key: string, value: string) => Promise<void>;
-      getItem: (key: string) => Promise<string | null>;
-      removeItem: (key: string) => Promise<void>;
-      getKeysByPrefix: (prefix: string) => Promise<string[]>;
-    };
+  private getElectronAPI(): NonNullable<ElectronStorageAPI> {
+    return requireElectronStorageAPI();
   }
 
   async saveSession(session: StorageSession): Promise<void> {

@@ -46,6 +46,7 @@ interface Spies {
   prevTab: ReturnType<typeof vi.fn<() => void>>;
   newTab: ReturnType<typeof vi.fn<() => void>>;
   switchToIndex: ReturnType<typeof vi.fn<(index: number) => void>>;
+  openSearchFromShortcut: ReturnType<typeof vi.fn<() => void>>;
 }
 
 function makeSpies(): Spies {
@@ -55,6 +56,7 @@ function makeSpies(): Spies {
     prevTab: vi.fn<() => void>(),
     newTab: vi.fn<() => void>(),
     switchToIndex: vi.fn<(index: number) => void>(),
+    openSearchFromShortcut: vi.fn<() => void>(),
   };
 }
 
@@ -81,6 +83,7 @@ function HookHost({ spies, isElectron }: { spies: Spies; isElectron: boolean }):
     handleToggleTcy: () => {},
     setShowSettingsModal: () => {},
     setSearchOpenTrigger: () => {},
+    openSearchFromShortcut: spies.openSearchFromShortcut,
     incrementEditorKey: spies.incrementEditorKey,
     nextTab: spies.nextTab,
     prevTab: spies.prevTab,
@@ -151,6 +154,15 @@ function dispatchCtrl(key: string, extra: Partial<KeyboardEventInit> = {}): void
 }
 
 describe("useKeyboardShortcuts — tab navigation must not remount the editor (#1878)", () => {
+  it("opens search through the selection-aware callback for CmdOrCtrl+F (#2218)", () => {
+    const spies = makeSpies();
+    mount(spies);
+
+    dispatchCmdOrCtrl("f");
+
+    expect(spies.openSearchFromShortcut).toHaveBeenCalledTimes(1);
+  });
+
   it("⌘1 switches to index 0 without bumping the editor key", () => {
     const spies = makeSpies();
     mount(spies);

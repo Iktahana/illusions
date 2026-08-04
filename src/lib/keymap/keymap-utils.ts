@@ -1,6 +1,20 @@
 import type { KeyBinding } from "./keymap-types";
 import { isMacOS, isElectronRenderer } from "@/lib/utils/runtime-env";
 
+const PUNCTUATION_BY_CODE: Record<string, string> = {
+  Backquote: "`",
+  Minus: "-",
+  Equal: "=",
+  BracketLeft: "[",
+  BracketRight: "]",
+  Backslash: "\\",
+  Semicolon: ";",
+  Quote: "'",
+  Comma: ",",
+  Period: ".",
+  Slash: "/",
+};
+
 /**
  * Returns the platform-specific display string for a key binding.
  * e.g. { modifiers: ["CmdOrCtrl", "Shift"], key: "s" } -> "Cmd+Shift+S" (macOS) / "Ctrl+Shift+S" (Win/Linux)
@@ -87,11 +101,25 @@ export function matchesEvent(binding: KeyBinding | null, event: KeyboardEvent): 
   if (!binding.modifiers.includes("Shift") && event.shiftKey) return false;
   if (!binding.modifiers.includes("Alt") && event.altKey) return false;
 
-  // Normalize the event key for comparison
-  const eventKey = event.key.toLowerCase();
+  // On macOS, Option changes KeyboardEvent.key to the generated character
+  // (for example, ⌥V reports `√`). Match letter/digit bindings by physical
+  // key so Option shortcuts remain usable while the editor suppresses the
+  // generated text input.
+  const eventKey = keyForBinding(event);
   const bindingKey = binding.key.toLowerCase();
 
   return eventKey === bindingKey;
+}
+
+function keyForBinding(event: KeyboardEvent): string {
+  if (isMacOS() && event.altKey) {
+    const codeMatch = /^(?:Key([A-Z])|Digit([0-9]))$/.exec(event.code);
+    const physicalKey = codeMatch?.[1] ?? codeMatch?.[2];
+    if (physicalKey) return physicalKey.toLowerCase();
+
+    if (PUNCTUATION_BY_CODE[event.code]) return PUNCTUATION_BY_CODE[event.code];
+  }
+  return event.key.toLowerCase();
 }
 
 /**

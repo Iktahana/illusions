@@ -5,6 +5,13 @@
  * which is why they use localStorage instead of the async StorageService.
  */
 
+import {
+  isPdfPreviewMaxPagesPreference,
+  type PdfPreviewMaxPagesPreference,
+} from "@/lib/export/pdf-preview-limits";
+
+export type { PdfPreviewMaxPagesPreference } from "@/lib/export/pdf-preview-limits";
+
 const PREFIX = "illusions:" as const;
 
 const KEYS = {
@@ -16,6 +23,7 @@ const KEYS = {
   sidebarBottomOrder: `${PREFIX}sidebar-bottom-order`,
   searchHistory: `${PREFIX}search-history`,
   genjiAnalysisExpanded: `${PREFIX}genji-analysis-expanded`,
+  pdfPreviewMaxPages: `${PREFIX}pdf-preview-max-pages`,
 } as const;
 
 // One-time migration from old keys to new keys
@@ -68,7 +76,6 @@ function set(key: string, value: string): void {
 
 export type ThemeMode = "light" | "dark" | "auto";
 export type WritingMode = "vertical" | "horizontal";
-
 export const localPreferences = {
   // --- Theme ---
   getThemeMode(): ThemeMode | null {
@@ -153,5 +160,16 @@ export const localPreferences = {
   },
   setGenjiAnalysisExpanded(expanded: boolean): void {
     set(KEYS.genjiAnalysisExpanded, expanded ? "1" : "0");
+  },
+
+  // --- PDF preview ---
+  getPdfPreviewMaxPages(): PdfPreviewMaxPagesPreference {
+    const value = get(KEYS.pdfPreviewMaxPages);
+    return isPdfPreviewMaxPagesPreference(value) ? value : "auto";
+  },
+  setPdfPreviewMaxPages(value: PdfPreviewMaxPagesPreference): void {
+    if (isPdfPreviewMaxPagesPreference(value)) {
+      set(KEYS.pdfPreviewMaxPages, value);
+    }
   },
 } as const;

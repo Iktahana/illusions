@@ -1,8 +1,9 @@
 // File-related IPC handlers: open, save, export, and file security utilities
 
-const { ipcMain, dialog, app } = require("electron");
+const { ipcMain, dialog, app, clipboard, BrowserWindow } = require("electron");
 const path = require("path");
 const fs = require("fs/promises");
+const os = require("os");
 const log = require("electron-log");
 const { createApprovedPathRegistry } = require("../lib/approved-paths");
 const { normalizeSeparators } = require("../lib/path-utils");
@@ -10,6 +11,110 @@ const { isSensitiveSystemPath, MAX_CONTENT_BYTES } = require("../lib/path-policy
 const { FILE_CHANNELS, EXPORT_CHANNELS } = require("../lib/ipc-channels");
 const { readFileStrictUtf8 } = require("../lib/text-decode");
 const { addStandalonePath, hasStandalonePath } = require("../lib/standalone-files");
+
+const TEXT_EXPORT_FORMATS = new Set(["txt", "txt-ruby", "narou", "kakuyomu", "aozora", "note"]);
+
+/**
+ * Keep native save panels attached to the IPC sender so they stay above and
+ * modal to the editor window. Fall back to an app-modal panel in headless
+ * tests or if the sender window disappeared between the click and the dialog.
+ * @param {Electron.IpcMainInvokeEvent} event
+ * @param {Electron.SaveDialogOptions} options
+ */
+function showSaveDialogForEvent(event, options) {
+  const parent = BrowserWindow?.fromWebContents?.(event.sender);
+  return parent && !parent.isDestroyed()
+    ? dialog.showSaveDialog(parent, options)
+    : dialog.showSaveDialog(options);
+}
+
+/** @param {Electron.IpcMainInvokeEvent} event @param {Electron.OpenDialogOptions} options */
+function showOpenDialogForEvent(event, options) {
+  const parent = BrowserWindow?.fromWebContents?.(event.sender);
+  return parent && !parent.isDestroyed()
+    ? dialog.showOpenDialog(parent, options)
+    : dialog.showOpenDialog(options);
+}
+
+/**
+ * Validate the Rust HTML renderer boundary and reject unsupported option keys.
+ * @param {unknown} content
+ * @param {unknown} options
+ * @returns {{ success: false, error: string, code?: string } | null}
+ */
+function validateHtmlRenderRequest(content, options) {
+  if (typeof content !== "string") {
+    return { success: false, error: "Invalid HTML render request" };
+  }
+  if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+    return {
+      success: false,
+      error: "コンテンツが大きすぎて処理できません（50 MB）",
+      code: "CONTENT_TOO_LARGE",
+    };
+  }
+  if (
+    options != null &&
+    (typeof options !== "object" ||
+      Array.isArray(options) ||
+      Object.keys(options).some((key) => key !== "bodyOnly" && key !== "writingMode") ||
+      ("bodyOnly" in options &&
+        options.bodyOnly !== undefined &&
+        typeof options.bodyOnly !== "boolean") ||
+      ("writingMode" in options &&
+        options.writingMode !== undefined &&
+        options.writingMode !== "horizontal" &&
+        options.writingMode !== "vertical"))
+  ) {
+    return { success: false, error: "Invalid HTML render options" };
+  }
+  return null;
+}
+
+/** @param {unknown} options */
+function normalizeHtmlRenderOptions(options) {
+  if (!options || typeof options !== "object") return {};
+  const normalized = {};
+  if (options.bodyOnly === true) normalized.bodyOnly = true;
+  if (options.writingMode === "horizontal" || options.writingMode === "vertical") {
+    normalized.writingMode = options.writingMode;
+  }
+  return normalized;
+}
+
+/**
+ * Validate text conversion requests before loading the Rust-backed MDI renderer.
+ * Both file export and clipboard copy use the same ceiling and format allowlist.
+ * @param {unknown} content
+ * @param {unknown} format
+ * @returns {{ success: false, error: string, code?: string } | null}
+ */
+function validateTextExportRequest(content, format) {
+  if (typeof content !== "string" || !TEXT_EXPORT_FORMATS.has(format)) {
+    return { success: false, error: "Invalid text export request" };
+  }
+  if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+    return {
+      success: false,
+      error: "コンテンツが大きすぎて処理できません（50 MB）",
+      code: "CONTENT_TOO_LARGE",
+    };
+  }
+  return null;
+}
+
+/**
+ * Convert editor source through @illusions-lab/mdi's Rust-backed renderer.
+ * @param {string} content
+ * @param {string} format
+ * @param {string | undefined} fileType
+ * @param {{ fullwidthSpaceIndent?: boolean, indentCount?: number } | undefined} indent
+ * @returns {Promise<string>}
+ */
+async function renderMdiText(content, format, fileType, indent) {
+  const { exportMdiText } = require("../../src/lib/export/txt-exporter");
+  return exportMdiText(content, format, fileType, indent);
+}
 
 /**
  * Absolute path to the persisted standalone-opened-paths allowlist (#1965).
@@ -60,6 +165,15 @@ async function writeBufferDurably(target, buffer) {
 // Intentional difference vs vfs-ipc.js: this registry is module-level so save-file
 // approvals persist for the whole app lifetime (until the window is destroyed).
 const dialogApprovedPaths = createApprovedPathRegistry();
+const activePdfPreviews = new Map();
+
+function cancelPdfPreview(webContentsId) {
+  const active = activePdfPreviews.get(webContentsId);
+  if (!active) return false;
+  active.controller.abort();
+  activePdfPreviews.delete(webContentsId);
+  return true;
+}
 
 /**
  * Add a path to the dialog-approved set for a specific window, with LRU eviction.
@@ -259,7 +373,7 @@ function setPendingFilePath(p) {
 
 function registerFileHandlers() {
   ipcMain.handle(FILE_CHANNELS.invoke.openFile, async (event) => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
+    const { canceled, filePaths } = await showOpenDialogForEvent(event, {
       properties: ["openFile"],
       filters: [
         { name: "illusions MDI Document", extensions: ["mdi"] },
@@ -367,7 +481,7 @@ function registerFileHandlers() {
           { name: "すべてのファイル", extensions: ["*"] },
         ];
       }
-      const result = await dialog.showSaveDialog({
+      const result = await showSaveDialogForEvent(event, {
         filters,
         defaultPath,
       });
@@ -449,21 +563,163 @@ function registerFileHandlers() {
 
   // --- Export handlers ---
 
-  ipcMain.handle(EXPORT_CHANNELS.invoke.generatePdfPreview, async (_event, content, options) => {
-    if (typeof content !== "string") {
-      return { success: false, error: "Invalid content" };
-    }
-    try {
-      const { generatePdf } = require("../../src/lib/export/pdf-exporter");
-      const pdfBuffer = await generatePdf(content, options || {});
-      return { success: true, data: pdfBuffer.toString("base64") };
-    } catch (error) {
-      log.error("PDF preview generation failed:", error);
-      return { success: false, error: error.message || "PDF preview generation failed" };
-    }
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.generateHtmlPreview,
+    async (_event, content, fileType, options) => {
+      const invalid = validateHtmlRenderRequest(content, options);
+      if (invalid) return invalid;
+
+      try {
+        const { generateHtml } = require("../../src/lib/export/html-exporter");
+        const html = await generateHtml(content, fileType, normalizeHtmlRenderOptions(options));
+        return { success: true, html };
+      } catch (error) {
+        log.error("HTML preview generation failed:", error);
+        return { success: false, error: error?.message || "HTML preview generation failed" };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.exportHtml,
+    async (event, content, fileType, title, options) => {
+      const invalid = validateHtmlRenderRequest(content, options);
+      if (invalid) return invalid;
+
+      try {
+        const { safeExportBaseName } = require("../../src/lib/export/safe-export-filename");
+        const { filePath } = await showSaveDialogForEvent(event, {
+          title: "HTMLとしてエクスポート",
+          defaultPath: `${safeExportBaseName(title)}.html`,
+          filters: [{ name: "HTMLファイル", extensions: ["html", "htm"] }],
+        });
+        if (!filePath) return null;
+
+        const { generateHtml } = require("../../src/lib/export/html-exporter");
+        const html = await generateHtml(content, fileType, normalizeHtmlRenderOptions(options));
+        await writeBufferDurably(filePath, Buffer.from(html, "utf-8"));
+        log.info(`Exported HTML: ${filePath}`);
+        return filePath;
+      } catch (error) {
+        log.error("HTML export failed:", error);
+        return { success: false, error: error?.message || "HTML export failed" };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.exportMdiText,
+    async (event, content, format, fileType, indent, title) => {
+      const invalid = validateTextExportRequest(content, format);
+      if (invalid) return invalid;
+
+      try {
+        const { txtExportSuggestedName } = require("../../src/lib/export/txt-export-filename");
+        const { filePath } = await showSaveDialogForEvent(event, {
+          title: "テキストとしてエクスポート",
+          defaultPath: txtExportSuggestedName(title, format),
+          filters: [{ name: "テキストファイル", extensions: ["txt"] }],
+        });
+        if (!filePath) return null;
+
+        const converted = await renderMdiText(content, format, fileType, indent);
+        await writeBufferDurably(filePath, Buffer.from(converted, "utf-8"));
+        log.info(`Exported text: ${filePath}`);
+        return filePath;
+      } catch (error) {
+        log.error("Text export failed:", error);
+        return { success: false, error: error?.message || "Text export failed" };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.copyMdiText,
+    async (_event, content, format, fileType, indent) => {
+      const invalid = validateTextExportRequest(content, format);
+      if (invalid) return invalid;
+
+      try {
+        const converted = await renderMdiText(content, format, fileType, indent);
+        clipboard.writeText(converted);
+        return { success: true };
+      } catch (error) {
+        log.error("Text clipboard copy failed:", error);
+        return { success: false, error: error?.message || "Text clipboard copy failed" };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    EXPORT_CHANNELS.invoke.generatePdfPreview,
+    async (event, content, options, requestedMaxPages) => {
+      const webContentsId = event.sender.id;
+      cancelPdfPreview(webContentsId);
+
+      if (typeof content !== "string") {
+        return { success: false, error: "Invalid content" };
+      }
+      if (Buffer.byteLength(content, "utf-8") > MAX_CONTENT_BYTES) {
+        return {
+          success: false,
+          error: "コンテンツが大きすぎてプレビューできません（50 MB）",
+          code: "CONTENT_TOO_LARGE",
+        };
+      }
+
+      const controller = new AbortController();
+      const job = { controller };
+      activePdfPreviews.set(webContentsId, job);
+      const abortOnDestroyed = () => controller.abort();
+      event.sender.once("destroyed", abortOnDestroyed);
+
+      try {
+        const {
+          generatePdfPreview,
+          resolvePdfPreviewPagePolicy,
+        } = require("../../src/lib/export/pdf-exporter");
+        const totalMemoryBytes = os.totalmem();
+        const { automaticMaxPages, maxPages } = resolvePdfPreviewPagePolicy(
+          totalMemoryBytes,
+          requestedMaxPages,
+        );
+        const result = await generatePdfPreview(content, options || {}, {
+          signal: controller.signal,
+          maxPages,
+        });
+        return {
+          success: true,
+          data: result.pdf,
+          maxPages: result.maxPages,
+          automaticMaxPages,
+          systemMemoryGiB: Math.round((totalMemoryBytes / 1024 ** 3) * 10) / 10,
+          sourceCharacterLimit: result.sourceCharacterLimit,
+          sourceTruncated: result.sourceTruncated,
+        };
+      } catch (error) {
+        if (controller.signal.aborted || error?.name === "AbortError") {
+          return { success: false, cancelled: true, error: "プレビューをキャンセルしました" };
+        }
+        log.error("PDF preview generation failed:", error);
+        return { success: false, error: error.message || "PDF preview generation failed" };
+      } finally {
+        event.sender.removeListener("destroyed", abortOnDestroyed);
+        if (activePdfPreviews.get(webContentsId) === job) {
+          activePdfPreviews.delete(webContentsId);
+        }
+      }
+    },
+  );
+
+  ipcMain.handle(EXPORT_CHANNELS.invoke.cancelPdfPreview, async (event) => {
+    return cancelPdfPreview(event.sender.id);
   });
 
-  ipcMain.handle(EXPORT_CHANNELS.invoke.exportPdf, async (_event, content, options) => {
+  /*
+   * Formal PDF export never crosses IPC. Preview stays a bounded in-memory
+   * payload because Chromium's embedded PDF viewer needs the complete Blob.
+   */
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportPdf, async (event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -475,17 +731,15 @@ function registerFileHandlers() {
       };
     }
     try {
-      const { generatePdf } = require("../../src/lib/export/pdf-exporter");
-      const pdfBuffer = await generatePdf(content, options || {});
-
-      const { filePath } = await dialog.showSaveDialog({
+      const { filePath } = await showSaveDialogForEvent(event, {
         title: "PDFとしてエクスポート",
         defaultPath: `${options?.metadata?.title || "untitled"}.pdf`,
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       });
 
       if (!filePath) return null;
-      await writeBufferDurably(filePath, pdfBuffer);
+      const { writePdfToFile } = require("../../src/lib/export/pdf-exporter");
+      await writePdfToFile(content, options || {}, filePath);
       log.info(`Exported PDF: ${filePath}`);
       return filePath;
     } catch (error) {
@@ -501,68 +755,21 @@ function registerFileHandlers() {
     // Declared outside try so the finally block can always destroy it,
     // preventing hidden BrowserWindow accumulation on print failures (#1919).
     let printWin = null;
+    let disposePrintDocument = null;
     try {
       const { BrowserWindow } = require("electron");
-      const { mdiToHtml } = require("../../src/lib/export/mdi-to-html");
-      const { calculateTypesetting } = require("../../src/lib/export/pdf-export-settings");
-      const { fullwidthIndentCount } = require("../../src/lib/export/fullwidth-indent");
+      const {
+        electronSystemPrintHtml,
+        electronSystemPrintOptions,
+        isPrintCancellationReason,
+        loadPrintDocumentHtml,
+        preparePdfPrintDocument,
+        waitForPrintFonts,
+      } = require("../../src/lib/export/pdf-exporter");
 
       const opts = options || {};
-      const pageSize = opts.pageSize ?? "A5";
-      const margins = opts.margins ?? { top: 20, bottom: 20, left: 15, right: 15 };
-      const verticalWriting = opts.verticalWriting ?? false;
-      const landscape = opts.landscape ?? false;
-
-      // Full-width-space 字下げ: literal U+3000 characters replace CSS text-indent.
-      // When the toggle is on, suppress textIndentEm to avoid double indentation
-      // (same logic as pdf-exporter.ts).
-      const fullwidthSpaceCount = opts.fullwidthSpaceIndent
-        ? fullwidthIndentCount(opts.textIndent ?? 0)
-        : 0;
-      const effectiveTextIndentEm = opts.fullwidthSpaceIndent ? 0 : opts.textIndent;
-
-      // Build typesetting when chars/lines specified
-      let typesetting;
-      if (opts.charsPerLine != null && opts.linesPerPage != null) {
-        const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
-          pageSize,
-          margins,
-          opts.charsPerLine,
-          opts.linesPerPage,
-          verticalWriting,
-          landscape,
-        );
-        typesetting = {
-          fontFamily: opts.fontFamily,
-          fontSizeMm,
-          lineHeightRatio,
-          textIndentEm: effectiveTextIndentEm,
-          margins,
-          pageSize,
-          landscape,
-        };
-      } else {
-        typesetting = { pageSize, landscape, margins };
-      }
-
-      const html = mdiToHtml(content, {
-        metadata: opts.metadata,
-        verticalWriting,
-        typesetting,
-        googleFontFamily: opts.googleFontFamily,
-        fileType: opts.fileType,
-        fullwidthSpaceIndentCount: fullwidthSpaceCount,
-        // Embed page numbers via CSS @page margin boxes so they appear in the
-        // actual print output (webContents.print does not support
-        // headerTemplate/footerTemplate unlike printToPDF).
-        pageNumbers: opts.showPageNumbers
-          ? {
-              show: true,
-              format: opts.pageNumberFormat,
-              position: opts.pageNumberPosition,
-            }
-          : undefined,
-      });
+      const prepared = preparePdfPrintDocument(content, opts);
+      const printHtml = electronSystemPrintHtml(prepared);
 
       const partition = `print-${Date.now()}`;
       printWin = new BrowserWindow({
@@ -599,27 +806,27 @@ function registerFileHandlers() {
         printWin.webContents.once("did-finish-load", () => resolve());
       });
 
-      await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      disposePrintDocument = await loadPrintDocumentHtml(printWin, printHtml);
       await loadPromise;
-
-      // Wait for fonts to load
-      const delay = hasGoogleFont ? 2000 : 100;
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await waitForPrintFonts(printWin.webContents);
 
       // Open system print dialog
       await new Promise((resolve, reject) => {
-        printWin.webContents.print({ silent: false }, (success, failureReason) => {
-          if (success) {
-            resolve();
-          } else {
-            // User cancelled is not an error
-            if (failureReason === "cancelled") {
+        printWin.webContents.print(
+          electronSystemPrintOptions(prepared),
+          (success, failureReason) => {
+            if (success) {
               resolve();
             } else {
-              reject(new Error(failureReason || "Print failed"));
+              // User cancelled is not an error
+              if (isPrintCancellationReason(failureReason)) {
+                resolve();
+              } else {
+                reject(new Error(failureReason || "Print failed"));
+              }
             }
-          }
-        });
+          },
+        );
       });
 
       return { success: true };
@@ -632,10 +839,13 @@ function registerFileHandlers() {
       if (printWin && !printWin.isDestroyed()) {
         printWin.destroy();
       }
+      if (typeof disposePrintDocument === "function") {
+        disposePrintDocument();
+      }
     }
   });
 
-  ipcMain.handle(EXPORT_CHANNELS.invoke.exportEpub, async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportEpub, async (event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -675,7 +885,7 @@ function registerFileHandlers() {
       const rawTitle = epubOptions?.metadata?.title || "untitled";
       const safeTitle = rawTitle.replace(/[<>:"/\\|?*]/g, "_");
 
-      const { filePath } = await dialog.showSaveDialog({
+      const { filePath } = await showSaveDialogForEvent(event, {
         title: "EPUBとしてエクスポート",
         defaultPath: `${safeTitle}.epub`,
         filters: [{ name: "EPUB", extensions: ["epub"] }],
@@ -691,7 +901,7 @@ function registerFileHandlers() {
     }
   });
 
-  ipcMain.handle(EXPORT_CHANNELS.invoke.exportDocx, async (_event, content, options) => {
+  ipcMain.handle(EXPORT_CHANNELS.invoke.exportDocx, async (event, content, options) => {
     if (typeof content !== "string") {
       return { success: false, error: "Invalid content" };
     }
@@ -706,7 +916,7 @@ function registerFileHandlers() {
       const { generateDocx } = require("../../src/lib/export/docx-exporter");
       const docxBuffer = await generateDocx(content, options || {});
 
-      const { filePath } = await dialog.showSaveDialog({
+      const { filePath } = await showSaveDialogForEvent(event, {
         title: "DOCXとしてエクスポート",
         defaultPath: `${options?.metadata?.title || "untitled"}.docx`,
         filters: [{ name: "Word Document", extensions: ["docx"] }],

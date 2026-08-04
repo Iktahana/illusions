@@ -5,10 +5,29 @@ import { getStorageService } from "@/lib/storage/storage-service";
 
 import type { RecentProjectEntry } from "./types";
 
+export const RECENT_PROJECTS_LOAD_TIMEOUT_MS = 10_000;
+
 export interface UseRecentProjectsResult {
   recentProjects: RecentProjectEntry[];
   autoRestoreProjectId: string | null;
   handleDeleteRecentProject: (projectId: string) => Promise<void>;
+}
+
+async function loadWithStartupTimeout<T>(operation: Promise<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("Recent projects startup load timed out")),
+          RECENT_PROJECTS_LOAD_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
 }
 
 /**
@@ -31,7 +50,7 @@ export function useRecentProjects(
       try {
         if (isElectron) {
           const storage = getStorageService();
-          const projects = await storage.getRecentProjects();
+          const projects = await loadWithStartupTimeout(storage.getRecentProjects());
           if (!mounted) return;
 
           const entries: RecentProjectEntry[] = projects.map((p) => ({
@@ -50,7 +69,7 @@ export function useRecentProjects(
           }
         } else {
           const projectManager = getProjectManager();
-          const handles = await projectManager.listProjectHandles();
+          const handles = await loadWithStartupTimeout(projectManager.listProjectHandles());
           if (!mounted) return;
 
           const entries: RecentProjectEntry[] = handles.map((h) => ({
@@ -68,6 +87,7 @@ export function useRecentProjects(
           }
         }
       } catch (error) {
+        if (!mounted) return;
         console.error("Failed to load recent projects:", error);
         onNoRestore();
       }

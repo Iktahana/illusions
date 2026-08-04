@@ -16,6 +16,7 @@ vi.mock("../AboutSection", () => ({ default: MockSettingsTab }));
 vi.mock("../AccountSettingsTab", () => ({ default: MockSettingsTab }));
 vi.mock("../AiApiSettingsTab", () => ({ default: MockSettingsTab }));
 vi.mock("../DictSettingsTab", () => ({ default: MockSettingsTab }));
+vi.mock("../ExportSettingsTab", () => ({ default: MockSettingsTab }));
 vi.mock("../KeymapSettingsTab", () => ({ default: MockSettingsTab }));
 vi.mock("../LintingSettingsTab", () => ({ default: MockSettingsTab }));
 vi.mock("../PosHighlightSettingsTab", () => ({ default: MockSettingsTab }));
@@ -34,6 +35,7 @@ describe("buildSettingsTabRegistry — platform gating", () => {
     expect(registry.terminal).toBeDefined();
     expect(registry.power).toBeDefined();
     expect(registry.privacy).toBeDefined();
+    expect(registry.export).toBeDefined();
   });
 
   it("omits Electron-only tabs on Web", () => {
@@ -41,6 +43,7 @@ describe("buildSettingsTabRegistry — platform gating", () => {
     expect(registry.terminal).toBeUndefined();
     expect(registry.power).toBeUndefined();
     expect(registry.privacy).toBeUndefined();
+    expect(registry.export).toBeUndefined();
   });
 });
 
@@ -56,6 +59,7 @@ describe("buildSettingsTabRegistry — entry contract", () => {
         "dictionary",
         "keymap",
         "speech",
+        "export",
         "terminal",
         "power",
         "privacy",

@@ -32,6 +32,11 @@ export function isElectronRenderer(): boolean {
   );
 }
 
+/** Whether this renderer is hosted by the local Electron development process. */
+export function isElectronDevelopment(): boolean {
+  return isElectronRenderer() && window.electronAPI?.appRuntime?.isDevelopment === true;
+}
+
 /**
  * 現在の実行環境を判別可能な union として返す
  */

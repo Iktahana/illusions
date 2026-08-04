@@ -71,6 +71,7 @@ describe("submitBugReport", () => {
     expect(body.user).toEqual({ email: "user@example.com" });
     expect(body.tags.source).toBe("bug-report-form");
     expect(body.release).toBe("1.4.2");
+    expect(body.environment).toBe("production");
     expect(body.tags.os).toBe("mac");
   });
 

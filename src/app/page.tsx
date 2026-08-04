@@ -7,7 +7,10 @@ import { useTheme } from "@/contexts/ThemeContext";
 import EditorLayout from "@/components/EditorLayout";
 import SettingsModal from "@/components/SettingsModal";
 import SettingsWindow from "@/components/SettingsWindow";
+import ExportDialogWindow from "@/components/ExportDialogWindow";
+import CreateProjectWindow from "@/components/CreateProjectWindow";
 import WelcomeScreen from "@/components/WelcomeScreen";
+import StartupRestoreScreen from "@/components/StartupRestoreScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
 import CreateProjectWizard from "@/components/CreateProjectWizard";
 import PermissionPrompt from "@/components/PermissionPrompt";
@@ -26,15 +29,16 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
-import { openWebPrintPreview } from "@/lib/export/web-print-preview";
+import { trackDocumentOutputResult } from "@/lib/analytics/document-output-events";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
-import type { TxtIndentOptions } from "@/lib/export/txt-exporter";
+import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-export-types";
 import type { ExportMetadata } from "@/lib/export/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
-import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
+import { toPdfGenerationOptions, type UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
+import type { HtmlExportOptions } from "@/lib/export/html-shared";
 import { notificationManager } from "@/lib/services/notification-manager";
 import { renameProjectFile, type RenameOutcome } from "@/lib/tab-manager/rename-file";
 import { useWebMenuHandlers } from "@/lib/menu/use-web-menu-handlers";
@@ -47,6 +51,7 @@ import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { IgnoredCorrectionsProvider } from "@/contexts/IgnoredCorrectionsContext";
 import { getAvailableFeatures } from "@/lib/utils/feature-detection";
 import { isProjectMode } from "@/lib/project/project-types";
+import { getProjectService } from "@/lib/project/project-service";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
 import { computeHistoryRestoreTabUpdate } from "@/lib/tab-manager/history-restore";
 import { useTextStatistics } from "@/lib/editor-page/use-text-statistics";
@@ -67,6 +72,7 @@ import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
 import { findSearchMatches, type SearchRange } from "@/lib/editor-page/find-search-matches";
 import { useSearchHighlight, isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
+import { takeEditorSelectionForSearch } from "@/lib/editor-page/search-selection";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
@@ -557,6 +563,14 @@ function EditorPageContent() {
     setEditorViewInstanceRaw(view);
   }, []);
 
+  // Snapshot selection before SearchDialog moves focus to its input, then keep
+  // a collapsed editor caret while the dialog owns DOM focus.
+  const handleOpenSearchFromShortcut = useCallback(() => {
+    const selectedText = takeEditorSelectionForSearch(editorViewRef.current);
+    if (selectedText !== undefined) setSearchTerm(selectedText);
+    setSearchOpenTrigger((prev) => prev + 1);
+  }, [setSearchTerm]);
+
   // --- 検索ハイライトの単一ソース ---
   // いずれかの検索 UI が表示中か。両方非表示ならハイライトを消す（要求2）。
   const isSearchVisible = isSearchDialogOpen || topView === "search";
@@ -801,9 +815,9 @@ function EditorPageContent() {
     return (tab && isEditorTab(tab) ? tab.fileType : undefined) ?? ".mdi";
   }, [tabs, activeTabId]);
 
-  // Export dialog state (PDF / DOCX share a single state slot)
+  // Shared export dialog state for HTML / PDF / DOCX / EPUB.
   interface ExportDialogState {
-    format: "pdf" | "docx" | "epub";
+    format: "html" | "pdf" | "docx" | "epub";
     content: string;
     metadata: ExportMetadata;
     /** Snapshot of the active tab's file type at the moment the dialog opened. */
@@ -823,22 +837,76 @@ function EditorPageContent() {
   }
   const [printDialogState, setPrintDialogState] = useState<PrintDialogState | null>(null);
 
-  const handlePrintDialogRequest = useCallback((content: string, metadata: ExportMetadata) => {
-    setPrintDialogState({ content, metadata, fileType: activeFileTypeRef.current });
-  }, []);
+  const executeSystemPrint = useCallback(
+    async (state: PrintDialogState, settings: PdfExportSettings): Promise<boolean> => {
+      if (!window.electronAPI?.printDocument) {
+        notificationManager.error("印刷機能を利用できません。アプリを再起動してください");
+        return false;
+      }
+      try {
+        const result = await window.electronAPI.printDocument(
+          state.content,
+          toPdfGenerationOptions(settings, state.metadata, state.fileType),
+        );
+        if (result && !result.success) {
+          notificationManager.error(`印刷に失敗しました: ${result.error}`);
+          return false;
+        }
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`印刷に失敗しました: ${message}`);
+        return false;
+      }
+    },
+    [],
+  );
 
-  // TXT export 字下げ dialog. The export hook awaits the user's choice via a
-  // promise resolved when the dialog is confirmed (options) or cancelled (null).
-  const [txtDialogFormat, setTxtDialogFormat] = useState<"txt" | "txt-ruby" | null>(null);
+  const handlePrintDialogRequest = useCallback(
+    (content: string, metadata: ExportMetadata) => {
+      const state: PrintDialogState = {
+        content,
+        metadata,
+        fileType: activeFileTypeRef.current,
+      };
+      if (window.electronAPI?.openExportDialog) {
+        void window.electronAPI
+          .openExportDialog({ kind: "print", ...state })
+          .then((result) => {
+            const options = result?.options as PdfExportSettings | undefined;
+            if (options) void executeSystemPrint(state, options);
+          })
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : "不明なエラー";
+            notificationManager.error(`印刷設定を開けませんでした: ${message}`);
+          });
+        return;
+      }
+      setPrintDialogState(state);
+    },
+    [executeSystemPrint],
+  );
+
+  // TXT export/copy 字下げ dialog. The export hook awaits the user's choice via
+  // a promise resolved when the dialog is confirmed (options) or cancelled (null).
+  const [txtDialogFormat, setTxtDialogFormat] = useState<TxtExportFormat | null>(null);
+  const [txtDialogOperation, setTxtDialogOperation] = useState<"export" | "copy">("export");
   const txtOptionsResolverRef = useRef<((options: TxtIndentOptions | null) => void) | null>(null);
 
   const handleRequestTxtExportOptions = useCallback(
-    (format: "txt" | "txt-ruby"): Promise<TxtIndentOptions | null> =>
+    (format: TxtExportFormat, operation: "export" | "copy"): Promise<TxtIndentOptions | null> =>
       new Promise<TxtIndentOptions | null>((resolve) => {
+        if (window.electronAPI?.openExportDialog) {
+          void window.electronAPI
+            .openExportDialog({ kind: "txt", format, operation })
+            .then((result) => resolve((result?.options as TxtIndentOptions | undefined) ?? null));
+          return;
+        }
         // If a previous request is still pending (e.g. the dialog was re-opened
         // before being answered), cancel it so its awaiting export does not hang.
         txtOptionsResolverRef.current?.(null);
         txtOptionsResolverRef.current = resolve;
+        setTxtDialogOperation(operation);
         setTxtDialogFormat(format);
       }),
     [],
@@ -852,7 +920,7 @@ function EditorPageContent() {
   }, []);
 
   const handleExportDialogRequest = useCallback(
-    (format: "pdf" | "docx" | "epub", content: string, metadata: ExportMetadata) => {
+    (format: "html" | "pdf" | "docx" | "epub", content: string, metadata: ExportMetadata) => {
       const state: ExportDialogState = {
         format,
         content,
@@ -860,10 +928,78 @@ function EditorPageContent() {
         fileType: activeFileTypeRef.current,
       };
       exportDialogStateRef.current = state;
+      if (window.electronAPI?.openExportDialog) {
+        void window.electronAPI.openExportDialog({ kind: "document", ...state }).then((result) => {
+          const options = result?.options;
+          if (!options) return;
+          if (format === "html")
+            void window.electronAPI?.exportHTML?.(
+              content,
+              state.fileType,
+              metadata.title,
+              options as HtmlExportOptions,
+            );
+          if (format === "pdf")
+            void window.electronAPI?.exportPDF?.(
+              content,
+              toPdfGenerationOptions(options as PdfExportSettings, metadata, state.fileType),
+            );
+          if (format === "docx")
+            void window.electronAPI?.exportDOCX?.(content, {
+              metadata,
+              settings: options as UnifiedExportSettings,
+              fileType: state.fileType,
+            });
+          if (format === "epub")
+            void window.electronAPI?.exportEPUB?.(content, {
+              ...(options as EpubExportOptions),
+              fileType: state.fileType,
+            });
+        });
+        return;
+      }
       setExportDialogState(state);
     },
     [],
   );
+
+  const handleHtmlExportConfirm = useCallback(async (options: HtmlExportOptions) => {
+    const dialogState = exportDialogStateRef.current;
+    if (!dialogState) return;
+
+    if (window.electronAPI?.exportHTML) {
+      setExportDialogState(null);
+
+      const progressId = notificationManager.showProgress("HTMLをエクスポート中...", {
+        type: "info",
+      });
+
+      try {
+        const result = await window.electronAPI.exportHTML(
+          dialogState.content,
+          dialogState.fileType,
+          dialogState.metadata.title,
+          options,
+        );
+
+        trackDocumentOutputResult("export", "html", result);
+        notificationManager.dismiss(progressId);
+        if (result === null || result === undefined) return;
+        if (typeof result === "object" && "success" in result && !result.success) {
+          notificationManager.error(`HTMLのエクスポートに失敗しました: ${result.error}`);
+          return;
+        }
+        notificationManager.success("HTMLをエクスポートしました");
+      } catch (error) {
+        notificationManager.dismiss(progressId);
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`HTMLのエクスポートに失敗しました: ${message}`);
+      }
+      return;
+    }
+
+    notificationManager.error("HTMLエクスポート機能を利用できません。アプリを再起動してください");
+  }, []);
 
   const handlePdfExportConfirm = useCallback(async (settings: PdfExportSettings) => {
     const dialogState = exportDialogStateRef.current;
@@ -878,27 +1014,12 @@ function EditorPageContent() {
       });
 
       try {
-        const result = await window.electronAPI.exportPDF(dialogState.content, {
-          metadata: dialogState.metadata,
-          verticalWriting: settings.verticalWriting,
-          pageSize: settings.pageSize,
-          landscape: settings.landscape,
-          margins: settings.margins,
-          charsPerLine: settings.charsPerLine,
-          linesPerPage: settings.linesPerPage,
-          fontFamily: settings.fontFamily,
-          showPageNumbers: settings.showPageNumbers,
-          pageNumberFormat: settings.pageNumberFormat,
-          pageNumberPosition: settings.pageNumberPosition,
-          textIndent: settings.textIndent,
-          fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
-          googleFontFamily: settings.googleFontFamily,
-          // Thread the active tab's snapshotted file type so the HTML pipeline
-          // un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
-          // literals authored in ".md"/".txt".
-          fileType: dialogState.fileType,
-        });
+        const result = await window.electronAPI.exportPDF(
+          dialogState.content,
+          toPdfGenerationOptions(settings, dialogState.metadata, dialogState.fileType),
+        );
 
+        trackDocumentOutputResult("export", "pdf", result);
         notificationManager.dismiss(progressId);
 
         if (result === null || result === undefined) return;
@@ -919,95 +1040,18 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: browser print preview (static import — no await before window.open)
-    try {
-      const opened = await openWebPrintPreview(
-        dialogState.content,
-        dialogState.metadata,
-        settings,
-        dialogState.fileType,
-      );
-      if (!opened) {
-        notificationManager.warning(
-          "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-        );
-        return;
-      }
-      // Close dialog — print preview is open. No success toast (browser print gives no result).
-      setExportDialogState(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.error("PDFエクスポート機能を利用できません。アプリを再起動してください");
   }, []);
 
   const handlePrintConfirm = useCallback(
     async (settings: PdfExportSettings) => {
       if (!printDialogState) return;
-
-      // Electron path: use IPC
-      if (window.electronAPI?.printDocument) {
-        try {
-          const result = await window.electronAPI.printDocument(printDialogState.content, {
-            metadata: printDialogState.metadata,
-            verticalWriting: settings.verticalWriting,
-            pageSize: settings.pageSize,
-            landscape: settings.landscape,
-            margins: settings.margins,
-            charsPerLine: settings.charsPerLine,
-            linesPerPage: settings.linesPerPage,
-            fontFamily: settings.fontFamily,
-            showPageNumbers: settings.showPageNumbers,
-            pageNumberFormat: settings.pageNumberFormat,
-            pageNumberPosition: settings.pageNumberPosition,
-            textIndent: settings.textIndent,
-            fullwidthSpaceIndent: settings.fullwidthSpaceIndent,
-            googleFontFamily: settings.googleFontFamily,
-            // Pass the snapshotted file type so the HTML pipeline correctly
-            // handles .md/.txt literals vs .mdi MDI macros (#1882).
-            fileType: printDialogState.fileType,
-          });
-          if (
-            result !== null &&
-            result !== undefined &&
-            typeof result === "object" &&
-            "success" in result &&
-            !result.success
-          ) {
-            notificationManager.error(`印刷に失敗しました: ${(result as { error: string }).error}`);
-            return;
-          }
-          setPrintDialogState(null);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "不明なエラー";
-          notificationManager.error(`印刷に失敗しました: ${message}`);
-        }
-        return;
-      }
-
-      // Web path: browser print preview
-      try {
-        const opened = await openWebPrintPreview(
-          printDialogState.content,
-          printDialogState.metadata,
-          settings,
-        );
-        if (!opened) {
-          notificationManager.warning(
-            "ポップアップがブロックされました。ブラウザの設定を確認してください。",
-          );
-          return;
-        }
-        setPrintDialogState(null);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "不明なエラー";
-        notificationManager.error(`印刷に失敗しました: ${message}`);
-      }
+      if (await executeSystemPrint(printDialogState, settings)) setPrintDialogState(null);
     },
-    [printDialogState],
+    [executeSystemPrint, printDialogState],
   );
 
-  const handleDocxExportConfirm = useCallback(async (settings: DocxExportSettings) => {
+  const handleDocxExportConfirm = useCallback(async (settings: UnifiedExportSettings) => {
     const dialogState = exportDialogStateRef.current;
     if (!dialogState) return;
 
@@ -1030,6 +1074,7 @@ function EditorPageContent() {
           fileType: dialogState.fileType,
         });
 
+        trackDocumentOutputResult("export", "docx", result);
         notificationManager.dismiss(progressId);
 
         if (result === null || result === undefined) return;
@@ -1050,37 +1095,7 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: generate DOCX blob and download
-    const progressId = notificationManager.showProgress("DOCXをエクスポート中...", {
-      type: "info",
-    });
-
-    try {
-      const { generateDocxBlob } = await import("@/lib/export/docx-exporter");
-      // Use the active tab's actual file type (snapshotted when the dialog
-      // opened) so macro un-escaping only applies to ".mdi" documents. Inferring
-      // from the title is wrong — the display title is extension-stripped, which
-      // would silently drop author-written \[\[blank]] literals in ".md"/".txt".
-      const blob = await generateDocxBlob(dialogState.content, {
-        metadata: dialogState.metadata,
-        settings,
-        fileType: dialogState.fileType,
-      });
-      const baseName = (dialogState.metadata.title || "untitled").replace(/\.[^.]+$/, "");
-      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(blob, `${baseName}.docx`, false);
-
-      notificationManager.dismiss(progressId);
-
-      if (saved) {
-        setExportDialogState(null);
-        notificationManager.success("DOCXをエクスポートしました");
-      }
-    } catch (error) {
-      notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.error("DOCXエクスポート機能を利用できません。アプリを再起動してください");
   }, []);
 
   const handleEpubExportConfirm = useCallback(async (options: EpubExportOptions) => {
@@ -1104,6 +1119,7 @@ function EditorPageContent() {
         // Electron IPC serializes Uint8Array automatically
         const result = await window.electronAPI.exportEPUB(dialogState.content, epubOptions);
 
+        trackDocumentOutputResult("export", "epub", result);
         notificationManager.dismiss(progressId);
 
         if (result === null || result === undefined) return;
@@ -1124,34 +1140,10 @@ function EditorPageContent() {
       return;
     }
 
-    // Web path: generate EPUB blob and download
-    const progressId = notificationManager.showProgress("EPUBをエクスポート中...", {
-      type: "info",
-    });
-
-    try {
-      const { generateEpubBlob } = await import("@/lib/export/epub-web");
-      const blob = await generateEpubBlob(dialogState.content, epubOptions);
-      const baseName = (options.metadata.title || "untitled")
-        .replace(/[<>:"/\\|?*]/g, "_")
-        .replace(/\.[^.]+$/, "");
-      const { saveBlobFile } = await import("@/lib/export/save-blob-file");
-      const saved = await saveBlobFile(blob, `${baseName}.epub`, false);
-
-      notificationManager.dismiss(progressId);
-
-      if (saved) {
-        setExportDialogState(null);
-        notificationManager.success("EPUBをエクスポートしました");
-      }
-    } catch (error) {
-      notificationManager.dismiss(progressId);
-      const message = error instanceof Error ? error.message : "不明なエラー";
-      notificationManager.error(`EPUBのエクスポートに失敗しました: ${message}`);
-    }
+    notificationManager.error("EPUBエクスポート機能を利用できません。アプリを再起動してください");
   }, []);
 
-  const { exportAs, printDocument } = useExport({
+  const { exportAs, copyAs, printDocument } = useExport({
     getContent: getExportContent,
     getTitle: getExportTitle,
     getFileType: getExportFileType,
@@ -1191,6 +1183,7 @@ function EditorPageContent() {
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onToggleWritingMode: () => toggleWritingModeRef.current(),
     onExport: (format) => void exportAs(format),
+    onCopyExport: (format) => void copyAs(format),
     onPrint: () => printDocument(),
     editorView: editorViewInstance,
     fontScale,
@@ -1379,6 +1372,7 @@ function EditorPageContent() {
     handleToggleTcy,
     setShowSettingsModal,
     setSearchOpenTrigger,
+    openSearchFromShortcut: handleOpenSearchFromShortcut,
     incrementEditorKey,
     nextTab,
     prevTab,
@@ -1490,10 +1484,41 @@ function EditorPageContent() {
 
   // --- Routing: WelcomeScreen vs Editor ---
   if (editorMode === null) {
-    // Show blank screen while auto-restoring last project (avoid WelcomeScreen flash)
+    // Keep startup visibly responsive while auto-restoring the last project.
     if (isRestoring) {
-      return <div className="h-screen bg-background" />;
+      return <StartupRestoreScreen />;
     }
+
+    const handleWelcomeCreateProject = async (): Promise<void> => {
+      const openNativeDialog = window.electronAPI?.openCreateProjectDialog;
+      if (!openNativeDialog) {
+        handleCreateProject();
+        return;
+      }
+
+      let selection;
+      try {
+        selection = await openNativeDialog();
+      } catch (error) {
+        // During Electron development the renderer/preload can reload before
+        // the long-lived main process has registered a newly-added handler.
+        // Preserve a usable create-project flow until the next full restart.
+        console.warn("[Create project] Native dialog unavailable; using web fallback:", error);
+        handleCreateProject();
+        return;
+      }
+      if (!selection) return;
+
+      try {
+        const { name, fileExtension } = selection;
+        const project = await getProjectService().createProject(name, fileExtension);
+        await handleProjectCreated(project);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        if (message.includes("cancelled by the user")) return;
+        notificationManager.error(`プロジェクトの作成に失敗しました: ${message}`);
+      }
+    };
 
     return (
       <EditorSettingsProvider settings={settings} handlers={settingsHandlers}>
@@ -1512,7 +1537,7 @@ function EditorPageContent() {
             )}
 
             <WelcomeScreen
-              onCreateProject={handleCreateProject}
+              onCreateProject={() => void handleWelcomeCreateProject()}
               onOpenProject={() => void handleOpenProject()}
               onOpenStandaloneFile={() => void handleOpenStandaloneFile()}
               onOpenRecentProject={(id) => void handleOpenRecentProject(id)}
@@ -1708,6 +1733,7 @@ function EditorPageContent() {
           exportDialog: {
             state: exportDialogState,
             onClose: () => setExportDialogState(null),
+            onHtmlExport: handleHtmlExportConfirm,
             onPdfExport: handlePdfExportConfirm,
             onDocxExport: handleDocxExportConfirm,
             onEpubExport: handleEpubExportConfirm,
@@ -1821,6 +1847,7 @@ function EditorPageContent() {
       <TxtExportDialog
         isOpen={txtDialogFormat != null}
         format={txtDialogFormat ?? "txt"}
+        operation={txtDialogOperation}
         onConfirm={(options) => resolveTxtExportOptions(options)}
         onCancel={() => resolveTxtExportOptions(null)}
       />
@@ -1851,12 +1878,31 @@ function EditorPageContent() {
  * load the dedicated Settings window from the same Next static export.
  */
 export default function EditorPage() {
-  const [route, setRoute] = useState<"pending" | "editor" | "settings">("pending");
+  const [route, setRoute] = useState<
+    "pending" | "editor" | "settings" | "export" | "create-project"
+  >("pending");
 
   useEffect(() => {
-    setRoute(new URLSearchParams(window.location.search).has("settings") ? "settings" : "editor");
+    const query = new URLSearchParams(window.location.search);
+    setRoute(
+      query.has("settings")
+        ? "settings"
+        : query.has("export-dialog")
+          ? "export"
+          : query.has("create-project")
+            ? "create-project"
+            : "editor",
+    );
   }, []);
 
   if (route === "pending") return <div className="h-screen bg-background" />;
-  return route === "settings" ? <SettingsWindow /> : <EditorPageContent />;
+  return route === "settings" ? (
+    <SettingsWindow />
+  ) : route === "export" ? (
+    <ExportDialogWindow />
+  ) : route === "create-project" ? (
+    <CreateProjectWindow />
+  ) : (
+    <EditorPageContent />
+  );
 }

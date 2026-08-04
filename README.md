@@ -86,3 +86,5 @@ AI 協作ルールは [CLAUDE.md](CLAUDE.md) にあります。
     </picture>
   </a>
 </div>
+
+<!-- ci-check-trigger -->

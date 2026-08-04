@@ -30,14 +30,17 @@ describe("resolveLegacyCategory", () => {
     }
   });
 
-  it("keeps terminal/power on Electron", () => {
+  it("keeps Electron-only categories on Electron", () => {
     expect(resolveLegacyCategory("terminal", { isElectron: true })).toBe("terminal");
     expect(resolveLegacyCategory("power", { isElectron: true })).toBe("power");
+    expect(resolveLegacyCategory("export", { isElectron: true })).toBe("export");
   });
 
   it("falls back to account when Electron-only tab requested on Web", () => {
     expect(resolveLegacyCategory("terminal", { isElectron: false })).toBe("account");
     expect(resolveLegacyCategory("power", { isElectron: false })).toBe("account");
+    expect(resolveLegacyCategory("privacy", { isElectron: false })).toBe("account");
+    expect(resolveLegacyCategory("export", { isElectron: false })).toBe("account");
   });
 
   it("does not affect non-electron-only tabs on Web", () => {
