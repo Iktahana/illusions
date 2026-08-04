@@ -187,8 +187,12 @@ async function syncLocalization(versionId, attributes) {
     `/appStoreVersions/${versionId}/appStoreVersionLocalizations?limit=200`,
   );
   const existing = localizations.data?.find((item) => item.attributes.locale === attributes.locale);
+  // App Store Connect accepts `locale` when creating a localization, but
+  // rejects it as immutable when updating an existing record.
+  const mutableAttributes = { ...attributes };
+  delete mutableAttributes.locale;
   const data = existing
-    ? { type: "appStoreVersionLocalizations", id: existing.id, attributes }
+    ? { type: "appStoreVersionLocalizations", id: existing.id, attributes: mutableAttributes }
     : {
         type: "appStoreVersionLocalizations",
         attributes,
