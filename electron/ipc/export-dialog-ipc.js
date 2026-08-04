@@ -1,4 +1,4 @@
-const { BrowserWindow, ipcMain, app, dialog, nativeTheme, screen } = require("electron");
+const { BrowserWindow, ipcMain, app, dialog, screen } = require("electron");
 const path = require("path");
 const { EXPORT_CHANNELS } = require("../lib/ipc-channels");
 const { isDev } = require("../app-constants");
@@ -36,6 +36,7 @@ function registerExportDialogHandlers() {
     return new Promise((resolve) => {
       const isTxt = request.kind === "txt";
       const isEpub = request.kind === "document" && request.format === "epub";
+      const useNativeFrame = process.platform === "win32";
       const width = isTxt ? 520 : isEpub ? 760 : 1280;
       const height = isTxt ? 480 : 820;
       const macWindowOptions =
@@ -54,13 +55,16 @@ function registerExportDialogHandlers() {
         minWidth: isTxt ? 420 : isEpub ? 640 : 960,
         minHeight: isTxt ? 380 : isEpub ? 640 : 620,
         show: false,
-        frame: false,
-        transparent: true,
+        // Windows users expect these task windows to expose the standard
+        // system title bar, including the native Close button. Keep the
+        // custom frameless treatment on macOS/Linux.
+        frame: useNativeFrame,
+        transparent: !useNativeFrame,
         hasShadow: true,
         // Prevent the native compositor from flashing its default white
         // surface while the renderer catches up during live resize.
-        backgroundColor: "#00000000",
-        title: "エクスポート設定",
+        backgroundColor: useNativeFrame ? "#1e1e1e" : "#00000000",
+        title: request.kind === "print" ? "印刷設定" : "エクスポート設定",
         webPreferences: {
           // The Electron main process is bundled into dist-main/main.js, so
           // bundled modules share dist-main as __dirname at runtime. The
