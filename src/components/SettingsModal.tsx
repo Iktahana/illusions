@@ -197,7 +197,7 @@ export default function SettingsModal({
       className={clsx(
         presentation === "modal"
           ? "fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          : "h-screen w-screen bg-background",
+          : "h-screen w-screen rounded-xl bg-background-elevated/95 p-0 shadow-2xl",
       )}
       onClick={handleOverlayClick}
     >
@@ -211,17 +211,21 @@ export default function SettingsModal({
           "relative w-full bg-background-elevated flex flex-col transition-[max-width] duration-200",
           presentation === "modal"
             ? "h-[80vh] mx-4 rounded-xl shadow-xl border border-border"
-            : "h-full",
+            : "h-full rounded-xl border border-border",
           isWide ? "max-w-6xl" : "max-w-4xl",
         )}
       >
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border">
+        <div
+          className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border"
+          style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+        >
           <h2 id={headingId} className="text-lg font-medium text-foreground">
             設定
           </h2>
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-hover text-foreground-secondary hover:text-foreground transition-colors"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             aria-label="閉じる"
           >
             <X className="w-5 h-5" />

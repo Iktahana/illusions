@@ -17,8 +17,15 @@ describe("native export dialog window smoke contract", () => {
     expect(source).toContain('preload: path.join(__dirname, "preload.js")');
     expect(source).not.toContain('path.join(__dirname, "../preload.js")');
     expect(source).toContain("backgroundColor:");
-    expect(source).toContain("nativeTheme.shouldUseDarkColors");
+    expect(source).toContain('useNativeFrame ? "#1e1e1e" : "#00000000"');
     expect(source).toContain('"?export-dialog"');
+  });
+
+  it("uses the native Windows frame so export and print windows have a system close button", () => {
+    expect(source).toContain('process.platform === "win32"');
+    expect(source).toContain("frame: useNativeFrame");
+    expect(source).toContain("transparent: !useNativeFrame");
+    expect(source).toContain('request.kind === "print" ? "印刷設定"');
   });
 
   it("uses a compact native window for EPUB, which has no preview pane", () => {

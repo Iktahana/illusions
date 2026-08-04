@@ -17,7 +17,7 @@ describe("native create-project dialog smoke contract", () => {
     expect(source).toContain("parent.setFocusable(false)");
     expect(source).toContain(": { parent, modal: true }");
     expect(source).toContain('preload: path.join(__dirname, "preload.js")');
-    expect(source).toContain("nativeTheme.shouldUseDarkColors");
+    expect(source).toContain('backgroundColor: "#00000000"');
     expect(source).toContain("?create-project");
   });
 

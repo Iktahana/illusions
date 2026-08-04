@@ -1,4 +1,4 @@
-const { BrowserWindow, ipcMain, app, nativeTheme, screen } = require("electron");
+const { BrowserWindow, ipcMain, app, screen } = require("electron");
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { PROJECT_DIALOG_CHANNELS } = require("../lib/ipc-channels");
@@ -54,7 +54,10 @@ function registerProjectDialogHandlers() {
         minWidth: 560,
         minHeight: 480,
         show: false,
-        backgroundColor: nativeTheme.shouldUseDarkColors ? "#080808" : "#fcfcfc",
+        frame: false,
+        transparent: true,
+        hasShadow: true,
+        backgroundColor: "#00000000",
         title: "新規プロジェクト",
         webPreferences: {
           preload: path.join(__dirname, "preload.js"),

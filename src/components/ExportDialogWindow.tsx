@@ -9,6 +9,12 @@ import type { TxtExportFormat, TxtIndentOptions } from "@/lib/export/txt-export-
 type Request =
   | { kind: "txt"; format: TxtExportFormat; operation: "export" | "copy" }
   | {
+      kind: "print";
+      content: string;
+      metadata: ExportMetadata;
+      fileType: ".mdi" | ".md" | ".txt";
+    }
+  | {
       kind: "document";
       format: ExportDialogFormat;
       content: string;
@@ -56,6 +62,22 @@ export default function ExportDialogWindow(): React.JSX.Element | null {
         operation={request.operation}
         onCancel={() => complete(null)}
         onConfirm={(options: TxtIndentOptions) => complete({ kind: "txt", options })}
+      />
+    );
+  if (request.kind === "print")
+    return (
+      <ExportDialog
+        isOpen
+        presentation="window"
+        confirmDiscard={confirmDiscard}
+        mode="print"
+        initialFormat="pdf"
+        content={request.content}
+        metadata={request.metadata}
+        fileType={request.fileType}
+        onClose={() => complete(null)}
+        onExportPdf={(options) => complete({ kind: "print", options })}
+        onExportDocx={() => {}}
       />
     );
   return (
