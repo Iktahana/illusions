@@ -1,0 +1,23 @@
+name: Verify build artifacts
+description: Fail when any required artifact glob has no matches.
+
+inputs:
+  patterns:
+    description: Newline-separated artifact glob patterns that must each match.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Verify required files
+      shell: bash
+      env:
+        REQUIRED_PATTERNS: ${{ inputs.patterns }}
+      run: |
+        while IFS= read -r pattern; do
+          [ -z "$pattern" ] && continue
+          if ! compgen -G "$pattern" > /dev/null; then
+            echo "::error::Missing build artifact: $pattern"
+            exit 1
+          fi
+        done <<< "$REQUIRED_PATTERNS"

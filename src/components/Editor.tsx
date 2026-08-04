@@ -17,6 +17,7 @@ import MilkdownEditor from "./editor/MilkdownEditor";
 import { buildSegments, buildSpeechChunks, buildSpeechMap } from "@/lib/hooks/speech-utils";
 import { scrollToSpeechTarget, cancelSpeechScroll } from "@/lib/editor-page/speech-auto-scroll";
 import { useSelectionTracking } from "@/lib/editor-page/use-selection-tracking";
+import { takeEditorSelectionForSearch } from "@/lib/editor-page/search-selection";
 import type { SelectionSearchRange } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { LintIssue } from "@/lib/linting";
@@ -195,8 +196,12 @@ export default function NovelEditor({
   /** コンテキストメニューの「検索」アクション。選択テキストを共有検索語へ反映して窓を開く。 */
   const handleFind = useCallback(
     (initialTerm?: string) => {
-      if (initialTerm !== undefined) {
-        onSearchTermChange(initialTerm);
+      // Collapse the live editor range before the dialog focuses its input.
+      // The context menu supplies `initialTerm`, but the selection still must
+      // be collapsed while focus moves to the dialog.
+      const selectedText = takeEditorSelectionForSearch(editorViewRef.current) ?? initialTerm;
+      if (selectedText !== undefined) {
+        onSearchTermChange(selectedText);
       }
       onOpenSearchDialog();
     },

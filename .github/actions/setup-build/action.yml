@@ -1,0 +1,78 @@
+name: Set up build dependencies
+description: Set up Node.js, restore Electron caches, and install locked dependencies.
+
+inputs:
+  cache-scope:
+    description: Platform and architecture suffix used to isolate Electron caches.
+    required: true
+  node-version:
+    description: Node.js version used by desktop builds.
+    required: false
+    default: "22"
+  cache-next:
+    description: Restore the incremental Next.js build cache.
+    required: false
+    default: "false"
+  cache-fonts:
+    description: Restore generated local font assets.
+    required: false
+    default: "false"
+
+outputs:
+  font-cache-hit:
+    description: Whether the generated local font cache matched exactly.
+    value: ${{ steps.font-cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+        cache-dependency-path: package-lock.json
+
+    - name: Restore Electron caches
+      uses: actions/cache@v6
+      with:
+        path: |
+          ${{ github.workspace }}/.cache/electron
+          ${{ github.workspace }}/.cache/electron-builder
+        key: electron-${{ runner.os }}-${{ inputs.cache-scope }}-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          electron-${{ runner.os }}-${{ inputs.cache-scope }}-
+
+    - name: Restore Next.js cache
+      if: inputs.cache-next == 'true'
+      uses: actions/cache@v6
+      with:
+        path: .next/cache
+        key: next-${{ runner.os }}-${{ inputs.cache-scope }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('package.json', 'src/**', 'electron/**', 'scripts/**', 'public/**', 'next.config.*', 'postcss.config.*', 'tailwind.config.*', 'tsconfig.json') }}
+        restore-keys: |
+          next-${{ runner.os }}-${{ inputs.cache-scope }}-${{ hashFiles('package-lock.json') }}-
+          next-${{ runner.os }}-${{ inputs.cache-scope }}-
+
+    - name: Restore local font cache
+      id: font-cache
+      if: inputs.cache-fonts == 'true'
+      uses: actions/cache@v6
+      with:
+        path: |
+          public/fonts
+          src/app/local-fonts.css
+        key: fonts-v1-${{ runner.os }}-${{ hashFiles('scripts/download-local-fonts.mjs') }}
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        for attempt in 1 2 3; do
+          npm ci && exit 0
+          if [ "$attempt" -lt 3 ]; then
+            echo "::warning::npm ci failed (attempt $attempt/3), retrying in 15 seconds"
+            sleep 15
+          fi
+        done
+
+        echo "::error::npm ci failed after 3 attempts"
+        exit 1

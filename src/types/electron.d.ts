@@ -18,7 +18,7 @@ export {};
 declare global {
   interface ElectronAPI {
     isElectron: boolean;
-    appRuntime?: AppRuntimeInfo;
+    appRuntime?: AppRuntimeInfo & { isDevelopment?: boolean };
     openFile: () => Promise<{ path: string; content: string } | null>;
     saveFile: (
       filePath: string | null,
@@ -100,7 +100,46 @@ declare global {
     generatePdfPreview?: (
       content: string,
       options: PdfGenerationOptions,
-    ) => Promise<{ success: true; data: string } | { success: false; error: string }>;
+      maxPages?: number,
+    ) => Promise<
+      | {
+          success: true;
+          data: Uint8Array<ArrayBuffer>;
+          maxPages: number;
+          automaticMaxPages: number;
+          systemMemoryGiB: number;
+          sourceCharacterLimit: number;
+          sourceTruncated: boolean;
+        }
+      | { success: false; error: string; cancelled?: boolean; code?: string }
+    >;
+    cancelPdfPreview?: () => Promise<boolean>;
+    generateHtmlPreview?: (
+      content: string,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      options?: import("@/lib/export/html-shared").HtmlExportOptions,
+    ) => Promise<
+      { success: true; html: string } | { success: false; error: string; code?: string }
+    >;
+    exportHTML?: (
+      content: string,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      title?: string,
+      options?: import("@/lib/export/html-shared").HtmlExportOptions,
+    ) => Promise<string | { success: false; error: string; code?: string } | null>;
+    exportMdiText?: (
+      content: string,
+      format: import("@/lib/export/txt-export-types").TxtExportFormat,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      indent?: import("@/lib/export/txt-export-types").TxtIndentOptions,
+      title?: string,
+    ) => Promise<string | { success: false; error: string; code?: string } | null>;
+    copyMdiText?: (
+      content: string,
+      format: import("@/lib/export/txt-export-types").TxtExportFormat,
+      fileType?: import("@/lib/project/project-types").SupportedFileExtension,
+      indent?: import("@/lib/export/txt-export-types").TxtIndentOptions,
+    ) => Promise<{ success: true } | { success: false; error: string; code?: string }>;
     exportPDF?: (
       content: string,
       options: PdfGenerationOptions,
@@ -113,17 +152,7 @@ declare global {
       content: string,
       options: {
         metadata: { title: string; author?: string; date?: string; language?: string };
-        settings?: {
-          pageSize?: string;
-          landscape?: boolean;
-          fontFamily?: string;
-          fontSize?: number;
-          lineSpacing?: number;
-          margins?: { top: number; bottom: number; left: number; right: number };
-          textIndent?: number;
-          fullwidthSpaceIndent?: boolean;
-          showPageNumbers?: boolean;
-        };
+        settings?: Partial<import("@/lib/export/export-settings").UnifiedExportSettings>;
         // Active tab's file type. The main-process generateDocx un-escapes MDI
         // macros only for ".mdi"; absent/unknown falls back to ".mdi".
         fileType?: import("@/lib/project/project-types").SupportedFileExtension;
@@ -133,9 +162,36 @@ declare global {
       content: string,
       options: PdfGenerationOptions,
     ) => Promise<{ success: boolean; error?: string }>;
+    openExportDialog?: (
+      request: Record<string, unknown>,
+    ) => Promise<Record<string, unknown> | null>;
+    getExportDialogRequest?: () => Promise<Record<string, unknown> | null>;
+    confirmExportDialogDiscard?: () => Promise<boolean>;
+    completeExportDialog?: (result: Record<string, unknown> | null) => Promise<boolean>;
+    openCreateProjectDialog?: () => Promise<{
+      name: string;
+      fileExtension: import("@/lib/project/project-types").SupportedFileExtension;
+    } | null>;
+    completeCreateProjectDialog?: (
+      result: {
+        name: string;
+        fileExtension: import("@/lib/project/project-types").SupportedFileExtension;
+      } | null,
+    ) => Promise<boolean>;
     onMenuPrint?: (callback: () => void) => (() => void) | void;
+    onMenuExportHTML?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;
     onMenuExportTxtRuby?: (callback: () => void) => (() => void) | void;
+    onMenuExportNarou?: (callback: () => void) => (() => void) | void;
+    onMenuExportKakuyomu?: (callback: () => void) => (() => void) | void;
+    onMenuExportAozora?: (callback: () => void) => (() => void) | void;
+    onMenuExportNote?: (callback: () => void) => (() => void) | void;
+    onMenuCopyTxt?: (callback: () => void) => (() => void) | void;
+    onMenuCopyTxtRuby?: (callback: () => void) => (() => void) | void;
+    onMenuCopyNarou?: (callback: () => void) => (() => void) | void;
+    onMenuCopyKakuyomu?: (callback: () => void) => (() => void) | void;
+    onMenuCopyAozora?: (callback: () => void) => (() => void) | void;
+    onMenuCopyNote?: (callback: () => void) => (() => void) | void;
     onMenuExportPDF?: (callback: () => void) => (() => void) | void;
     onMenuExportEPUB?: (callback: () => void) => (() => void) | void;
     onMenuExportDOCX?: (callback: () => void) => (() => void) | void;

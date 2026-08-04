@@ -57,16 +57,9 @@ yarn-error.log*
 # local
 *.local.*
 
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# Serwist (generated service worker)
-public/sw*
-public/swe-worker*
 
 # WebStorm
 .idea

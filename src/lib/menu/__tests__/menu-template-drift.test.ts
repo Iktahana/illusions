@@ -392,10 +392,37 @@ describe("WEB_MENU_STRUCTURE", () => {
             submenu: [
               { label: "テキスト（プレーン）としてエクスポート...", action: "export-txt" },
               { label: "テキスト（ルビ付き）としてエクスポート...", action: "export-txt-ruby" },
+              { label: "小説家になろう形式としてエクスポート...", action: "export-narou" },
+              { label: "カクヨム形式としてエクスポート...", action: "export-kakuyomu" },
+              { label: "青空文庫形式としてエクスポート...", action: "export-aozora" },
+              { label: "note形式としてエクスポート...", action: "export-note" },
+              { type: "separator" },
+              {
+                label: "テキスト（プレーン）をクリップボードにコピー",
+                action: "copy-txt",
+              },
+              {
+                label: "テキスト（ルビ付き）をクリップボードにコピー",
+                action: "copy-txt-ruby",
+              },
+              {
+                label: "小説家になろう形式をクリップボードにコピー",
+                action: "copy-narou",
+              },
+              {
+                label: "カクヨム形式をクリップボードにコピー",
+                action: "copy-kakuyomu",
+              },
+              {
+                label: "青空文庫形式をクリップボードにコピー",
+                action: "copy-aozora",
+              },
+              { label: "note形式をクリップボードにコピー", action: "copy-note" },
               { type: "separator" },
               { label: "PDF としてエクスポート...", action: "export-pdf" },
               { label: "EPUB としてエクスポート...", action: "export-epub" },
               { label: "DOCX としてエクスポート...", action: "export-docx" },
+              { label: "HTML としてエクスポート...", action: "export-html" },
             ],
           },
           { type: "separator" },

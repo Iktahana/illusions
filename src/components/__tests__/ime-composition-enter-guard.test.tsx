@@ -286,7 +286,10 @@ describe("CreateProjectWizard — IME composition Enter guard (#1858)", () => {
     vi.restoreAllMocks();
   });
 
-  async function renderWizard(onProjectCreated: () => void) {
+  async function renderWizard(
+    onProjectCreated: () => void,
+    onSubmit?: (selection: { name: string; fileExtension: ".mdi" | ".md" | ".txt" }) => void,
+  ) {
     const { default: CreateProjectWizard } = await import("../CreateProjectWizard");
     await act(async () => {
       root.render(
@@ -294,6 +297,7 @@ describe("CreateProjectWizard — IME composition Enter guard (#1858)", () => {
           isOpen={true}
           onClose={() => {}}
           onProjectCreated={onProjectCreated}
+          onSubmit={onSubmit}
         />,
       );
     });
@@ -389,5 +393,30 @@ describe("CreateProjectWizard — IME composition Enter guard (#1858)", () => {
     });
 
     expect(onProjectCreated).toHaveBeenCalled();
+  });
+
+  it("returns serializable settings without creating in the native window", async () => {
+    const onProjectCreated = vi.fn();
+    const onSubmit = vi.fn();
+    await renderWizard(onProjectCreated, onSubmit);
+
+    const input = getNameInput();
+    expect(input).not.toBeNull();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
+        input!,
+        "春の物語",
+      );
+      input!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const nextButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "次へ",
+    );
+    expect(nextButton).toBeDefined();
+    await act(async () => nextButton!.click());
+
+    expect(onSubmit).toHaveBeenCalledWith({ name: "春の物語", fileExtension: ".mdi" });
+    expect(onProjectCreated).not.toHaveBeenCalled();
   });
 });

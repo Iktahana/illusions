@@ -6,12 +6,14 @@
 import type { MilkdownPlugin } from "@milkdown/ctx";
 import { $prose, $remark } from "@milkdown/utils";
 import { Plugin, PluginKey } from "@milkdown/prose/state";
+import remarkFrontmatter from "remark-frontmatter";
 import { rubySchema } from "./nodes/ruby";
 import { tcySchema } from "./nodes/tcy";
 import { nobreakSchema } from "./nodes/nobreak";
 import { kernSchema } from "./nodes/kern";
 import { mdibreakSchema } from "./nodes/mdibreak";
 import { blankParagraphSchema } from "./nodes/blank-paragraph";
+import { frontmatterSchema } from "./nodes/frontmatter";
 import { headingAnchorSchema } from "./nodes/heading-anchor";
 import {
   remarkFullWidthMarkdownPlugin,
@@ -45,6 +47,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     enableNoBreak,
     enableKern,
     enableMdiBreak,
+    enableFrontmatter,
     plainText,
   } = opts;
 
@@ -98,6 +101,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     () => remarkFullWidthMarkdownPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
     { enable: !plainText },
   );
+  const remarkMdiFrontmatter = $remark("japaneseNovelFrontmatter", () => remarkFrontmatter, "yaml");
 
   const stylePlugin = $prose(() => {
     const classList = [...classes];
@@ -139,6 +143,7 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
   });
 
   const plugins: MilkdownPlugin[] = [
+    ...(enableFrontmatter ? [remarkMdiFrontmatter, frontmatterSchema] : []),
     remarkFullWidthMarkdown,
     ...(enableRuby ? [remarkRuby, rubySchema] : []),
     ...(enableTcy ? [remarkTcy, tcySchema] : []),

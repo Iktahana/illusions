@@ -553,16 +553,15 @@ async function main() {
     const flight = await getPackageFlight(token);
     if (flight?.pendingFlightSubmission?.id) {
       submissionId = flight.pendingFlightSubmission.id;
-      console.log(`  Reusing existing pending package flight submission: ${submissionId}`);
-      const pendingSubmission = await apiGet(token, getSubmissionPath(submissionId));
-      const pendingStatus = pendingSubmission.status ?? pendingSubmission.commitStatus;
-      if (pendingStatus === "PreProcessing" || pendingStatus === "InProgress") {
-        console.log(
-          `  Pending package flight submission is ${pendingStatus}; deleting it before creating a fresh submission.`,
-        );
-        await apiDelete(token, getSubmissionPath(submissionId));
-        submissionId = undefined;
-      }
+      // A pending flight submission can retain the fileUploadUrl issued when
+      // it was created. Reusing an old draft then fails with a 403 after that
+      // SAS URL expires, so package automation must always start from a fresh
+      // submission.
+      console.log(
+        `  Deleting existing pending package flight submission before upload: ${submissionId}`,
+      );
+      await apiDelete(token, getSubmissionPath(submissionId));
+      submissionId = undefined;
     }
   } else if (app.pendingApplicationSubmission?.id) {
     const pendingId = app.pendingApplicationSubmission.id;

@@ -57,6 +57,14 @@ describe("usage analytics facade", () => {
     }).not.toThrow();
   });
 
+  it("recognizes distinct fixed document and note output event contracts", async () => {
+    const { isUsageEventName } = await import("../usage-events");
+
+    expect(isUsageEventName("document_output_completed")).toBe(true);
+    expect(isUsageEventName("note_output_completed")).toBe(true);
+    expect(isUsageEventName("document_output_with_private_path")).toBe(false);
+  });
+
   it("maps raw errors to safe reason enums without exposing messages", async () => {
     const { classifyTelemetryError } = await import("../usage-events");
 

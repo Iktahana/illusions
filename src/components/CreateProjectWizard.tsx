@@ -14,8 +14,19 @@ import type { ProjectMode, SupportedFileExtension } from "@/lib/project/project-
 
 interface CreateProjectWizardProps {
   isOpen: boolean;
+  presentation?: "overlay" | "window";
   onClose: () => void;
   onProjectCreated: (project: ProjectMode) => void;
+  /**
+   * Native-window mode collects settings only. The parent renderer performs
+   * directory selection and creation so VFS approval belongs to the editor.
+   */
+  onSubmit?: (selection: CreateProjectSelection) => void;
+}
+
+export interface CreateProjectSelection {
+  name: string;
+  fileExtension: SupportedFileExtension;
 }
 
 /** Wizard step identifiers */
@@ -57,8 +68,10 @@ const STEP_LABELS = ["設定", "作成"] as const;
  */
 export default function CreateProjectWizard({
   isOpen,
+  presentation = "overlay",
   onClose,
   onProjectCreated,
+  onSubmit,
 }: CreateProjectWizardProps) {
   const [step, setStep] = useState<WizardStep>("name-format");
   const [projectName, setProjectName] = useState("");
@@ -93,6 +106,11 @@ export default function CreateProjectWizard({
 
   /** Handle project creation */
   const handleCreate = useCallback(async () => {
+    if (onSubmit) {
+      onSubmit({ name: projectName, fileExtension: selectedExtension });
+      return;
+    }
+
     setStep("creating");
     setIsCreating(true);
     setErrorMessage(null);
@@ -138,7 +156,7 @@ export default function CreateProjectWizard({
         setErrorMessage("プロジェクトの作成中にエラーが発生しました。");
       }
     }
-  }, [projectName, selectedExtension, onProjectCreated]);
+  }, [projectName, selectedExtension, onProjectCreated, onSubmit]);
 
   /** Handle retry after error */
   const handleRetry = useCallback(() => {
@@ -172,9 +190,14 @@ export default function CreateProjectWizard({
   return (
     <GlassDialog
       isOpen={isOpen}
+      presentation={presentation}
       onBackdropClick={step === "name-format" ? onClose : undefined}
       ariaLabel="新規プロジェクト作成"
-      panelClassName="mx-4 w-full max-w-lg p-6"
+      panelClassName={
+        presentation === "window"
+          ? "h-screen w-screen overflow-y-auto bg-background p-8"
+          : "mx-4 w-full max-w-lg p-6"
+      }
     >
       {/* Step indicator */}
       <div className="mb-6 flex items-center justify-center gap-3">

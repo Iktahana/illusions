@@ -46,6 +46,8 @@ const { registerRulesetsHandlers } = require("./ipc/rulesets-ipc");
 const { getRulesetsManager } = require("./rulesets-manager");
 const { registerAnalyticsHandlers } = require("./ipc/analytics-ipc");
 const { registerErrorReportingHandlers } = require("./ipc/error-reporting-ipc");
+const { registerExportDialogHandlers } = require("./ipc/export-dialog-ipc");
+const { registerProjectDialogHandlers } = require("./ipc/project-dialog-ipc");
 const {
   initializeErrorReporting,
   captureMainError,
@@ -84,7 +86,6 @@ initializeErrorReporting({
   dsn: process.env.ERROR_REPORT_DSN || "",
   getStorageManager,
   getRelease: () => app.getVersion(),
-  environment: app.isPackaged ? "production" : "development",
 });
 
 process.on("uncaughtException", (err) => {
@@ -253,6 +254,8 @@ app.whenReady().then(async () => {
   registerRulesetsHandlers();
   registerAnalyticsHandlers({ hasAppKey: () => Boolean(APTABASE_APP_KEY) });
   registerErrorReportingHandlers({ captureRendererError });
+  registerExportDialogHandlers();
+  registerProjectDialogHandlers();
 
   // 匿名使用統計：起動イベント（同意フラグ未設定時はデフォルト ON）
   if (APTABASE_APP_KEY) {

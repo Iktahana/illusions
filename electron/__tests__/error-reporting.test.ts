@@ -27,7 +27,6 @@ describe("electron/error-reporting", () => {
         dsn: "",
         getStorageManager: () => ({ loadAppState: loadAppStateMock }),
         getRelease: () => "1.2.0",
-        environment: "test",
         sentryMainModule: {
           init: initMock,
           withScope: withScopeMock,
@@ -45,7 +44,6 @@ describe("electron/error-reporting", () => {
       dsn: "https://public@example.invalid/1",
       getStorageManager: () => ({ loadAppState: loadAppStateMock }),
       getRelease: () => "1.2.0",
-      environment: "test",
       sentryMainModule: {
         init: initMock,
         withScope: withScopeMock,
@@ -55,6 +53,8 @@ describe("electron/error-reporting", () => {
 
     expect(initMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        environment: "production",
+        release: "1.2.0",
         defaultIntegrations: false,
         sendDefaultPii: false,
         tracesSampleRate: 0,
@@ -63,13 +63,29 @@ describe("electron/error-reporting", () => {
     );
   });
 
+  it("derives the GlitchTip environment from the prerelease identifier", async () => {
+    const mod = await loadErrorReporting();
+
+    mod.initializeErrorReporting({
+      dsn: "https://public@example.invalid/1",
+      getStorageManager: () => ({ loadAppState: loadAppStateMock }),
+      getRelease: () => "1.2.0-beta.3",
+      sentryMainModule: {
+        init: initMock,
+        withScope: withScopeMock,
+        captureException: captureExceptionMock,
+      },
+    });
+
+    expect(initMock).toHaveBeenCalledWith(expect.objectContaining({ environment: "beta" }));
+  });
+
   it("captures main errors only when consent is enabled", async () => {
     const mod = await loadErrorReporting();
     mod.initializeErrorReporting({
       dsn: "https://public@example.invalid/1",
       getStorageManager: () => ({ loadAppState: loadAppStateMock }),
       getRelease: () => "1.2.0",
-      environment: "test",
       sentryMainModule: {
         init: initMock,
         withScope: withScopeMock,
@@ -99,7 +115,6 @@ describe("electron/error-reporting", () => {
       dsn: "https://public@example.invalid/1",
       getStorageManager: () => ({ loadAppState: loadAppStateMock }),
       getRelease: () => "1.2.0",
-      environment: "test",
       sentryMainModule: {
         init: initMock,
         withScope: withScopeMock,

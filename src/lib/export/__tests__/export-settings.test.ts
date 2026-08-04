@@ -12,6 +12,8 @@ import {
   DEFAULT_EXPORT_SETTINGS,
   loadExportSettings,
   saveExportSettings,
+  toPdfExportSettings,
+  toPdfGenerationOptions,
 } from "@/lib/export/export-settings";
 
 // インメモリ KV で StorageService をモックする
@@ -49,7 +51,77 @@ describe("saveExportSettings", () => {
   });
 });
 
+describe("toPdfExportSettings", () => {
+  it("旧形式の Noto Serif キーでも Google Fonts を読み込む", () => {
+    const converted = toPdfExportSettings({
+      ...DEFAULT_EXPORT_SETTINGS,
+      fontFamily: "noto-serif",
+    });
+
+    expect(converted.fontFamily).toBe('"Noto Serif JP", serif');
+    expect(converted.googleFontFamily).toBe("Noto Serif JP");
+  });
+
+  it("直接選択した Google Fonts のファミリー名を保持する", () => {
+    const converted = toPdfExportSettings({
+      ...DEFAULT_EXPORT_SETTINGS,
+      fontFamily: "Shippori Mincho",
+    });
+
+    expect(converted.fontFamily).toBe('"Shippori Mincho", serif');
+    expect(converted.googleFontFamily).toBe("Shippori Mincho");
+  });
+});
+
+describe("toPdfGenerationOptions", () => {
+  it("forwards the complete UI profile unchanged to preview, PDF, and system print IPCs", () => {
+    const settings = toPdfExportSettings({
+      ...DEFAULT_EXPORT_SETTINGS,
+      pageSize: "Bunko",
+      landscape: false,
+      verticalWriting: false,
+      charsPerLine: 33,
+      linesPerPage: 22,
+      margins: { top: 11, right: 12, bottom: 13, left: 14 },
+      fontFamily: "Shippori Mincho",
+      showPageNumbers: true,
+      pageNumberFormat: "fraction",
+      pageNumberPosition: "top-right",
+      textIndent: 2,
+      fullwidthSpaceIndent: true,
+    });
+
+    expect(
+      toPdfGenerationOptions(settings, { title: "組版テスト", author: "著者" }, ".mdi"),
+    ).toEqual({
+      metadata: { title: "組版テスト", author: "著者" },
+      fileType: ".mdi",
+      pageSize: "Bunko",
+      landscape: false,
+      verticalWriting: false,
+      charsPerLine: 33,
+      linesPerPage: 22,
+      margins: { top: 11, right: 12, bottom: 13, left: 14 },
+      fontFamily: '"Shippori Mincho", serif',
+      googleFontFamily: "Shippori Mincho",
+      showPageNumbers: true,
+      pageNumberFormat: "fraction",
+      pageNumberPosition: "top-right",
+      textIndent: 2,
+      fullwidthSpaceIndent: true,
+    });
+  });
+});
+
 describe("loadExportSettings", () => {
+  it("HTMLの本文のみ設定を保存値から復元する", async () => {
+    kvStore.set(STORAGE_KEY, JSON.stringify({ ...DEFAULT_EXPORT_SETTINGS, htmlBodyOnly: true }));
+
+    const loaded = await loadExportSettings();
+
+    expect(loaded.htmlBodyOnly).toBe(true);
+  });
+
   it("StorageService に保存済みの設定を読み込む", async () => {
     const settings = { ...DEFAULT_EXPORT_SETTINGS, linesPerPage: 22, landscape: false };
     kvStore.set(STORAGE_KEY, JSON.stringify(settings));

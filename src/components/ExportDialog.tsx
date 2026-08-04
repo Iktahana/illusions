@@ -3,17 +3,18 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import clsx from "clsx";
 import GlassDialog from "@/shared/ui/GlassDialog";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import {
   DEFAULT_EXPORT_SETTINGS,
   loadExportSettings,
   saveExportSettings,
   toPdfExportSettings,
-  toDocxExportSettings,
+  toPdfGenerationOptions,
   toEpubExportOptions,
 } from "@/lib/export/export-settings";
 import { FontSelector } from "@/components/explorer/FontSelector";
 import { PageSizeSelector } from "@/components/PageSizeSelector";
-import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import { localPreferences } from "@/lib/storage/local-preferences";
 import { useAuthSafe } from "@/contexts/AuthContext";
 
 import type {
@@ -22,15 +23,16 @@ import type {
   PageNumberPosition,
 } from "@/lib/export/export-settings";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
-import type { DocxExportSettings } from "@/lib/export/docx-export-settings";
 import type { EpubExportOptions, ChapterSplitLevel } from "@/lib/export/epub-shared";
+import type { HtmlExportOptions } from "@/lib/export/html-shared";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { ExportMetadata } from "@/lib/export/types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type ExportDialogFormat = "pdf" | "docx" | "epub";
+export type ExportDialogFormat = "html" | "pdf" | "docx" | "epub";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -38,11 +40,15 @@ export type ExportDialogFormat = "pdf" | "docx" | "epub";
 
 interface ExportDialogProps {
   isOpen: boolean;
+  presentation?: "overlay" | "window";
+  /** Native-window confirmation hook; web overlays use ConfirmDialog instead. */
+  confirmDiscard?: () => Promise<boolean>;
   mode?: "export" | "print";
   initialFormat: ExportDialogFormat;
   onClose: () => void;
+  onExportHtml?: (options: HtmlExportOptions) => void;
   onExportPdf: (settings: PdfExportSettings) => void;
-  onExportDocx: (settings: DocxExportSettings) => void;
+  onExportDocx: (settings: UnifiedExportSettings) => void;
   onExportEpub?: (options: EpubExportOptions) => void;
   content: string;
   metadata: ExportMetadata;
@@ -51,7 +57,7 @@ interface ExportDialogProps {
    * pipeline un-escapes MDI macros only for ".mdi" and preserves \[\[blank]]
    * literals in ".md"/".txt". Absent → ".mdi".
    */
-  fileType?: string;
+  fileType?: SupportedFileExtension;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,9 +118,12 @@ function clampFloat(raw: string, min: number, max: number): number {
  */
 export default function ExportDialog({
   isOpen,
+  presentation = "overlay",
+  confirmDiscard,
   mode = "export",
   initialFormat,
   onClose,
+  onExportHtml,
   onExportPdf,
   onExportDocx,
   onExportEpub,
@@ -126,8 +135,11 @@ export default function ExportDialog({
   return (
     <ExportDialogInner
       mode={mode}
+      presentation={presentation}
+      confirmDiscard={confirmDiscard}
       initialFormat={initialFormat}
       onClose={onClose}
+      onExportHtml={onExportHtml}
       onExportPdf={onExportPdf}
       onExportDocx={onExportDocx}
       onExportEpub={onExportEpub}
@@ -140,8 +152,11 @@ export default function ExportDialog({
 
 function ExportDialogInner({
   mode = "export",
+  presentation = "overlay",
+  confirmDiscard: confirmDiscardNative,
   initialFormat,
   onClose,
+  onExportHtml,
   onExportPdf,
   onExportDocx,
   onExportEpub,
@@ -150,24 +165,29 @@ function ExportDialogInner({
   fileType,
 }: Omit<ExportDialogProps, "isOpen">) {
   const [selectedFormat, setSelectedFormat] = useState<ExportDialogFormat>(initialFormat);
+  const [isDirty, setIsDirty] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [settings, setSettings] = useState<UnifiedExportSettings>(() => ({
     ...DEFAULT_EXPORT_SETTINGS,
   }));
+  const settingsEditedRef = useRef(false);
 
   // 保存済みのエクスポート設定を StorageService から非同期に読み込む
   useEffect(() => {
     let cancelled = false;
     void loadExportSettings().then((loaded) => {
-      if (!cancelled) setSettings(loaded);
+      if (!cancelled && !settingsEditedRef.current) setSettings(loaded);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
+  const isHtml = selectedFormat === "html";
   const isEpub = selectedFormat === "epub";
-  const isElectron = typeof window !== "undefined" && isElectronRenderer();
-  const hasPreviewApi = isElectron && !!window.electronAPI?.generatePdfPreview;
+  const hasPreviewApi = typeof window !== "undefined" && !!window.electronAPI?.generatePdfPreview;
+  const hasHtmlPreviewApi =
+    typeof window !== "undefined" && !!window.electronAPI?.generateHtmlPreview;
 
   // --- Author auto-fill from auth context ---
   const authContext = useAuthSafe();
@@ -186,9 +206,10 @@ function ExportDialogInner({
 
   // --- Cover image state ---
   const [coverImage, setCoverImage] = useState<Uint8Array | null>(null);
-  const [coverMediaType, setCoverMediaType] = useState<string | null>(null);
+  const [coverMediaType, setCoverMediaType] = useState<"image/jpeg" | "image/png" | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const coverReaderRef = useRef<FileReader | null>(null);
 
   // --- Blob URL refs for cleanup (state captures stale values in [] effects) ---
   const pdfUrlRef = useRef<string | null>(null);
@@ -198,19 +219,31 @@ function ExportDialogInner({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewInfo, setPreviewInfo] = useState<{
+    systemMemoryGiB: number;
+    maxPages: number;
+    sourceTruncated: boolean;
+  } | null>(null);
+  const [previewMaxPagesPreference] = useState(() => localPreferences.getPdfPreviewMaxPages());
   const generationIdRef = useRef(0);
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showWebPageNumberHint = !isElectron && selectedFormat === "pdf" && settings.showPageNumbers;
+  const [htmlPreview, setHtmlPreview] = useState<string | null>(null);
+  const [htmlPreviewLoading, setHtmlPreviewLoading] = useState(false);
+  const [htmlPreviewError, setHtmlPreviewError] = useState<string | null>(null);
+  const htmlGenerationIdRef = useRef(0);
 
   const updateField = useCallback(
     <K extends keyof UnifiedExportSettings>(key: K, value: UnifiedExportSettings[K]) => {
+      settingsEditedRef.current = true;
+      setIsDirty(true);
       setSettings((prev) => ({ ...prev, [key]: value }));
     },
     [],
   );
 
   const updateMargin = useCallback((side: "top" | "bottom" | "left" | "right", value: number) => {
+    settingsEditedRef.current = true;
+    setIsDirty(true);
     setSettings((prev) => ({
       ...prev,
       margins: { ...prev.margins, [side]: value },
@@ -220,11 +253,16 @@ function ExportDialogInner({
   // --- Cover image handling ---
   const handleCoverFile = useCallback((file: File) => {
     if (!file.type.match(/^image\/(jpeg|png)$/)) return;
+    setIsDirty(true);
+    coverReaderRef.current?.abort();
     const reader = new FileReader();
+    coverReaderRef.current = reader;
     reader.onload = () => {
+      if (coverReaderRef.current !== reader) return;
+      coverReaderRef.current = null;
       const buf = new Uint8Array(reader.result as ArrayBuffer);
       setCoverImage(buf);
-      setCoverMediaType(file.type);
+      setCoverMediaType(file.type as "image/jpeg" | "image/png");
       const blob = new Blob([buf], { type: file.type });
       const newUrl = URL.createObjectURL(blob);
       coverPreviewUrlRef.current = newUrl;
@@ -233,10 +271,16 @@ function ExportDialogInner({
         return newUrl;
       });
     };
+    reader.onerror = reader.onabort = () => {
+      if (coverReaderRef.current === reader) coverReaderRef.current = null;
+    };
     reader.readAsArrayBuffer(file);
   }, []);
 
   const handleCoverRemove = useCallback(() => {
+    setIsDirty(true);
+    coverReaderRef.current?.abort();
+    coverReaderRef.current = null;
     setCoverImage(null);
     setCoverMediaType(null);
     setCoverPreviewUrl((prev) => {
@@ -260,6 +304,14 @@ function ExportDialogInner({
   const handleExport = useCallback(() => {
     void saveExportSettings(settings);
 
+    if (isHtml && onExportHtml) {
+      onExportHtml({
+        bodyOnly: settings.htmlBodyOnly,
+        writingMode: settings.verticalWriting ? "vertical" : "horizontal",
+      });
+      return;
+    }
+
     if (isEpub && onExportEpub) {
       const options = toEpubExportOptions(
         settings,
@@ -278,13 +330,15 @@ function ExportDialogInner({
     if (mode === "print" || selectedFormat === "pdf") {
       onExportPdf(toPdfExportSettings(settings));
     } else {
-      onExportDocx(toDocxExportSettings(settings));
+      onExportDocx(settings);
     }
   }, [
     settings,
     selectedFormat,
     mode,
+    isHtml,
     isEpub,
+    onExportHtml,
     onExportPdf,
     onExportDocx,
     onExportEpub,
@@ -297,51 +351,71 @@ function ExportDialogInner({
 
   // --- Electron: debounced PDF preview generation ---
   useEffect(() => {
-    if (!hasPreviewApi || isEpub) return;
+    const id = ++generationIdRef.current;
+
+    if (!hasPreviewApi || isEpub || isHtml) {
+      void window.electronAPI?.cancelPdfPreview?.();
+      setPreviewLoading(false);
+      setPreviewError(null);
+      setPreviewInfo(null);
+      if (pdfUrlRef.current) {
+        URL.revokeObjectURL(pdfUrlRef.current);
+        pdfUrlRef.current = null;
+      }
+      setPdfUrl(null);
+      return;
+    }
 
     if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+    void window.electronAPI?.cancelPdfPreview?.();
 
     previewTimeoutRef.current = setTimeout(async () => {
-      const id = ++generationIdRef.current;
+      previewTimeoutRef.current = null;
       setPreviewLoading(true);
       setPreviewError(null);
+      setPreviewInfo(null);
 
       const previewSettings = toPdfExportSettings(settings);
 
       try {
-        const result = await window.electronAPI!.generatePdfPreview!(content, {
-          metadata,
-          verticalWriting: settings.verticalWriting,
-          pageSize: previewSettings.pageSize,
-          landscape: previewSettings.landscape,
-          margins: previewSettings.margins,
-          charsPerLine: previewSettings.charsPerLine,
-          linesPerPage: previewSettings.linesPerPage,
-          fontFamily: previewSettings.fontFamily,
-          showPageNumbers: previewSettings.showPageNumbers,
-          pageNumberFormat: previewSettings.pageNumberFormat,
-          pageNumberPosition: previewSettings.pageNumberPosition,
-          textIndent: previewSettings.textIndent,
-          fullwidthSpaceIndent: previewSettings.fullwidthSpaceIndent,
-          googleFontFamily: previewSettings.googleFontFamily,
-          fileType,
-        });
+        const result = await window.electronAPI!.generatePdfPreview!(
+          content,
+          toPdfGenerationOptions(previewSettings, metadata, fileType),
+          previewMaxPagesPreference === "auto" ? undefined : Number(previewMaxPagesPreference),
+        );
 
         if (id !== generationIdRef.current) return;
 
         if (result.success) {
-          if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+          if (pdfUrlRef.current) {
+            URL.revokeObjectURL(pdfUrlRef.current);
+            pdfUrlRef.current = null;
+          }
 
-          const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
-          const blob = new Blob([bytes], { type: "application/pdf" });
-          const newPdfUrl = URL.createObjectURL(blob) + "#view=FitH";
-          pdfUrlRef.current = newPdfUrl;
-          setPdfUrl(newPdfUrl);
-        } else {
+          const blob = new Blob([result.data], { type: "application/pdf" });
+          const objectUrl = URL.createObjectURL(blob);
+          pdfUrlRef.current = objectUrl;
+          setPdfUrl(`${objectUrl}#view=FitH`);
+          setPreviewInfo({
+            systemMemoryGiB: result.systemMemoryGiB,
+            maxPages: result.maxPages,
+            sourceTruncated: result.sourceTruncated,
+          });
+        } else if (!result.cancelled) {
+          if (pdfUrlRef.current) {
+            URL.revokeObjectURL(pdfUrlRef.current);
+            pdfUrlRef.current = null;
+          }
+          setPdfUrl(null);
           setPreviewError(result.error);
         }
       } catch (err) {
         if (id !== generationIdRef.current) return;
+        if (pdfUrlRef.current) {
+          URL.revokeObjectURL(pdfUrlRef.current);
+          pdfUrlRef.current = null;
+        }
+        setPdfUrl(null);
         setPreviewError(err instanceof Error ? err.message : "Preview generation failed");
       } finally {
         if (id === generationIdRef.current) {
@@ -351,17 +425,82 @@ function ExportDialogInner({
     }, 800);
 
     return () => {
+      if (generationIdRef.current === id) generationIdRef.current += 1;
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+      void window.electronAPI?.cancelPdfPreview?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPreviewApi, settings, selectedFormat, content, metadata, fileType]);
+  }, [
+    hasPreviewApi,
+    isEpub,
+    isHtml,
+    settings,
+    content,
+    metadata,
+    fileType,
+    previewMaxPagesPreference,
+  ]);
+
+  // --- Electron: Rust HTML renderer preview, displayed directly in a sandboxed iframe ---
+  useEffect(() => {
+    const id = ++htmlGenerationIdRef.current;
+
+    if (!isHtml || !hasHtmlPreviewApi) {
+      setHtmlPreview(null);
+      setHtmlPreviewLoading(false);
+      setHtmlPreviewError(null);
+      return;
+    }
+
+    setHtmlPreviewLoading(true);
+    setHtmlPreviewError(null);
+
+    void window.electronAPI!.generateHtmlPreview!(content, fileType, {
+      bodyOnly: settings.htmlBodyOnly,
+      writingMode: settings.verticalWriting ? "vertical" : "horizontal",
+    })
+      .then((result) => {
+        if (id !== htmlGenerationIdRef.current) return;
+        if (result.success) {
+          setHtmlPreview(result.html);
+        } else {
+          setHtmlPreview(null);
+          setHtmlPreviewError(result.error);
+        }
+      })
+      .catch((error: unknown) => {
+        if (id !== htmlGenerationIdRef.current) return;
+        setHtmlPreview(null);
+        setHtmlPreviewError(
+          error instanceof Error ? error.message : "HTMLプレビューの生成に失敗しました",
+        );
+      })
+      .finally(() => {
+        if (id === htmlGenerationIdRef.current) setHtmlPreviewLoading(false);
+      });
+
+    return () => {
+      if (htmlGenerationIdRef.current === id) htmlGenerationIdRef.current += 1;
+    };
+  }, [
+    isHtml,
+    hasHtmlPreviewApi,
+    content,
+    fileType,
+    settings.htmlBodyOnly,
+    settings.verticalWriting,
+  ]);
 
   // Cleanup blob URLs on unmount (refs always hold the latest values)
   useEffect(() => {
     return () => {
+      generationIdRef.current += 1;
+      htmlGenerationIdRef.current += 1;
+      coverReaderRef.current?.abort();
+      coverReaderRef.current = null;
       if (pdfUrlRef.current) URL.revokeObjectURL(pdfUrlRef.current);
       if (coverPreviewUrlRef.current) URL.revokeObjectURL(coverPreviewUrlRef.current);
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+      void window.electronAPI?.cancelPdfPreview?.();
     };
   }, []);
 
@@ -371,18 +510,37 @@ function ExportDialogInner({
       ? "印刷"
       : isEpub
         ? "EPUBとしてエクスポート"
-        : selectedFormat === "pdf"
-          ? "PDFとしてエクスポート"
-          : "DOCXとしてエクスポート";
+        : isHtml
+          ? "HTMLとしてエクスポート"
+          : selectedFormat === "pdf"
+            ? "PDFとしてエクスポート"
+            : "DOCXとしてエクスポート";
+  const requestClose = async (): Promise<void> => {
+    if (!isDirty) {
+      onClose();
+      return;
+    }
+    if (confirmDiscardNative) {
+      if (await confirmDiscardNative()) onClose();
+      return;
+    }
+    setConfirmDiscard(true);
+  };
 
   return (
     <GlassDialog
       isOpen
-      onBackdropClick={onClose}
+      presentation={presentation}
+      onBackdropClick={requestClose}
       ariaLabel={mode === "print" ? "印刷設定" : "エクスポート設定"}
-      panelClassName={clsx("mx-4 w-full p-0 overflow-hidden", isEpub ? "max-w-2xl" : "max-w-7xl")}
+      panelClassName={clsx(
+        "w-full p-0 overflow-hidden",
+        presentation === "window"
+          ? "h-screen rounded-xl border border-border bg-background-elevated/95 shadow-2xl"
+          : clsx("mx-4", isEpub ? "max-w-2xl" : isHtml ? "max-w-5xl" : "max-w-7xl"),
+      )}
     >
-      <div className="flex max-h-[85vh]">
+      <div className={clsx("flex", presentation === "window" ? "h-screen" : "max-h-[85vh]")}>
         {/* Left: Settings panel */}
         <div
           className={clsx(
@@ -397,7 +555,7 @@ function ExportDialogInner({
             {/* Format toggle (hidden in print mode) */}
             {mode !== "print" && (
               <div className="flex gap-1 p-1 bg-background-secondary rounded-lg">
-                {(["pdf", "docx", "epub"] as const).map((fmt) => (
+                {(["pdf", "docx", "epub", "html"] as const).map((fmt) => (
                   <button
                     key={fmt}
                     type="button"
@@ -407,7 +565,10 @@ function ExportDialogInner({
                         ? "bg-accent text-accent-foreground shadow-sm"
                         : "text-foreground-secondary hover:text-foreground",
                     )}
-                    onClick={() => setSelectedFormat(fmt)}
+                    onClick={() => {
+                      if (fmt !== selectedFormat) setIsDirty(true);
+                      setSelectedFormat(fmt);
+                    }}
                   >
                     {fmt.toUpperCase()}
                   </button>
@@ -422,6 +583,52 @@ function ExportDialogInner({
               isEpub && "max-w-lg mx-auto w-full",
             )}
           >
+            {/* ══════════════════════════════════════════════════════════ */}
+            {/* HTML-only: options owned by @illusions-lab/mdi           */}
+            {/* ══════════════════════════════════════════════════════════ */}
+            {isHtml && (
+              <>
+                <div>
+                  <label className={labelClass}>出力範囲</label>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      className={clsx(
+                        "w-full px-3 py-3 rounded-lg border text-left transition-colors",
+                        !settings.htmlBodyOnly
+                          ? "bg-accent text-accent-foreground border-accent"
+                          : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                      )}
+                      onClick={() => updateField("htmlBodyOnly", false)}
+                    >
+                      <span className="block text-sm font-medium">完全なHTML文書</span>
+                      <span className="block mt-1 text-xs opacity-75">
+                        DOCTYPE、メタデータ、MDI用CSSを含めます
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={clsx(
+                        "w-full px-3 py-3 rounded-lg border text-left transition-colors",
+                        settings.htmlBodyOnly
+                          ? "bg-accent text-accent-foreground border-accent"
+                          : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                      )}
+                      onClick={() => updateField("htmlBodyOnly", true)}
+                    >
+                      <span className="block text-sm font-medium">本文のみ</span>
+                      <span className="block mt-1 text-xs opacity-75">
+                        body要素の中身だけを書き出します
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-foreground-tertiary leading-relaxed">
+                  言語と書名はMDIフロントマターの設定を使用します。
+                </p>
+              </>
+            )}
+
             {/* ══════════════════════════════════════════════════════════ */}
             {/* EPUB-only: Metadata section                              */}
             {/* ══════════════════════════════════════════════════════════ */}
@@ -483,7 +690,10 @@ function ExportDialogInner({
                     type="text"
                     className={inputClass}
                     value={epubTitle}
-                    onChange={(e) => setEpubTitle(e.target.value)}
+                    onChange={(e) => {
+                      setIsDirty(true);
+                      setEpubTitle(e.target.value);
+                    }}
                     placeholder={metadata.title || "タイトルを入力"}
                   />
                 </div>
@@ -495,7 +705,10 @@ function ExportDialogInner({
                     type="text"
                     className={inputClass}
                     value={epubAuthor}
-                    onChange={(e) => setEpubAuthor(e.target.value)}
+                    onChange={(e) => {
+                      setIsDirty(true);
+                      setEpubAuthor(e.target.value);
+                    }}
                     placeholder="著者名を入力"
                   />
                 </div>
@@ -549,7 +762,7 @@ function ExportDialogInner({
             {/* ══════════════════════════════════════════════════════════ */}
             {/* Page layout section (hidden for EPUB)                     */}
             {/* ══════════════════════════════════════════════════════════ */}
-            {!isEpub && (
+            {!isEpub && !isHtml && (
               <>
                 {/* Paper size */}
                 <div>
@@ -593,48 +806,50 @@ function ExportDialogInner({
               </>
             )}
 
-            {/* Writing direction (shared: PDF/DOCX/EPUB) */}
-            <div>
-              <label className={labelClass}>組方向</label>
-              {isEpub && (
-                <p className="text-xs text-foreground-tertiary mb-1">
-                  EPUBのCSS writing-modeに反映
-                </p>
-              )}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className={clsx(
-                    "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
-                    settings.verticalWriting
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
-                  )}
-                  onClick={() => updateField("verticalWriting", true)}
-                >
-                  縦書き
-                </button>
-                <button
-                  type="button"
-                  className={clsx(
-                    "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
-                    !settings.verticalWriting
-                      ? "bg-accent text-accent-foreground border-accent"
-                      : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
-                  )}
-                  onClick={() => updateField("verticalWriting", false)}
-                >
-                  横書き
-                </button>
+            {/* Writing direction */}
+            {
+              <div>
+                <label className={labelClass}>組方向</label>
+                {isEpub && (
+                  <p className="text-xs text-foreground-tertiary mb-1">
+                    EPUBのCSS writing-modeに反映
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={clsx(
+                      "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
+                      settings.verticalWriting
+                        ? "bg-accent text-accent-foreground border-accent"
+                        : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                    )}
+                    onClick={() => updateField("verticalWriting", true)}
+                  >
+                    縦書き
+                  </button>
+                  <button
+                    type="button"
+                    className={clsx(
+                      "flex-1 px-3 py-2 rounded-lg border text-sm transition-colors",
+                      !settings.verticalWriting
+                        ? "bg-accent text-accent-foreground border-accent"
+                        : "bg-background text-foreground-secondary border-border-secondary hover:bg-hover",
+                    )}
+                    onClick={() => updateField("verticalWriting", false)}
+                  >
+                    横書き
+                  </button>
+                </div>
               </div>
-            </div>
+            }
 
-            <hr className="border-border" />
+            {!isHtml && <hr className="border-border" />}
 
             {/* ── Typography section ── */}
 
             {/* Chars per line + Lines per page (PDF/DOCX only) */}
-            {!isEpub && (
+            {!isEpub && !isHtml && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>一行の文字数</label>
@@ -664,30 +879,34 @@ function ExportDialogInner({
             )}
 
             {/* Font (shared) */}
-            <div>
-              <label className={labelClass}>フォント</label>
-              <FontSelector
-                value={settings.fontFamily}
-                onChange={(font) => updateField("fontFamily", font)}
-              />
-            </div>
+            {!isHtml && (
+              <div>
+                <label className={labelClass}>フォント</label>
+                <FontSelector
+                  value={settings.fontFamily}
+                  onChange={(font) => updateField("fontFamily", font)}
+                />
+              </div>
+            )}
 
             {/* Indent (shared) */}
-            <div>
-              <label className={labelClass}>字下げ（em）</label>
-              <input
-                type="number"
-                className={numberInputClass + " w-full"}
-                min={0}
-                max={4}
-                step={0.5}
-                value={settings.textIndent}
-                onChange={(e) => updateField("textIndent", clampFloat(e.target.value, 0, 4))}
-              />
-            </div>
+            {!isHtml && (
+              <div>
+                <label className={labelClass}>字下げ（em）</label>
+                <input
+                  type="number"
+                  className={numberInputClass + " w-full"}
+                  min={0}
+                  max={4}
+                  step={0.5}
+                  value={settings.textIndent}
+                  onChange={(e) => updateField("textIndent", clampFloat(e.target.value, 0, 4))}
+                />
+              </div>
+            )}
 
             {/* Full-width-space indent toggle (PDF/DOCX only) */}
-            {!isEpub && (
+            {!isEpub && !isHtml && (
               <div>
                 <div className="flex items-center justify-between">
                   <label className={labelClass + " mb-0"}>全角スペースで字下げ</label>
@@ -722,7 +941,7 @@ function ExportDialogInner({
             )}
 
             {/* ── Page number section (PDF/DOCX only) ── */}
-            {!isEpub && (
+            {!isEpub && !isHtml && (
               <>
                 <hr className="border-border" />
 
@@ -746,12 +965,6 @@ function ExportDialogInner({
                     />
                   </button>
                 </div>
-                {showWebPageNumberHint && (
-                  <p className="text-xs text-foreground-tertiary -mt-2">
-                    Web版ではこの設定は適用されません。必要な場合はブラウザの印刷設定でヘッダー/フッターを有効にしてください。
-                  </p>
-                )}
-
                 {settings.showPageNumbers && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -829,7 +1042,7 @@ function ExportDialogInner({
             <button
               type="button"
               className="w-full px-4 py-2 rounded-lg text-sm text-foreground-secondary hover:bg-hover transition-colors"
-              onClick={onClose}
+              onClick={requestClose}
             >
               キャンセル
             </button>
@@ -839,17 +1052,64 @@ function ExportDialogInner({
         {/* Right: Preview panel (hidden for EPUB) */}
         {!isEpub && (
           <div className="flex-1 flex flex-col bg-background-secondary min-w-0">
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-shrink-0">
-              <span className="text-sm font-medium text-foreground">プレビュー</span>
-              <span className="text-xs text-foreground-tertiary">
-                {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-                {settings.verticalWriting ? "縦書き" : "横書き"}
-              </span>
+            <div className="px-4 py-3 border-b border-border flex-shrink-0 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">プレビュー</span>
+                <span className="text-xs text-foreground-tertiary">
+                  {isHtml
+                    ? settings.htmlBodyOnly
+                      ? "本文のみ"
+                      : "完全なHTML文書"
+                    : `${settings.pageSize} · ${settings.landscape ? "横置き" : "縦置き"} · ${
+                        settings.verticalWriting ? "縦書き" : "横書き"
+                      }`}
+                </span>
+              </div>
+              {previewInfo && (
+                <p className="text-xs text-foreground-tertiary">
+                  搭載メモリは {previewInfo.systemMemoryGiB} GBです。プレビューの上限は
+                  {previewInfo.maxPages}ページです。設定の「エクスポート」で変更できます。
+                  {previewInfo.sourceTruncated &&
+                    " 長い文書のため、末尾はプレビューに含まれません。"}
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-hidden">
-              {hasPreviewApi ? (
-                pdfUrl ? (
+              {isHtml ? (
+                !hasHtmlPreviewApi ? (
+                  <div className="flex items-center justify-center h-full px-6">
+                    <p className="text-sm text-danger text-center">
+                      HTMLプレビューを利用できません。アプリを再起動してください。
+                    </p>
+                  </div>
+                ) : htmlPreviewError ? (
+                  <div className="w-full h-full flex items-center justify-center px-6">
+                    <span className="text-sm text-danger">{htmlPreviewError}</span>
+                  </div>
+                ) : htmlPreview !== null ? (
+                  <iframe
+                    title="HTMLプレビュー"
+                    srcDoc={htmlPreview}
+                    sandbox=""
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full border-0 bg-white"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {htmlPreviewLoading && (
+                      <span className="text-sm text-foreground-tertiary">
+                        プレビューを生成中...
+                      </span>
+                    )}
+                  </div>
+                )
+              ) : hasPreviewApi ? (
+                previewError ? (
+                  <div className="w-full h-full flex items-center justify-center px-6">
+                    <span className="text-sm text-danger">{previewError}</span>
+                  </div>
+                ) : pdfUrl ? (
                   <embed src={pdfUrl} type="application/pdf" className="w-full h-full" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -858,21 +1118,13 @@ function ExportDialogInner({
                         プレビューを生成中...
                       </span>
                     )}
-                    {previewError && <span className="text-sm text-danger">{previewError}</span>}
                   </div>
                 )
               ) : selectedFormat === "pdf" ? (
-                <div className="flex flex-col items-center justify-center h-full gap-4 px-6">
-                  <div className="text-center space-y-2">
-                    <p className="text-sm text-foreground-secondary">
-                      エクスポートボタンをクリックすると印刷ダイアログが開きます。
-                      「PDFとして保存」を選択してください。
-                    </p>
-                    <p className="text-xs text-foreground-tertiary">
-                      {settings.pageSize} · {settings.landscape ? "横置き" : "縦置き"} ·{" "}
-                      {settings.verticalWriting ? "縦書き" : "横書き"} · {settings.fontFamily}
-                    </p>
-                  </div>
+                <div className="flex items-center justify-center h-full px-6">
+                  <p className="text-sm text-danger text-center">
+                    PDFプレビューを利用できません。アプリを再起動してください。
+                  </p>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full">
@@ -885,6 +1137,18 @@ function ExportDialogInner({
           </div>
         )}
       </div>
+      {!confirmDiscardNative && (
+        <ConfirmDialog
+          isOpen={confirmDiscard}
+          title="エクスポートをキャンセルしますか？"
+          message="変更したエクスポート設定は適用されません。"
+          confirmLabel="キャンセルする"
+          cancelLabel="続ける"
+          dangerous
+          onConfirm={onClose}
+          onCancel={() => setConfirmDiscard(false)}
+        />
+      )}
     </GlassDialog>
   );
 }

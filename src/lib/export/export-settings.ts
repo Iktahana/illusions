@@ -1,9 +1,9 @@
 /**
- * Unified export settings for PDF, DOCX, and EPUB.
+ * Unified export settings for HTML, PDF, DOCX, EPUB, and TXT.
  *
  * Uses charsPerLine / linesPerPage as the canonical typesetting model
- * (more expressive than raw fontSize + lineSpacing). DOCX-specific values
- * are derived at export time via toDocxExportSettings().
+ * (more expressive than raw fontSize + lineSpacing). The same canonical
+ * settings are mapped directly to the upstream export profile for every format.
  *
  * Persisted via the unified StorageService (SQLite on Electron, IndexedDB on Web).
  * Migrates from legacy localStorage keys (unified + per-format) on first load,
@@ -12,13 +12,11 @@
 
 import { getStorageService } from "@/lib/storage/storage-service";
 import { ALL_JAPANESE_FONTS } from "@/lib/utils/fonts";
-import { calculateTypesetting } from "./pdf-export-settings";
-import { PAGE_DIMENSIONS, ALL_PAGE_SIZE_KEYS } from "./page-sizes";
+import { ALL_PAGE_SIZE_KEYS, MDI_VERTICAL_PRINT_DEFAULTS, PAGE_DIMENSIONS } from "./page-sizes";
 
 import type { PdfExportSettings } from "./pdf-export-settings";
-import type { DocxExportSettings } from "./docx-export-settings";
 import type { ChapterSplitLevel, EpubExportOptions } from "./epub-shared";
-import type { ExportMetadata } from "./types";
+import type { ExportMetadata, PdfGenerationOptions } from "./types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +30,8 @@ export type PageNumberPosition =
   "bottom-left" | "bottom-center" | "bottom-right" | "top-left" | "top-center" | "top-right";
 
 export interface UnifiedExportSettings {
+  /** HTML export: emit only the semantic contents of `<body>`. Default false. */
+  htmlBodyOnly: boolean;
   pageSize: ExportPageSize;
   landscape: boolean;
   verticalWriting: boolean;
@@ -60,12 +60,13 @@ export interface UnifiedExportSettings {
 }
 
 export const DEFAULT_EXPORT_SETTINGS: UnifiedExportSettings = {
-  pageSize: "A4",
-  landscape: true,
-  verticalWriting: true,
-  charsPerLine: 40,
-  linesPerPage: 30,
-  margins: { top: 34, bottom: 28, left: 28, right: 45 },
+  htmlBodyOnly: false,
+  pageSize: MDI_VERTICAL_PRINT_DEFAULTS.pageSize,
+  landscape: MDI_VERTICAL_PRINT_DEFAULTS.landscape,
+  verticalWriting: MDI_VERTICAL_PRINT_DEFAULTS.verticalWriting,
+  charsPerLine: MDI_VERTICAL_PRINT_DEFAULTS.charsPerLine,
+  linesPerPage: MDI_VERTICAL_PRINT_DEFAULTS.linesPerPage,
+  margins: { ...MDI_VERTICAL_PRINT_DEFAULTS.margins },
   fontFamily: "serif",
   showPageNumbers: true,
   pageNumberFormat: "simple",
@@ -173,8 +174,12 @@ export function fontKeyToDocx(key: string): string {
 // ---------------------------------------------------------------------------
 
 export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings {
-  // Determine if the font is a Google Font (for <link> injection in export HTML)
-  const isGoogleFont = ALL_JAPANESE_FONTS.some((f) => f.family === s.fontFamily);
+  const fontFamily = fontKeyToCss(s.fontFamily);
+  // Legacy settings use canonical keys such as `noto-serif`. Resolve the CSS
+  // first so those users still receive the required Google Fonts stylesheet.
+  const googleFontFamily = ALL_JAPANESE_FONTS.find(
+    (font) => font.family === s.fontFamily || fontFamily.includes(`"${font.family}"`),
+  )?.family;
 
   return {
     pageSize: s.pageSize,
@@ -183,40 +188,29 @@ export function toPdfExportSettings(s: UnifiedExportSettings): PdfExportSettings
     charsPerLine: s.charsPerLine,
     linesPerPage: s.linesPerPage,
     margins: { ...s.margins },
-    fontFamily: fontKeyToCss(s.fontFamily),
+    fontFamily,
     showPageNumbers: s.showPageNumbers,
     pageNumberFormat: s.pageNumberFormat,
     pageNumberPosition: s.pageNumberPosition,
     textIndent: s.textIndent,
     fullwidthSpaceIndent: s.fullwidthSpaceIndent,
-    googleFontFamily: isGoogleFont ? s.fontFamily : undefined,
+    googleFontFamily,
   };
 }
 
-export function toDocxExportSettings(s: UnifiedExportSettings): DocxExportSettings {
-  const { fontSizeMm, lineHeightRatio } = calculateTypesetting(
-    s.pageSize,
-    s.margins,
-    s.charsPerLine,
-    s.linesPerPage,
-    s.verticalWriting,
-    s.landscape,
-  );
-  const fontSizePt = fontSizeMm * (72 / 25.4);
-
+/**
+ * Build the single IPC payload shared by PDF preview, final export, and system
+ * print so every UI profile field reaches the same Chromium adapter.
+ */
+export function toPdfGenerationOptions(
+  settings: PdfExportSettings,
+  metadata: ExportMetadata,
+  fileType?: string,
+): PdfGenerationOptions {
   return {
-    pageSize: s.pageSize,
-    landscape: s.landscape,
-    verticalWriting: s.verticalWriting,
-    fontFamily: fontKeyToDocx(s.fontFamily),
-    fontSize: Math.round(fontSizePt * 2) / 2, // nearest 0.5pt
-    lineSpacing: Math.round(lineHeightRatio * 10) / 10,
-    margins: { ...s.margins },
-    textIndent: s.textIndent,
-    fullwidthSpaceIndent: s.fullwidthSpaceIndent,
-    showPageNumbers: s.showPageNumbers,
-    pageNumberFormat: s.pageNumberFormat,
-    pageNumberPosition: s.pageNumberPosition,
+    ...settings,
+    metadata,
+    fileType,
   };
 }
 
@@ -224,7 +218,7 @@ export function toEpubExportOptions(
   s: UnifiedExportSettings,
   metadata: ExportMetadata,
   coverImage?: Uint8Array,
-  coverMediaType?: string,
+  coverMediaType?: "image/jpeg" | "image/png",
 ): EpubExportOptions {
   return {
     metadata: {
@@ -279,6 +273,7 @@ function sanitize(raw: Partial<UnifiedExportSettings>): UnifiedExportSettings {
     typeof raw.fontFamily === "string" && raw.fontFamily.length > 0 ? raw.fontFamily : d.fontFamily;
 
   return {
+    htmlBodyOnly: typeof raw.htmlBodyOnly === "boolean" ? raw.htmlBodyOnly : d.htmlBodyOnly,
     pageSize,
     landscape: typeof raw.landscape === "boolean" ? raw.landscape : d.landscape,
     verticalWriting:
