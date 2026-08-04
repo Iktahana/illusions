@@ -837,9 +837,55 @@ function EditorPageContent() {
   }
   const [printDialogState, setPrintDialogState] = useState<PrintDialogState | null>(null);
 
-  const handlePrintDialogRequest = useCallback((content: string, metadata: ExportMetadata) => {
-    setPrintDialogState({ content, metadata, fileType: activeFileTypeRef.current });
-  }, []);
+  const executeSystemPrint = useCallback(
+    async (state: PrintDialogState, settings: PdfExportSettings): Promise<boolean> => {
+      if (!window.electronAPI?.printDocument) {
+        notificationManager.error("印刷機能を利用できません。アプリを再起動してください");
+        return false;
+      }
+      try {
+        const result = await window.electronAPI.printDocument(
+          state.content,
+          toPdfGenerationOptions(settings, state.metadata, state.fileType),
+        );
+        if (result && !result.success) {
+          notificationManager.error(`印刷に失敗しました: ${result.error}`);
+          return false;
+        }
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "不明なエラー";
+        notificationManager.error(`印刷に失敗しました: ${message}`);
+        return false;
+      }
+    },
+    [],
+  );
+
+  const handlePrintDialogRequest = useCallback(
+    (content: string, metadata: ExportMetadata) => {
+      const state: PrintDialogState = {
+        content,
+        metadata,
+        fileType: activeFileTypeRef.current,
+      };
+      if (window.electronAPI?.openExportDialog) {
+        void window.electronAPI
+          .openExportDialog({ kind: "print", ...state })
+          .then((result) => {
+            const options = result?.options as PdfExportSettings | undefined;
+            if (options) void executeSystemPrint(state, options);
+          })
+          .catch((error: unknown) => {
+            const message = error instanceof Error ? error.message : "不明なエラー";
+            notificationManager.error(`印刷設定を開けませんでした: ${message}`);
+          });
+        return;
+      }
+      setPrintDialogState(state);
+    },
+    [executeSystemPrint],
+  );
 
   // TXT export/copy 字下げ dialog. The export hook awaits the user's choice via
   // a promise resolved when the dialog is confirmed (options) or cancelled (null).
@@ -1000,35 +1046,9 @@ function EditorPageContent() {
   const handlePrintConfirm = useCallback(
     async (settings: PdfExportSettings) => {
       if (!printDialogState) return;
-
-      // Electron path: use IPC
-      if (window.electronAPI?.printDocument) {
-        try {
-          const result = await window.electronAPI.printDocument(
-            printDialogState.content,
-            toPdfGenerationOptions(settings, printDialogState.metadata, printDialogState.fileType),
-          );
-          if (
-            result !== null &&
-            result !== undefined &&
-            typeof result === "object" &&
-            "success" in result &&
-            !result.success
-          ) {
-            notificationManager.error(`印刷に失敗しました: ${(result as { error: string }).error}`);
-            return;
-          }
-          setPrintDialogState(null);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "不明なエラー";
-          notificationManager.error(`印刷に失敗しました: ${message}`);
-        }
-        return;
-      }
-
-      notificationManager.error("印刷機能を利用できません。アプリを再起動してください");
+      if (await executeSystemPrint(printDialogState, settings)) setPrintDialogState(null);
     },
-    [printDialogState],
+    [executeSystemPrint, printDialogState],
   );
 
   const handleDocxExportConfirm = useCallback(async (settings: UnifiedExportSettings) => {
