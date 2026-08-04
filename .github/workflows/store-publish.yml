@@ -324,6 +324,7 @@ jobs:
           chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 
       - name: Upload to App Store Connect
+        if: ${{ !inputs.skip_appstore_upload }}
         shell: bash
         run: |
           PKG_FILE=$(find dist-electron -name "*.pkg" -type f | head -n 1)
