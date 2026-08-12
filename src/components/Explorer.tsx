@@ -15,6 +15,7 @@ export type { ExplorerProps, FileTreeEntry, EditingEntry, Tab } from "./explorer
 export default function Explorer({
   className,
   content = "",
+  fileType,
   onChapterClick,
   onInsertText,
   compactMode = false,
@@ -72,6 +73,7 @@ export default function Explorer({
           <div className={compactMode ? "p-3" : "p-4"}>
             <ChaptersPanel
               content={content}
+              fileType={fileType}
               onChapterClick={onChapterClick}
               onInsertText={onInsertText}
             />

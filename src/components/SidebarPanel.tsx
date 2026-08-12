@@ -158,6 +158,7 @@ export default function SidebarPanel({
           <Explorer
             compactMode={compactMode}
             content={content}
+            fileType={fileType}
             onChapterClick={onChapterClick}
             onInsertText={onInsertText}
           />
@@ -196,7 +197,7 @@ export default function SidebarPanel({
         />
       );
     case "outline":
-      return <Outline content={content} onHeadingClick={onChapterClick} />;
+      return <Outline content={content} fileType={fileType} onHeadingClick={onChapterClick} />;
     case "characters":
       return <Characters content={content} fileType={fileType} />;
     case "dictionary":

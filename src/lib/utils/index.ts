@@ -225,7 +225,7 @@ export interface Chapter {
 
 export function parseMarkdownChapters(
   markdown: string,
-  fileType: SupportedFileExtension = ".mdi",
+  fileType: SupportedFileExtension,
 ): Chapter[] {
   if (fileType === ".txt") return [];
   if (fileType === ".mdi") {

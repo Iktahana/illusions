@@ -47,7 +47,12 @@ export const encodePlainTextDocument = (document: ProseNode, originalSource = ""
 
 let mdiInitialization: Promise<void> | undefined;
 const initializeMdiOnce = (): Promise<void> => {
-  mdiInitialization ??= initializeMdi();
+  mdiInitialization ??= initializeMdi().catch((error: unknown) => {
+    // A transient WASM fetch/compile failure must not poison the application
+    // for the rest of the session. The startup gate can retry this adapter.
+    mdiInitialization = undefined;
+    throw error;
+  });
   return mdiInitialization;
 };
 

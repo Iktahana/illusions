@@ -5,16 +5,23 @@ import { RefreshCw } from "lucide-react";
 import { useChapters } from "@/lib/editor-page";
 import { ChapterItem } from "./ChapterItem";
 import { MarkdownSyntaxPanel } from "./MarkdownSyntaxPanel";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 
 interface ChaptersPanelProps {
   content: string;
+  fileType: SupportedFileExtension;
   onChapterClick?: (anchorId: string) => void;
   onInsertText?: (text: string) => void;
 }
 
 /** Table of contents panel showing heading-based chapter navigation */
-export function ChaptersPanel({ content, onChapterClick, onInsertText }: ChaptersPanelProps) {
-  const { chapters, refresh } = useChapters(content);
+export function ChaptersPanel({
+  content,
+  fileType,
+  onChapterClick,
+  onInsertText,
+}: ChaptersPanelProps) {
+  const { chapters, refresh } = useChapters(content, fileType);
   const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
 
   return (

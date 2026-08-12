@@ -22,7 +22,6 @@ import type { Token } from "@/lib/nlp-client/types";
 import { computeTextStatistics } from "./text-statistics";
 import type { TextStatistics } from "./text-statistics";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
-import { getDocumentAdapter } from "@/lib/document-format";
 
 export type { TextStatistics };
 
@@ -56,35 +55,12 @@ export function useTextStatistics(
   content: string,
   fileType: SupportedFileExtension = ".mdi",
 ): TextStatisticsResult {
-  const [mdiReady, setMdiReady] = useState(false);
-  const analysisReady = fileType !== ".mdi" || mdiReady;
-
-  useEffect(() => {
-    if (fileType !== ".mdi" || mdiReady) return;
-    let cancelled = false;
-    void getDocumentAdapter("mdi")
-      .initialize()
-      .then(() => {
-        if (!cancelled) setMdiReady(true);
-      })
-      .catch((error: unknown) => {
-        console.error("MDI 統計ランタイムの初期化に失敗しました:", error);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [fileType, mdiReady]);
-
   const manuscriptStats = useMemo(
-    () =>
-      analysisReady ? computeTextStatistics(content, fileType) : computeTextStatistics("", ".txt"),
-    [analysisReady, content, fileType],
+    () => computeTextStatistics(content, fileType),
+    [content, fileType],
   );
 
-  const cleanedContent = useMemo(
-    () => (analysisReady ? cleanMarkdown(content, fileType) : ""),
-    [analysisReady, content, fileType],
-  );
+  const cleanedContent = useMemo(() => cleanMarkdown(content, fileType), [content, fileType]);
 
   const sentenceCount = useMemo(() => countSentences(cleanedContent), [cleanedContent]);
   const charTypeAnalysis = useMemo(() => analyzeCharacterTypes(cleanedContent), [cleanedContent]);

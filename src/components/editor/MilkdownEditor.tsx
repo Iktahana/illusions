@@ -143,7 +143,6 @@ export default function MilkdownEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const adapter = useMemo(() => getDocumentAdapter(documentFormat), [documentFormat]);
-  const [adapterReady, setAdapterReady] = useState(documentFormat !== "mdi");
   const [documentDiagnostics, setDocumentDiagnostics] = useState<readonly DocumentDiagnostic[]>([]);
   const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
@@ -195,23 +194,8 @@ export default function MilkdownEditor({
   );
 
   useEffect(() => {
-    let cancelled = false;
-    setAdapterReady(documentFormat !== "mdi");
-    void adapter
-      .initialize()
-      .then(() => {
-        if (!cancelled) {
-          setAdapterReady(true);
-          refreshDocumentDiagnostics(currentContentRef.current);
-        }
-      })
-      .catch((error: unknown) => {
-        console.error("文書フォーマットの初期化に失敗しました:", error);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [adapter, documentFormat, refreshDocumentDiagnostics]);
+    refreshDocumentDiagnostics(currentContentRef.current);
+  }, [refreshDocumentDiagnostics]);
 
   const { get } = useEditor(
     (root) => {
@@ -287,7 +271,7 @@ export default function MilkdownEditor({
 
       return editor;
     },
-    [adapter, adapterReady, isPlainText, refreshDocumentDiagnostics],
+    [adapter, isPlainText, refreshDocumentDiagnostics],
   );
 
   // Presentation changes are hot actions. They must never recreate Milkdown,
@@ -849,7 +833,7 @@ export default function MilkdownEditor({
           padding-inline: 4rem;
         }
       `}</style>
-      {adapterReady ? <Milkdown /> : <div aria-busy="true" />}
+      <Milkdown />
       {documentDiagnostics.length > 0 && (
         <aside
           aria-label="MDI diagnostics"

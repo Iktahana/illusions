@@ -5,7 +5,7 @@ import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core"
 import { nord } from "@milkdown/theme-nord";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
-import { initializeMdi, mdi } from "@illusions-lab/milkdown-plugin-mdi";
+import { mdi } from "@illusions-lab/milkdown-plugin-mdi";
 import { verticalWriting } from "@illusions-lab/milkdown-plugin-vertical-writing";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
@@ -132,8 +132,7 @@ export default function PosHighlightPreview({
     const controller = new AbortController();
     // Use relative path for Electron file:// protocol compatibility
     const basePath = window.location.protocol === "file:" ? "." : "";
-    void initializeMdi()
-      .then(() => fetch(`${basePath}/demo/鏡地獄.mdi`, { signal: controller.signal }))
+    void fetch(`${basePath}/demo/鏡地獄.mdi`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.text();

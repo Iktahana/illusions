@@ -5,6 +5,7 @@ import { AuthProvider } from "../contexts/AuthContext";
 import { KeymapProvider } from "../contexts/KeymapContext";
 import { NotificationContainer } from "@/components/NotificationContainer";
 import { ErrorReportingRuntime } from "@/components/ErrorReportingRuntime";
+import { MdiRuntimeProvider } from "@/components/MdiRuntimeProvider";
 
 export default function RootLayout({
   children,
@@ -28,7 +29,9 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <EditorModeProvider>
-              <KeymapProvider>{children}</KeymapProvider>
+              <KeymapProvider>
+                <MdiRuntimeProvider>{children}</MdiRuntimeProvider>
+              </KeymapProvider>
             </EditorModeProvider>
           </AuthProvider>
         </ThemeProvider>

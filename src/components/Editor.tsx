@@ -145,6 +145,7 @@ export default function NovelEditor({
   const selectionState = useSelectionTracking({
     editorViewInstance,
     scrollContainerRef,
+    documentFormat,
     onSelectionChange,
     onSelectionRangeChange,
   });
