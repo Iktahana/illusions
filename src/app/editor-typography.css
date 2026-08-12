@@ -1,96 +1,60 @@
-/** Application-owned typography. Layout and scrolling belong to the vertical-writing plugin. */
+/** Application typography only. Layout and scrolling belong to vertical-writing. */
 
 @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap");
 
-.novel-editor-content {
-  font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", "MS 明朝", serif;
-  font-weight: 400;
-  font-size: 1em;
+.editor-core > .milkdown {
+  --milkdown-vertical-writing-viewport-size: 100%;
+  width: 100%;
+  height: 100%;
+}
+
+.editor-core > .milkdown > .editor {
+  min-height: 100%;
+  margin-inline: auto;
+  padding-block: 2rem;
+  padding-inline: 4rem;
+  font-family: var(
+    --editor-font-family,
+    "Noto Serif JP",
+    "Hiragino Mincho ProN",
+    "Yu Mincho",
+    serif
+  );
+  font-size: var(--editor-font-scale, 100%);
+  line-height: var(--editor-line-height, 1.8);
   letter-spacing: 0.05em;
-  word-spacing: 0.1em;
-  /* No "palt": novel typesetting uses full-width pitch (JIS X 4051 べた組み) */
-  font-feature-settings: normal;
-}
-
-/* Ruby (振仮名) unified base styling */
-.novel-editor-content ruby {
-  ruby-align: center;
-}
-
-.novel-editor-content rt {
-  font-size: 0.5em;
-  letter-spacing: 0;
-}
-
-/*
- * Suppress the phantom blank line below a block (e.g. a heading) whose last
- * inline node is an atom such as ruby. ProseMirror appends a zero-width
- * `<img class="ProseMirror-separator">` followed by a `<br class="ProseMirror-trailingBreak">`
- * after a trailing inline leaf so the caret can sit after it. The default
- * stylesheet leaves that <br> visible, so a ruby-only heading renders an
- * undeletable empty line underneath. Hiding only the trailing <br> that directly
- * follows a separator removes the phantom line while keeping the caret position
- * (handled by the separator <img>). Genuine empty blocks have no separator
- * sibling, so their trailing break — and intentional `[[blank]]` paragraphs
- * (handled separately via `p.mdi-blank::before`) — are unaffected.
- */
-.novel-editor-content img.ProseMirror-separator + br.ProseMirror-trailingBreak {
-  display: none;
-}
-
-/* Tate-chu-yoko: horizontal digits/punctuation */
-.novel-editor-content .tcy {
-  text-combine-upright: all;
-}
-
-/* No-break: prevent line breaks in proper nouns */
-.novel-editor-content .mdi-nobr {
-  white-space: nowrap;
-  word-break: keep-all;
-}
-
-/* Kerning: adjust letter spacing */
-.novel-editor-content .mdi-kern {
-  letter-spacing: var(--mdi-kern, 0em);
-}
-
-/* Blank paragraph (強制空段落 `[[blank]]`): when empty, render a line-box of natural height
-   via a zero-width space so paragraph counters don't stack. As soon as the user types,
-   `:empty` no longer matches and the actual content takes over. */
-.novel-editor-content p.mdi-blank:empty::before {
-  content: "\200B";
-}
-
-.novel-editor-content {
   overflow-wrap: break-word;
   word-break: normal;
   line-break: strict;
 }
 
-.milkdown[data-writing-mode="horizontal-tb"] .novel-editor-content {
-  text-align: left;
+.editor-core .milkdown .ProseMirror p {
+  margin-block-end: var(--editor-paragraph-spacing, 0.5em);
+  text-indent: var(--editor-text-indent, 1em);
 }
 
-.milkdown:not([data-writing-mode="horizontal-tb"]) .novel-editor-content {
-  text-align: justify;
-  vertical-align: bottom;
+.editor-core .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6, li, blockquote) {
+  text-indent: 0;
 }
 
-.novel-editor-content ul,
-.novel-editor-content ol {
-  margin-block: 0.5em;
-  margin-inline: 0;
-  padding-inline-start: 2em;
+.editor-core .mdi-ruby {
+  ruby-align: center;
 }
 
-.novel-editor-content li {
-  margin-block: 0.25em;
-  margin-inline: 0;
+.editor-core .mdi-ruby rt {
+  font-size: 0.5em;
+  letter-spacing: 0;
 }
 
-.novel-editor-content blockquote {
-  margin-block: 0.5em;
-  margin-inline: 0;
-  padding-inline-start: 1em;
-  border-inline-start: 3px solid rgb(var(--border-secondary));
+.editor-core .mdi-tcy {
+  text-combine-upright: all;
+}
+
+.editor-core .mdi-no-break {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.editor-core .mdi-kern {
+  letter-spacing: var(--mdi-kern, 0);
 }

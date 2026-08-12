@@ -2,7 +2,7 @@
 
 import type React from "react";
 import dynamic from "next/dynamic";
-import { DEFAULT_POS_COLORS } from "@/lib/editor-page/pos-highlight/pos-colors";
+import { DEFAULT_POS_COLORS } from "@/lib/editor-page/pos-highlight-colors";
 import { usePosHighlightSettings } from "@/contexts/EditorSettingsContext";
 import ColorPicker from "@/components/ColorPicker";
 import { SettingsField, SettingsToggle } from "./primitives";

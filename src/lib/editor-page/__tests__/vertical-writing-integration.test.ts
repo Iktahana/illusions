@@ -34,6 +34,24 @@ async function createEditor(): Promise<{ editor: Editor; root: HTMLDivElement }>
   return { editor, root: root.querySelector(".milkdown") ?? root };
 }
 
+async function createFormatEditor(format: DocumentFormat, source: string): Promise<Editor> {
+  const adapter = getDocumentAdapter(format);
+  await adapter.initialize();
+  const mount = document.createElement("div");
+  document.body.appendChild(mount);
+
+  let builder = Editor.make()
+    .config((ctx) => {
+      ctx.set(rootCtx, mount);
+      ctx.set(defaultValueCtx, source);
+    })
+    .use(commonmark);
+  builder = adapter.configureEditor(builder);
+  const editor = await builder.use(verticalWriting({ mode: "horizontal-tb" })).create();
+  editors.push(editor);
+  return editor;
+}
+
 describe("vertical-writing app integration", () => {
   it("changes mode and line length without replacing the view, document, selection or history", async () => {
     const { editor, root } = await createEditor();
@@ -120,6 +138,27 @@ describe("vertical-writing app integration", () => {
       expect(pluginRoot).not.toBeNull();
       expect(pluginRoot?.dataset.writingMode).toBe("vertical-rl");
       expect(pluginRoot?.dataset.lineLength).toBe("28");
+    },
+  );
+
+  it.each([
+    ["mdi", "{東京|とうきょう}と^12^。\n", "と12。"],
+    ["markdown", "# {東京|とうきょう}\n", "{東京|とうきょう}"],
+    ["plain-text", "# {東京|とうきょう}\n[[pagebreak]]", "# {東京|とうきょう}[[pagebreak]]"],
+  ] as const)(
+    "round-trips %s through its explicit document adapter",
+    async (format, source, text) => {
+      const editor = await createFormatEditor(format, source);
+      const adapter = getDocumentAdapter(format);
+      const view = editor.ctx.get(editorViewCtx);
+
+      expect(view.state.doc.textContent).toBe(text);
+
+      let encoded = "";
+      editor.action((ctx) => {
+        encoded = adapter.encodeEditor(ctx, ctx.get(editorViewCtx).state.doc);
+      });
+      expect(encoded).toBe(source);
     },
   );
 });

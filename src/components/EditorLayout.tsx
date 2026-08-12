@@ -53,7 +53,7 @@ import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { HtmlExportOptions } from "@/lib/export/html-shared";
 import type { ExportMetadata } from "@/lib/export/types";
-import type { RuleRunnerLike } from "@/lib/editor-page/linting-plugin";
+import type { RuleRunnerLike } from "@/lib/editor-page/linting-plugin/worker/protocol";
 import { decideResponsivePanels } from "@/lib/editor-page/responsive-layout";
 import { useWindowWidth } from "@/lib/editor-page/use-window-width";
 import { documentFormatForExtension } from "@/lib/document-format";
@@ -177,15 +177,13 @@ interface EditorLayoutProps {
     setEditorDiff: (diff: PanelState["editorDiff"]) => void;
     editorDomRef: RefObject<HTMLDivElement | null>;
     handleChange: NonNullable<React.ComponentProps<typeof NovelEditor>["onChange"]>;
-    handleInsertText: NonNullable<React.ComponentProps<typeof NovelEditor>["onInsertText"]>;
+    handleInsertText: (text: string) => void;
     onSelectionChange: (
       charCount: number,
       manuscriptCells: number,
       manuscriptPages: number,
     ) => void;
-    onSelectionRangeChange: NonNullable<
-      React.ComponentProps<typeof NovelEditor>["onSelectionRangeChange"]
-    >;
+    onSelectionRangeChange: (range: { from: number; to: number } | null) => void;
     searchOpenTrigger: number;
     searchInitialTerm?: string;
     // 共有検索 state。SearchDialog は dockview パネル外（<main>）でレンダリングする。
@@ -214,14 +212,10 @@ interface EditorLayoutProps {
     handleOpenRubyDialog: () => void;
     handleToggleTcy: () => void;
     handleOpenDictionary: (searchTerm?: string) => void;
-    handleShowLintHint: NonNullable<React.ComponentProps<typeof NovelEditor>["onShowLintHint"]>;
-    handleIgnoreCorrection: NonNullable<
-      React.ComponentProps<typeof NovelEditor>["onIgnoreCorrection"]
-    >;
-    handleAddToUserDictionary: NonNullable<
-      React.ComponentProps<typeof NovelEditor>["onAddToUserDictionary"]
-    >;
-    dictEntryRuleIds: React.ComponentProps<typeof NovelEditor>["dictEntryRuleIds"];
+    handleShowLintHint: (issue: LintIssue) => void;
+    handleIgnoreCorrection: (issue: LintIssue, ignoreAll: boolean) => void;
+    handleAddToUserDictionary: (issue: LintIssue) => void;
+    dictEntryRuleIds: ReadonlySet<string>;
     switchTab: (tabId: string) => void;
     updateTab: (tabId: string, updates: Partial<EditorTabState>) => void;
     registerFlush: NonNullable<React.ComponentProps<typeof NovelEditor>["registerFlush"]>;
@@ -600,26 +594,11 @@ export default function EditorLayout({
                                     panelEditorKey,
                                   )}
                                   initialContent={panelContent}
-                                  // 編集・選択系の callback は app 全体で 1 本の active tab content /
-                                  // selection に書き込むため、active panel のみに配線する。
+                                  // 編集 callback は app 全体で 1 本の active tab content に
+                                  // 書き込むため、active panel のみに配線する。
                                   // inactive panel の instance は履歴保持のため生かしておくが、
                                   // それらの編集がアクティブタブの内容を汚さないようにする (#1878)。
                                   onChange={isActivePanel ? mainArea.handleChange : undefined}
-                                  onInsertText={
-                                    isActivePanel ? mainArea.handleInsertText : undefined
-                                  }
-                                  onSelectionChange={
-                                    isActivePanel ? mainArea.onSelectionChange : undefined
-                                  }
-                                  onSelectionRangeChange={
-                                    isActivePanel ? mainArea.onSelectionRangeChange : undefined
-                                  }
-                                  // 検索の入力/表示は <main> の SearchDialog が担当。
-                                  // pane へは「語を反映」「開く」「トグル」の安定 callback のみ渡す
-                                  // （dockview の凍結クロージャでも安定 ref は機能するため）。
-                                  onSearchTermChange={mainArea.onSearchTermChange}
-                                  onOpenSearchDialog={mainArea.onOpenSearchDialog}
-                                  onToggleSearchDialog={mainArea.onToggleSearchDialog}
                                   // app 全体に 1 つだけ存在する「アクティブな EditorView」は
                                   // active panel のみが登録する。inactive panel が登録すると
                                   // split view で最後にレンダリングされた pane が勝ってしまう。
@@ -630,20 +609,6 @@ export default function EditorLayout({
                                   registerWritingModeToggle={
                                     isActivePanel ? mainArea.registerWritingModeToggle : undefined
                                   }
-                                  lintingRuleRunner={mainArea.ruleRunner}
-                                  onLintIssuesUpdated={mainArea.handleLintIssuesUpdated}
-                                  onNlpError={mainArea.handleNlpError}
-                                  onOpenSpeechSettings={() => {
-                                    dialogs.setSettingsInitialCategory("speech");
-                                    dialogs.setShowSettingsModal(true);
-                                  }}
-                                  onOpenRubyDialog={mainArea.handleOpenRubyDialog}
-                                  onToggleTcy={mainArea.handleToggleTcy}
-                                  onOpenDictionary={mainArea.handleOpenDictionary}
-                                  onShowLintHint={mainArea.handleShowLintHint}
-                                  onIgnoreCorrection={mainArea.handleIgnoreCorrection}
-                                  onAddToUserDictionary={mainArea.handleAddToUserDictionary}
-                                  dictEntryRuleIds={mainArea.dictEntryRuleIds}
                                   documentFormat={panelDocumentFormat}
                                   externalContent={panelPendingExternalContent}
                                   onExternalContentApplied={() => {

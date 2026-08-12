@@ -11,7 +11,7 @@
  *   unsubscribe();
  */
 
-import type { RuleRunnerProxy } from "@/lib/editor-page/linting-plugin";
+import type { RuleRunnerProxy } from "@/lib/editor-page/linting-plugin/worker/rule-runner-proxy";
 import { notificationManager } from "@/lib/services/notification-manager";
 
 // -------------------------------------------------------------------------
