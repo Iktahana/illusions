@@ -3,7 +3,7 @@ title: エディタ初期化ライフサイクル
 slug: editor-lifecycle
 type: architecture
 status: active
-updated: 2026-04-06
+updated: 2026-08-13
 tags:
   - architecture
   - lifecycle
@@ -24,6 +24,8 @@ illusions のエディタ（メインウィンドウ）が起動し、ユーザ�
 
 - 実行環境（Electron / Web）を特定し、適切な `StorageService` プロバイダーを初期化します。
 - ユーザーのテーマ設定、表示設定（フォント、マージン等）をロードします。
+- `MdiRuntimeProvider` が browser WASM を初期化します。同期 MDI projection を呼ぶ画面は、この
+  startup gate の完了後に render されます。初期化失敗時は rejected promise を固定せず再試行できます。
 
 ### 2. セッションの復元 (Auto-Restore)
 
@@ -49,8 +51,10 @@ Electron 環境で、ファイルやディレクトリをアプリにドラッ�
 
 ### 5. コンテンツのロードとレンダリング
 
-- 最後にアクティブだったタブのバッファ（`BufferState`）をロードし、Milkdown エディタに流し込みます。
-- 統計情報（文字数、読了時間）、校正（Linting）の実行、履歴（History）のインデックス作成を並行して開始します。
+- 最後にアクティブだったタブのバッファをロードし、拡張子から明示的な `DocumentAdapter` を選びます。
+- MDI は公式 MDI plugin、Markdown は CommonMark + GFM、TXT は plain-text adapter で decode します。
+- 最小 editor core は history、clipboard、change notification、flush、external content、vertical-writing
+  plugin のみを構成します。校正 decoration 等の追加機能は現在再接続待ちです。
 
 ## 終了処理 (Termination)
 

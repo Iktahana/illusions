@@ -69,7 +69,7 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
-import { findSearchMatches, type SearchRange } from "@/lib/editor-page/find-search-matches";
+import { findSearchMatches } from "@/lib/editor-page/find-search-matches";
 import { useSearchHighlight, isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 import { takeEditorSelectionForSearch } from "@/lib/editor-page/search-selection";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
@@ -307,7 +307,6 @@ function EditorPageContent() {
     setShowRubyDialog,
     setRubySelectedText,
     setEditorDiff,
-    handleOpenDictionary,
     setSearchTerm,
     setCaseSensitive,
     setRegexSearch,
@@ -547,10 +546,11 @@ function EditorPageContent() {
     name: string;
     execute: () => Promise<void>;
   } | null>(null);
-  const [selectedCharCount, setSelectedCharCount] = useState(0);
-  const [selectedManuscriptCells, setSelectedManuscriptCells] = useState(0);
-  const [selectedManuscriptPages, setSelectedManuscriptPages] = useState(0);
-  const [searchSelectionRange, setSearchSelectionRange] = useState<SearchRange | null>(null);
+  // 選択追跡は新エディター拡張として再実装するまで UI の値を 0 に固定する。
+  const selectedCharCount = 0;
+  const selectedManuscriptCells = 0;
+  const selectedManuscriptPages = 0;
+  const searchSelectionRange = null;
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstanceRaw] = useState<EditorView | null>(null);
@@ -631,9 +631,7 @@ function EditorPageContent() {
   // 開閉状態を page 側で持つ。dockview パネル内に置くと、パネルのクロージャが
   // マウント時に凍結され searchTerm/matches など変化する値が pane へ届かず、入力が
   // 反映されない（editorDiff 比較ビューを <main> へ移したのと同じ理由）。
-  const openSearchDialog = useCallback(() => setIsSearchDialogOpen(true), []);
   const closeSearchDialog = useCallback(() => setIsSearchDialogOpen(false), []);
-  const toggleSearchDialog = useCallback(() => setIsSearchDialogOpen((v) => !v), []);
 
   // ⌘F・辞書語検索などの外部トリガーで検索窓を開く（カウンタ増加で発火）。
   useEffect(() => {
@@ -1270,14 +1268,7 @@ function EditorPageContent() {
   );
 
   // --- Linting hook ---
-  const {
-    ruleRunner,
-    lintIssues,
-    isLinting,
-    handleLintIssuesUpdated,
-    handleNlpError,
-    refreshLinting,
-  } = useLinting(
+  const { lintIssues, isLinting, refreshLinting } = useLinting(
     lintingEnabled,
     lintingRuleConfigs,
     editorViewInstance,
@@ -1307,7 +1298,6 @@ function EditorPageContent() {
     enrichedLintIssues,
     activeLintIssueIndex,
     handleNavigateToIssue,
-    handleShowLintHint,
     handleIgnoreCorrection,
     handleAddToUserDictionary,
     handleApplyFix,
@@ -1758,18 +1748,6 @@ function EditorPageContent() {
           setEditorDiff,
           editorDomRef,
           handleChange,
-          handleInsertText,
-          onSelectionChange: (count: number, cells: number, pages: number) => {
-            setSelectedCharCount(count);
-            setSelectedManuscriptCells(cells);
-            setSelectedManuscriptPages(pages);
-          },
-          onSelectionRangeChange: (range: SearchRange | null) => {
-            setSearchSelectionRange(range);
-            if (!range) setSelectionOnly(false);
-          },
-          searchOpenTrigger,
-          searchInitialTerm,
           // 共有検索 state（SearchDialog は <main> でレンダリング）
           searchTerm,
           caseSensitive,
@@ -1779,21 +1757,9 @@ function EditorPageContent() {
           onSearchTermChange: setSearchTerm,
           onCaseSensitiveChange: setCaseSensitive,
           onCurrentMatchIndexChange: handleNavigateToMatch,
-          onOpenSearchDialog: openSearchDialog,
           onCloseSearchDialog: closeSearchDialog,
-          onToggleSearchDialog: toggleSearchDialog,
           setEditorViewInstance,
           handleShowAllSearchResults,
-          ruleRunner,
-          handleLintIssuesUpdated,
-          handleNlpError,
-          handleOpenRubyDialog,
-          handleToggleTcy,
-          handleOpenDictionary,
-          handleShowLintHint,
-          handleIgnoreCorrection,
-          handleAddToUserDictionary,
-          dictEntryRuleIds,
           switchTab,
           updateTab,
           registerFlush,

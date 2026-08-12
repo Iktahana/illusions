@@ -47,13 +47,11 @@ import {
 import type { MdiFileDescriptor } from "@/lib/project/mdi-file";
 import { isEditorTab, type EditorTabState, type TabState } from "@/lib/tab-manager/tab-types";
 import type { ContextMenuState } from "@/lib/hooks/use-context-menu";
-import type { LintIssue } from "@/lib/linting/types";
 import type { PdfExportSettings } from "@/lib/export/pdf-export-settings";
 import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { HtmlExportOptions } from "@/lib/export/html-shared";
 import type { ExportMetadata } from "@/lib/export/types";
-import type { RuleRunnerLike } from "@/lib/editor-page/linting-plugin/worker/protocol";
 import { decideResponsivePanels } from "@/lib/editor-page/responsive-layout";
 import { useWindowWidth } from "@/lib/editor-page/use-window-width";
 import { documentFormatForExtension } from "@/lib/document-format";
@@ -177,15 +175,6 @@ interface EditorLayoutProps {
     setEditorDiff: (diff: PanelState["editorDiff"]) => void;
     editorDomRef: RefObject<HTMLDivElement | null>;
     handleChange: NonNullable<React.ComponentProps<typeof NovelEditor>["onChange"]>;
-    handleInsertText: (text: string) => void;
-    onSelectionChange: (
-      charCount: number,
-      manuscriptCells: number,
-      manuscriptPages: number,
-    ) => void;
-    onSelectionRangeChange: (range: { from: number; to: number } | null) => void;
-    searchOpenTrigger: number;
-    searchInitialTerm?: string;
     // 共有検索 state。SearchDialog は dockview パネル外（<main>）でレンダリングする。
     searchTerm: string;
     caseSensitive: boolean;
@@ -197,25 +186,13 @@ interface EditorLayoutProps {
     onCurrentMatchIndexChange: React.ComponentProps<
       typeof SearchDialog
     >["onCurrentMatchIndexChange"];
-    onOpenSearchDialog: () => void;
     onCloseSearchDialog: () => void;
-    onToggleSearchDialog: () => void;
     setEditorViewInstance: NonNullable<
       React.ComponentProps<typeof NovelEditor>["onEditorViewReady"]
     >;
     handleShowAllSearchResults: NonNullable<
       React.ComponentProps<typeof SearchDialog>["onShowAllResults"]
     >;
-    ruleRunner: RuleRunnerLike | null;
-    handleLintIssuesUpdated: (issues: LintIssue[]) => void;
-    handleNlpError: (error: Error) => void;
-    handleOpenRubyDialog: () => void;
-    handleToggleTcy: () => void;
-    handleOpenDictionary: (searchTerm?: string) => void;
-    handleShowLintHint: (issue: LintIssue) => void;
-    handleIgnoreCorrection: (issue: LintIssue, ignoreAll: boolean) => void;
-    handleAddToUserDictionary: (issue: LintIssue) => void;
-    dictEntryRuleIds: ReadonlySet<string>;
     switchTab: (tabId: string) => void;
     updateTab: (tabId: string, updates: Partial<EditorTabState>) => void;
     registerFlush: NonNullable<React.ComponentProps<typeof NovelEditor>["registerFlush"]>;

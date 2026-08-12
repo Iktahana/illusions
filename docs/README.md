@@ -50,6 +50,7 @@ tags:
 - [プロジェクトライフサイクル](architecture/project-lifecycle.md)
 - [可読性スコアリング](architecture/readability-scoring.md)
 - [テキスト統計](architecture/text-statistics.md)
+- [MDI 2.0 エディター統合監査](architecture/mdi-2-editor-audit.md)
 - [NLP バックエンド](architecture/nlp-backend-architecture.md)
 - [通知システム](architecture/notification-system.md)
 - [校正・AI 校正システム](architecture/correction-ai-system.ja.md)
