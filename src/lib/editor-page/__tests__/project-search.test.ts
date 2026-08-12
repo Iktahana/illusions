@@ -195,9 +195,21 @@ describe("raw project document matching", () => {
       listDirectory: vi.fn(async () => [entry("huge.mdi", "file")]),
       readFile: vi.fn(async () => content),
     } as unknown as VirtualFileSystem;
-    const matchDocument = vi.fn(async (...args: Parameters<typeof findRawDocumentMatches>) =>
-      findRawDocumentMatches(...args),
-    );
+    const matchDocument = vi.fn(async () => ({
+      content,
+      matches: [
+        {
+          from: 2_000_000,
+          to: 2_000_006,
+          rawFrom: 2_000_000,
+          rawTo: 2_000_006,
+          lineNumber: 1,
+          text: "target",
+          source: "text" as const,
+          replaceable: true,
+        },
+      ],
+    }));
 
     const results = await searchProjectFiles({
       vfs,
@@ -207,6 +219,7 @@ describe("raw project document matching", () => {
     });
 
     expect(matchDocument).toHaveBeenCalledTimes(1);
+    expect(matchDocument).toHaveBeenCalledWith(content, ".mdi", "target", {});
     expect(results[0].matches[0].rawFrom).toBe(2_000_000);
   });
 });
