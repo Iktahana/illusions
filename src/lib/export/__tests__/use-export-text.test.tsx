@@ -85,7 +85,11 @@ describe("useExport native text export", () => {
     await act(async () => api?.exportAs("note"));
 
     expect(exportMdiText).toHaveBeenCalledWith("本文。", "note", ".mdi", indent, "作品.mdi");
-    expect(trackEvent).toHaveBeenCalledTimes(1);
+    expect(trackEvent).toHaveBeenCalledTimes(2);
+    expect(trackEvent).toHaveBeenCalledWith("note_output_attempted", {
+      operation: "export",
+      format: "note",
+    });
     expect(trackEvent).toHaveBeenCalledWith("note_output_completed", {
       operation: "export",
       format: "note",
@@ -96,12 +100,15 @@ describe("useExport native text export", () => {
   it.each([
     ["cancelled", null],
     ["failed", { success: false, error: "private write failure" }],
-  ] as const)("does not track a %s note export", async (_label, result) => {
+  ] as const)("tracks a safe %s note export outcome", async (label, result) => {
     exportMdiText.mockResolvedValue(result);
 
     await act(async () => api?.exportAs("note"));
 
-    expect(trackEvent).not.toHaveBeenCalled();
+    expect(trackEvent).toHaveBeenCalledWith(
+      label === "cancelled" ? "note_output_cancelled" : "note_output_failed",
+      expect.objectContaining({ operation: "export", format: "note" }),
+    );
   });
 
   it("does not report success when the native save dialog is cancelled", async () => {
@@ -112,7 +119,10 @@ describe("useExport native text export", () => {
     expect(notifications.dismiss).toHaveBeenCalledWith("progress-id");
     expect(notifications.success).not.toHaveBeenCalled();
     expect(notifications.error).not.toHaveBeenCalled();
-    expect(trackEvent).not.toHaveBeenCalled();
+    expect(trackEvent).toHaveBeenCalledWith("document_output_cancelled", {
+      operation: "export",
+      format: "txt",
+    });
   });
 
   it("reports a structured main-process export failure", async () => {
@@ -124,7 +134,11 @@ describe("useExport native text export", () => {
       "青空文庫形式のエクスポートに失敗しました: 書き込みに失敗しました",
     );
     expect(notifications.success).not.toHaveBeenCalled();
-    expect(trackEvent).not.toHaveBeenCalled();
+    expect(trackEvent).toHaveBeenCalledWith("document_output_failed", {
+      operation: "export",
+      format: "aozora",
+      reason: "unknown",
+    });
   });
 
   it("keeps a successful export successful when analytics delivery fails", async () => {
@@ -176,7 +190,11 @@ describe("useExport native HTML export", () => {
       "HTMLのエクスポートに失敗しました: HTML生成に失敗しました",
     );
     expect(notifications.success).not.toHaveBeenCalled();
-    expect(trackEvent).not.toHaveBeenCalled();
+    expect(trackEvent).toHaveBeenCalledWith("document_output_failed", {
+      operation: "export",
+      format: "html",
+      reason: "unknown",
+    });
   });
 });
 
@@ -209,7 +227,11 @@ describe("useExport native text clipboard copy", () => {
 
     expect(requestTxtExportOptions).not.toHaveBeenCalled();
     expect(copyMdiText).toHaveBeenCalledWith("本文。", "note", ".mdi", undefined);
-    expect(trackEvent).toHaveBeenCalledTimes(1);
+    expect(trackEvent).toHaveBeenCalledTimes(2);
+    expect(trackEvent).toHaveBeenCalledWith("note_output_attempted", {
+      operation: "copy",
+      format: "note",
+    });
     expect(trackEvent).toHaveBeenCalledWith("note_output_completed", {
       operation: "copy",
       format: "note",
@@ -217,12 +239,16 @@ describe("useExport native text clipboard copy", () => {
     expect(trackEvent).not.toHaveBeenCalledWith("document_output_completed", expect.anything());
   });
 
-  it("does not track a failed formatted note copy", async () => {
+  it("tracks a failed formatted note copy without private data", async () => {
     copyMdiText.mockResolvedValue({ success: false, error: "private clipboard failure" });
 
     await act(async () => api?.copyAs("note"));
 
-    expect(trackEvent).not.toHaveBeenCalled();
+    expect(trackEvent).toHaveBeenCalledWith("note_output_failed", {
+      operation: "copy",
+      format: "note",
+      reason: "unknown",
+    });
   });
 
   it("copies immediately even when the export indentation dialog would cancel", async () => {
@@ -247,6 +273,10 @@ describe("useExport native text clipboard copy", () => {
       "青空文庫形式のクリップボードへのコピーに失敗しました: クリップボードを利用できません",
     );
     expect(notifications.success).not.toHaveBeenCalled();
-    expect(trackEvent).not.toHaveBeenCalled();
+    expect(trackEvent).toHaveBeenCalledWith("document_output_failed", {
+      operation: "copy",
+      format: "aozora",
+      reason: "unknown",
+    });
   });
 });

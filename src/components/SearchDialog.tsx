@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Search, X, ChevronUp, ChevronDown, List } from "lucide-react";
 import { computeAnchorPos, clampDragPos } from "@/lib/search-dialog/compute-anchor-pos";
 import type { SearchMatch } from "@/lib/editor-page/find-search-matches";
+import { bucketTelemetryCount, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 const DIALOG_WIDTH = 320; // w-80 と一致させる
 const DIALOG_PADDING = 16; // 8px top offset / 16px right offset の元値と整合
@@ -49,6 +50,7 @@ export default function SearchDialog({
   // Drag state (session-only, resets on close)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
   const isDragging = useRef(false);
+  const lastCommittedSearchRef = useRef("");
   const dragStart = useRef<{ mouseX: number; mouseY: number; elX: number; elY: number }>({
     mouseX: 0,
     mouseY: 0,
@@ -79,6 +81,7 @@ export default function SearchDialog({
       );
     }
     if (!isOpen) {
+      lastCommittedSearchRef.current = "";
       setAnchorPos(null);
       setDragOffset(null);
     }
@@ -186,12 +189,28 @@ export default function SearchDialog({
     onCurrentMatchIndexChange((currentMatchIndex - 1 + matches.length) % matches.length);
   };
 
+  const commitSearchTelemetry = () => {
+    if (!searchTerm) return;
+    const key = `${caseSensitive}:${searchTerm}`;
+    if (lastCommittedSearchRef.current === key) return;
+    lastCommittedSearchRef.current = key;
+    trackUsageEvent("search_completed", {
+      scope: "current",
+      case_sensitive: caseSensitive ? "true" : "false",
+      whole_word: "false",
+      regex: "false",
+      target: "all",
+      result_count_bucket: bucketTelemetryCount(matches.length),
+    });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       onClose();
     } else if (e.key === "Enter") {
       // Ignore IME composition confirmation — only handle real Enter
       if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+      commitSearchTelemetry();
       if (e.shiftKey) {
         goToPreviousMatch();
       } else {
@@ -240,6 +259,7 @@ export default function SearchDialog({
             type="text"
             value={searchTerm}
             onChange={(e) => onSearchTermChange(e.target.value)}
+            onBlur={commitSearchTelemetry}
             placeholder="検索..."
             className="w-full px-3 py-2 pr-20 border border-border-secondary bg-background text-foreground rounded focus:outline-none focus:ring-2 focus:ring-accent text-sm"
           />

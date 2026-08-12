@@ -46,11 +46,13 @@ function applyConfig(utterance: SpeechSynthesisUtterance, config?: SpeechConfig)
 export interface SpeechCallbacks {
   onBoundary?: (charIndex: number, charLength: number) => void;
   onEnd?: () => void;
+  onError?: () => void;
 }
 
 export interface SegmentCallbacks {
   onSegmentStart?: (index: number) => void;
   onEnd?: () => void;
+  onError?: () => void;
 }
 
 export function useSpeech(config?: SpeechConfig): {
@@ -74,6 +76,7 @@ export function useSpeech(config?: SpeechConfig): {
   // Store callbacks in refs so they can be updated without recreating the utterance.
   const onBoundaryRef = useRef<SpeechCallbacks["onBoundary"]>(undefined);
   const onEndRef = useRef<SpeechCallbacks["onEnd"]>(undefined);
+  const onErrorRef = useRef<SpeechCallbacks["onError"]>(undefined);
   const onSegmentStartRef = useRef<SegmentCallbacks["onSegmentStart"]>(undefined);
   // Flag set during stop() so cancel-triggered onend/onerror events are ignored.
   // This prevents stop() from being mistaken for natural completion by continuation logic.
@@ -100,6 +103,7 @@ export function useSpeech(config?: SpeechConfig): {
 
     onBoundaryRef.current = callbacks?.onBoundary;
     onEndRef.current = callbacks?.onEnd;
+    onErrorRef.current = callbacks?.onError;
 
     // Cancel whatever is currently playing before starting new speech.
     window.speechSynthesis.cancel();
@@ -132,7 +136,7 @@ export function useSpeech(config?: SpeechConfig): {
     utterance.onerror = () => {
       setState({ isPlaying: false, isPaused: false, isSupported: true });
       if (!isStoppingRef.current) {
-        onEndRef.current?.();
+        onErrorRef.current?.();
       }
     };
 
@@ -160,6 +164,7 @@ export function useSpeech(config?: SpeechConfig): {
 
     onSegmentStartRef.current = callbacks?.onSegmentStart;
     onEndRef.current = callbacks?.onEnd;
+    onErrorRef.current = callbacks?.onError;
 
     window.speechSynthesis.cancel();
     // Chromium/Electron bug: resume() needed after cancel() to unblock the queue.
@@ -188,7 +193,7 @@ export function useSpeech(config?: SpeechConfig): {
         window.speechSynthesis.cancel();
         setState({ isPlaying: false, isPaused: false, isSupported: true });
         if (!isStoppingRef.current) {
-          onEndRef.current?.();
+          onErrorRef.current?.();
         }
       };
       return u;

@@ -5,6 +5,7 @@ import { Eye, EyeOff, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 import { useAiApiSettings } from "@/contexts/EditorSettingsContext";
 import { testAiConnection } from "@/lib/ai/ai-client";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 import { fetchAppState } from "@/lib/storage/app-state-manager";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { SettingsField, SettingsSection } from "./primitives";
@@ -49,6 +50,7 @@ export default function AiApiSettingsTab() {
 
   const handleTestConnection = useCallback(async () => {
     if (!apiKey) {
+      trackUsageEvent("ai_connection_test_failed", { reason: "invalid_input" });
       setTestStatus("error");
       setTestMessage("APIキーが設定されていません。");
       return;
@@ -64,8 +66,10 @@ export default function AiApiSettingsTab() {
         modelId: aiModelId,
       });
       setTestStatus("success");
+      trackUsageEvent("ai_connection_test_completed");
       setTestMessage(`接続成功 — ${count}個のモデルが利用可能です。`);
     } catch (e) {
+      trackUsageEvent("ai_connection_test_failed", { reason: classifyTelemetryFailure(e) });
       setTestStatus("error");
       setTestMessage(e instanceof Error ? `接続失敗: ${e.message}` : "接続失敗: 不明なエラー");
     }

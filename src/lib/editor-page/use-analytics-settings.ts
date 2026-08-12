@@ -4,6 +4,7 @@
  */
 import { useCallback, useState } from "react";
 import { persistAppState } from "@/lib/storage/app-state-manager";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export interface AnalyticsSettings {
   usageAnalyticsConsent: boolean;
@@ -46,7 +47,15 @@ export function useAnalyticsSettings(): UseAnalyticsSettingsResult {
     void persistAppState({
       errorReportingConsent: value,
       errorReportingConsentPromptedAt: new Date().toISOString(),
-    }).catch((e: unknown) => console.error("プライバシー設定の保存に失敗しました", e));
+    })
+      .then(() => {
+        trackUsageEvent("settings_change_completed", {
+          category: "privacy",
+          setting: "error_reporting",
+          action: value ? "enabled" : "disabled",
+        });
+      })
+      .catch((e: unknown) => console.error("プライバシー設定の保存に失敗しました", e));
   }, []);
 
   return {

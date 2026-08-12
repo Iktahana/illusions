@@ -478,9 +478,393 @@
       "operation": ["export", "copy"],
       "format": ["html", "pdf", "epub", "docx", "txt", "txt-ruby", "narou", "kakuyomu", "aozora"]
     },
+    "document_output_attempted": {
+      "operation": ["export", "copy"],
+      "format": ["html", "pdf", "epub", "docx", "txt", "txt-ruby", "narou", "kakuyomu", "aozora"]
+    },
+    "document_output_failed": {
+      "operation": ["export", "copy"],
+      "format": ["html", "pdf", "epub", "docx", "txt", "txt-ruby", "narou", "kakuyomu", "aozora"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "document_output_cancelled": {
+      "operation": ["export", "copy"],
+      "format": ["html", "pdf", "epub", "docx", "txt", "txt-ruby", "narou", "kakuyomu", "aozora"]
+    },
     "note_output_completed": {
       "operation": ["export", "copy"],
       "format": ["note"]
-    }
+    },
+    "note_output_attempted": { "operation": ["export", "copy"], "format": ["note"] },
+    "note_output_failed": {
+      "operation": ["export", "copy"],
+      "format": ["note"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "note_output_cancelled": { "operation": ["export", "copy"], "format": ["note"] },
+    "print_attempted": {},
+    "print_completed": {},
+    "print_failed": {
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "print_cancelled": {},
+    "feature_view_opened": {
+      "view": [
+        "files",
+        "explorer",
+        "search",
+        "dictionary",
+        "word_frequency",
+        "corrections",
+        "stats",
+        "history"
+      ],
+      "surface": ["activity_bar", "shortcut", "menu", "cross_feature"]
+    },
+    "settings_category_opened": {
+      "category": [
+        "account",
+        "ai_connection",
+        "typography",
+        "scroll",
+        "pos_highlight",
+        "linting",
+        "speech",
+        "export",
+        "keymap",
+        "terminal",
+        "power",
+        "dictionary",
+        "privacy",
+        "about"
+      ]
+    },
+    "settings_change_completed": {
+      "category": [
+        "account",
+        "ai_connection",
+        "typography",
+        "scroll",
+        "pos_highlight",
+        "linting",
+        "speech",
+        "export",
+        "keymap",
+        "terminal",
+        "power",
+        "dictionary",
+        "privacy",
+        "about"
+      ],
+      "setting": [
+        "theme",
+        "typography",
+        "scroll",
+        "pos_highlight",
+        "linting",
+        "speech",
+        "export",
+        "keymap",
+        "terminal",
+        "power",
+        "dictionary",
+        "beta_updates",
+        "error_reporting",
+        "account"
+      ],
+      "action": ["enabled", "disabled", "updated", "reset"]
+    },
+    "search_completed": {
+      "scope": ["current", "project", "folder"],
+      "case_sensitive": ["true", "false"],
+      "whole_word": ["true", "false"],
+      "regex": ["true", "false"],
+      "target": ["all", "body", "ruby"],
+      "result_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"]
+    },
+    "search_failed": {
+      "scope": ["current", "project", "folder"],
+      "case_sensitive": ["true", "false"],
+      "whole_word": ["true", "false"],
+      "regex": ["true", "false"],
+      "target": ["all", "body", "ruby"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "search_replacement_completed": {
+      "scope": ["current", "project", "folder"],
+      "mode": ["single", "all", "undo"],
+      "replacement_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"]
+    },
+    "search_replacement_failed": {
+      "scope": ["current", "project", "folder"],
+      "mode": ["single", "all", "undo"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "proofreading_run_completed": {
+      "trigger": ["first_auto", "manual", "settings_change"],
+      "issue_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"]
+    },
+    "proofreading_run_failed": {
+      "trigger": ["first_auto", "manual", "settings_change"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "proofreading_issue_action_completed": {
+      "action": ["navigate", "apply_fix", "ignore_one", "ignore_all", "add_dictionary"]
+    },
+    "ruleset_sync_completed": {
+      "trigger": ["startup", "manual", "redownload"],
+      "change_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"]
+    },
+    "ruleset_sync_failed": {
+      "trigger": ["startup", "manual", "redownload"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "dictionary_search_completed": {
+      "source": ["panel", "selection", "correction"],
+      "result_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"]
+    },
+    "dictionary_entry_changed": { "operation": ["add", "update", "remove", "import", "clear"] },
+    "dictionary_lookup_opened": { "provider": ["local", "genji", "unknown"] },
+    "dictionary_download_completed": { "trigger": ["startup", "manual", "update", "repair"] },
+    "dictionary_download_failed": {
+      "trigger": ["startup", "manual", "update", "repair"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "history_action_completed": {
+      "action": ["create_snapshot", "restore", "compare", "bookmark_add", "bookmark_remove"]
+    },
+    "history_action_failed": {
+      "action": ["create_snapshot", "restore", "compare", "bookmark_add", "bookmark_remove"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "word_frequency_completed": {
+      "trigger": ["initial", "manual"],
+      "cache_hit": ["true", "false"],
+      "total_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"],
+      "unique_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"]
+    },
+    "word_frequency_failed": {
+      "trigger": ["initial", "manual"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "editor_format_applied": { "format": ["ruby", "tcy"], "operation": ["apply", "remove"] },
+    "editor_layout_changed": {
+      "action": ["writing_mode", "compact_mode", "split"],
+      "value": ["horizontal", "vertical", "enabled", "disabled", "single", "split"]
+    },
+    "speech_session_started": { "voice_kind": ["default", "custom"] },
+    "speech_session_finished": {
+      "voice_kind": ["default", "custom"],
+      "outcome": ["completed", "stopped", "error"]
+    },
+    "terminal_session_started": {
+      "context": ["project", "standalone"],
+      "shell_kind": ["default", "custom"]
+    },
+    "terminal_session_failed": {
+      "context": ["project", "standalone"],
+      "shell_kind": ["default", "custom"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "terminal_session_finished": {
+      "context": ["project", "standalone"],
+      "shell_kind": ["default", "custom"],
+      "outcome": ["exit_zero", "exit_nonzero", "killed"]
+    },
+    "ai_connection_test_completed": {},
+    "ai_connection_test_failed": {
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "feedback_opened": { "category": ["bug", "feature", "ai_inappropriate", "other"] },
+    "feedback_submit_completed": { "category": ["bug", "feature", "ai_inappropriate", "other"] },
+    "feedback_submit_failed": {
+      "category": ["bug", "feature", "ai_inappropriate", "other"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "app_update_available": { "trigger": ["automatic", "manual"], "channel": ["stable", "beta"] },
+    "app_update_download_completed": {
+      "trigger": ["automatic", "manual"],
+      "channel": ["stable", "beta"]
+    },
+    "app_update_download_failed": {
+      "trigger": ["automatic", "manual"],
+      "channel": ["stable", "beta"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "app_update_install_started": {
+      "trigger": ["automatic", "manual"],
+      "channel": ["stable", "beta"]
+    },
+    "app_update_install_blocked": {
+      "trigger": ["automatic", "manual"],
+      "channel": ["stable", "beta"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "keymap_changed": { "operation": ["set", "reset", "reset_all"] }
   }
 }

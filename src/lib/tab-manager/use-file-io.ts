@@ -362,15 +362,18 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         // #1840: serialize the live editor doc before saving so we never write
         // debounce-lagged content (and applySavedTabState compares correctly).
         const tabToSave = flushActiveTabContent(tab);
-        trackUsageEvent(isAutoSave ? "autosave_attempted" : "save_attempted", {
-          ...(isAutoSave
-            ? { target_kind: getTelemetryTargetKind(tabToSave.file), activity: "unknown" }
-            : {
-                trigger: "manual",
-                mode: isProjectRef.current ? "project" : "standalone",
-                target_kind: getTelemetryTargetKind(tabToSave.file),
-              }),
-        });
+        if (isAutoSave) {
+          trackUsageEvent("autosave_attempted", {
+            target_kind: getTelemetryTargetKind(tabToSave.file),
+            activity: "unknown",
+          });
+        } else {
+          trackUsageEvent("save_attempted", {
+            trigger: "manual",
+            mode: isProjectRef.current ? "project" : "standalone",
+            target_kind: getTelemetryTargetKind(tabToSave.file),
+          });
+        }
         const outcome = await executeTabSave({
           tab: tabToSave,
           isProject: isProjectRef.current,
@@ -385,26 +388,32 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         });
 
         if (outcome.status === "saved" && outcome.persistFailed) {
-          trackUsageEvent(isAutoSave ? "autosave_completed" : "save_completed", {
-            ...(isAutoSave
-              ? { target_kind: getTelemetryTargetKind(outcome.descriptor), activity: "unknown" }
-              : {
-                  trigger: "manual",
-                  mode: isProjectRef.current ? "project" : "standalone",
-                  target_kind: getTelemetryTargetKind(outcome.descriptor),
-                }),
-          });
+          if (isAutoSave) {
+            trackUsageEvent("autosave_completed", {
+              target_kind: getTelemetryTargetKind(outcome.descriptor),
+              activity: "unknown",
+            });
+          } else {
+            trackUsageEvent("save_completed", {
+              trigger: "manual",
+              mode: isProjectRef.current ? "project" : "standalone",
+              target_kind: getTelemetryTargetKind(outcome.descriptor),
+            });
+          }
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         } else if (outcome.status === "saved") {
-          trackUsageEvent(isAutoSave ? "autosave_completed" : "save_completed", {
-            ...(isAutoSave
-              ? { target_kind: getTelemetryTargetKind(outcome.descriptor), activity: "unknown" }
-              : {
-                  trigger: "manual",
-                  mode: isProjectRef.current ? "project" : "standalone",
-                  target_kind: getTelemetryTargetKind(outcome.descriptor),
-                }),
-          });
+          if (isAutoSave) {
+            trackUsageEvent("autosave_completed", {
+              target_kind: getTelemetryTargetKind(outcome.descriptor),
+              activity: "unknown",
+            });
+          } else {
+            trackUsageEvent("save_completed", {
+              trigger: "manual",
+              mode: isProjectRef.current ? "project" : "standalone",
+              target_kind: getTelemetryTargetKind(outcome.descriptor),
+            });
+          }
         } else if (outcome.status === "conflicted") {
           trackUsageEvent("save_conflict_blocked", {
             trigger: isAutoSave ? "auto" : "manual",

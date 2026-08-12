@@ -11,6 +11,7 @@ import { SHORTCUT_REGISTRY } from "@/lib/keymap/shortcut-registry";
 import { formatBinding } from "@/lib/keymap/keymap-utils";
 import { useKeymap } from "@/contexts/KeymapContext";
 import KeybindingInput from "./KeybindingInput";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 /** Japanese display names for each category */
 const CATEGORY_LABELS: Record<ShortcutCategory, string> = {
@@ -87,15 +88,33 @@ export default function KeymapSettings() {
 
   const handleRecord = async (id: CommandId, binding: KeyBinding) => {
     await setOverrideWithConflictResolution(id, binding);
+    trackUsageEvent("keymap_changed", { operation: "set" });
+    trackUsageEvent("settings_change_completed", {
+      category: "keymap",
+      setting: "keymap",
+      action: "updated",
+    });
     setRecording(null);
   };
 
   const handleReset = async (id: CommandId) => {
     await resetOverride(id);
+    trackUsageEvent("keymap_changed", { operation: "reset" });
+    trackUsageEvent("settings_change_completed", {
+      category: "keymap",
+      setting: "keymap",
+      action: "reset",
+    });
   };
 
   const handleResetAll = async () => {
     await resetAll();
+    trackUsageEvent("keymap_changed", { operation: "reset_all" });
+    trackUsageEvent("settings_change_completed", {
+      category: "keymap",
+      setting: "keymap",
+      action: "reset",
+    });
   };
 
   const isOverridden = (id: CommandId) => id in overrides;

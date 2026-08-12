@@ -4,6 +4,7 @@ import { Fragment } from "@milkdown/prose/model";
 import { toggleMark } from "@milkdown/prose/commands";
 import type { EditorView } from "@milkdown/prose/view";
 import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export interface RubyApplicationSegment {
   base: string;
@@ -62,9 +63,12 @@ export function useRubyTcy({
           : state.schema.text(segment.base),
       );
       const fragment = Fragment.from(nodes);
-      dispatchIfEditorViewAlive(view, (aliveView) =>
+      const applied = dispatchIfEditorViewAlive(view, (aliveView) =>
         aliveView.state.tr.replaceWith(sel.from, sel.to, fragment),
       );
+      if (applied) {
+        trackUsageEvent("editor_format_applied", { format: "ruby", operation: "apply" });
+      }
       rubySelectionRef.current = null;
     },
     // editorViewRef is a stable ref object; including it here satisfies the React Compiler
@@ -81,7 +85,11 @@ export function useRubyTcy({
     if (!state.doc.textBetween(from, to).trim()) return;
     const markType = state.schema.marks.mdiTcy;
     if (!markType) return;
-    toggleMark(markType)(state, view.dispatch, view);
+    const operation = state.doc.rangeHasMark(from, to, markType) ? "remove" : "apply";
+    const applied = toggleMark(markType)(state, view.dispatch, view);
+    if (applied) {
+      trackUsageEvent("editor_format_applied", { format: "tcy", operation });
+    }
     // editorViewRef is a stable ref object; including it here satisfies the React Compiler
   }, [editorViewRef]);
 

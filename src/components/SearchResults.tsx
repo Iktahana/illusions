@@ -37,6 +37,11 @@ import { ProjectSearchWorkerClient } from "@/lib/editor-page/project-search-work
 import { addSearchHistoryEntry, loadSearchHistory } from "@/lib/editor-page/search-history";
 import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
+import {
+  bucketTelemetryCount,
+  classifyTelemetryFailure,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 
 type SearchScope = "project" | "current" | "folder";
 const EMPTY_PROJECT_BUFFERS: ReadonlyMap<string, string> = new Map();
@@ -126,6 +131,7 @@ export default function SearchResults({
   const searchInputRef = useRef<HTMLInputElement>(null);
   /** Monotonically increasing counter used to ignore stale open-file resolutions. */
   const navRequestIdRef = useRef(0);
+  const lastSettledSearchRef = useRef("");
 
   useEffect(() => setHistory(loadSearchHistory()), []);
 
@@ -195,12 +201,36 @@ export default function SearchResults({
           });
         })
         .then((results) => {
-          if (!controller.signal.aborted) setProjectResults(results);
+          if (!controller.signal.aborted) {
+            setProjectResults(results);
+            const key = JSON.stringify([scope, searchTerm, searchOptions]);
+            if (lastSettledSearchRef.current !== key) {
+              lastSettledSearchRef.current = key;
+              trackUsageEvent("search_completed", {
+                scope,
+                case_sensitive: String(searchOptions.caseSensitive) as "true" | "false",
+                whole_word: String(searchOptions.wholeWord) as "true" | "false",
+                regex: String(searchOptions.regex) as "true" | "false",
+                target: searchOptions.searchTarget ?? "all",
+                result_count_bucket: bucketTelemetryCount(
+                  results.reduce((total, file) => total + file.matches.length, 0),
+                ),
+              });
+            }
+          }
         })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;
           setProjectSearchError(error instanceof Error ? error.message : "検索に失敗しました");
           setProjectResults([]);
+          trackUsageEvent("search_failed", {
+            scope,
+            case_sensitive: String(searchOptions.caseSensitive) as "true" | "false",
+            whole_word: String(searchOptions.wholeWord) as "true" | "false",
+            regex: String(searchOptions.regex) as "true" | "false",
+            target: searchOptions.searchTarget ?? "all",
+            reason: classifyTelemetryFailure(error),
+          });
         })
         .finally(() => {
           if (!controller.signal.aborted) setProjectSearchPending(false);
@@ -225,7 +255,24 @@ export default function SearchResults({
 
   const commitSearchHistory = useCallback(() => {
     setHistory(addSearchHistoryEntry(searchTerm));
-  }, [searchTerm]);
+    if (!searchTerm || scope !== "current") return;
+    const key = JSON.stringify([scope, searchTerm, searchOptions]);
+    if (lastSettledSearchRef.current === key) return;
+    lastSettledSearchRef.current = key;
+    const base = {
+      scope,
+      case_sensitive: String(searchOptions.caseSensitive) as "true" | "false",
+      whole_word: String(searchOptions.wholeWord) as "true" | "false",
+      regex: String(searchOptions.regex) as "true" | "false",
+      target: searchOptions.searchTarget ?? "all",
+    };
+    if (patternError) trackUsageEvent("search_failed", { ...base, reason: "invalid_pattern" });
+    else
+      trackUsageEvent("search_completed", {
+        ...base,
+        result_count_bucket: bucketTelemetryCount(matches.length),
+      });
+  }, [matches.length, patternError, scope, searchOptions, searchTerm]);
 
   const getMatchContext = useCallback(
     (match: SearchMatch): { before: string; text: string; after: string } => {
@@ -274,11 +321,18 @@ export default function SearchResults({
       const [step] = createReplacementSteps([match], replaceTerm, searchOptions);
       if (!step) return;
 
-      dispatchIfEditorViewAlive(editorView, (view) =>
+      const replaced = dispatchIfEditorViewAlive(editorView, (view) =>
         step.text
           ? view.state.tr.replaceWith(step.from, step.to, view.state.schema.text(step.text))
           : view.state.tr.delete(step.from, step.to),
       );
+      if (replaced) {
+        trackUsageEvent("search_replacement_completed", {
+          scope: "current",
+          mode: "single",
+          replacement_count_bucket: "1",
+        });
+      }
     },
     [editorView, replaceTerm, searchOptions],
   );
@@ -288,7 +342,7 @@ export default function SearchResults({
     const steps = createReplacementSteps(matches, replaceTerm, searchOptions);
     if (steps.length === 0) return;
 
-    dispatchIfEditorViewAlive(editorView, (view) => {
+    const replaced = dispatchIfEditorViewAlive(editorView, (view) => {
       let tr = view.state.tr;
       for (const step of steps) {
         tr = step.text
@@ -297,6 +351,13 @@ export default function SearchResults({
       }
       return tr;
     });
+    if (replaced) {
+      trackUsageEvent("search_replacement_completed", {
+        scope: "current",
+        mode: "all",
+        replacement_count_bucket: bucketTelemetryCount(steps.length),
+      });
+    }
     setConfirmReplaceAll(false);
   }, [editorView, matches, replaceTerm, searchOptions]);
 
@@ -317,15 +378,27 @@ export default function SearchResults({
           onOpenBufferChange: onProjectBufferChange,
         });
         setLastProjectReplacement(changes);
+        trackUsageEvent("search_replacement_completed", {
+          scope,
+          mode: "all",
+          replacement_count_bucket: bucketTelemetryCount(
+            changes.reduce((total, change) => total + change.replacementCount, 0),
+          ),
+        });
         setConfirmReplaceAll(false);
         setProjectRefreshToken((token) => token + 1);
       } catch (error) {
+        trackUsageEvent("search_replacement_failed", {
+          scope,
+          mode: "all",
+          reason: classifyTelemetryFailure(error),
+        });
         setProjectSearchError(error instanceof Error ? error.message : "置換に失敗しました");
       } finally {
         setReplacementPending(false);
       }
     },
-    [onProjectBufferChange, projectOpenBuffers, replaceTerm, searchOptions],
+    [onProjectBufferChange, projectOpenBuffers, replaceTerm, scope, searchOptions],
   );
 
   const undoLastProjectReplacement = useCallback(async () => {
@@ -341,14 +414,26 @@ export default function SearchResults({
         openBuffers: projectOpenBuffers,
         onOpenBufferChange: onProjectBufferChange,
       });
+      trackUsageEvent("search_replacement_completed", {
+        scope,
+        mode: "undo",
+        replacement_count_bucket: bucketTelemetryCount(
+          lastProjectReplacement.reduce((total, change) => total + change.replacementCount, 0),
+        ),
+      });
       setLastProjectReplacement([]);
       setProjectRefreshToken((token) => token + 1);
     } catch (error) {
+      trackUsageEvent("search_replacement_failed", {
+        scope,
+        mode: "undo",
+        reason: classifyTelemetryFailure(error),
+      });
       setProjectSearchError(error instanceof Error ? error.message : "取り消しに失敗しました");
     } finally {
       setReplacementPending(false);
     }
-  }, [lastProjectReplacement, onProjectBufferChange, projectOpenBuffers]);
+  }, [lastProjectReplacement, onProjectBufferChange, projectOpenBuffers, scope]);
 
   const currentGroups = useMemo(() => groupMatches(matches), [matches]);
   const projectMatchCount = useMemo(

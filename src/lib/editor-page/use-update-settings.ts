@@ -4,6 +4,7 @@
  */
 import { useCallback, useState } from "react";
 import { persistAppState } from "@/lib/storage/app-state-manager";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export interface UpdateSettings {
   /** ベータ版（プレリリース）アップデートを受け取るか */
@@ -33,6 +34,11 @@ export function useUpdateSettings(): UseUpdateSettingsResult {
     setAllowBetaUpdates(value);
     void persistAppState({ allowBetaUpdates: value })
       .then(() => {
+        trackUsageEvent("settings_change_completed", {
+          category: "about",
+          setting: "beta_updates",
+          action: value ? "enabled" : "disabled",
+        });
         // メインプロセスへ channel 再評価を通知（次回チェックを待たず即時反映）
         window.electronAPI?.reevaluateUpdateChannel?.();
       })

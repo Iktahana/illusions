@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useState } from "react";
 
 import { persistAppState } from "@/lib/storage/app-state-manager";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export interface DisplaySettings {
   fontScale: number;
@@ -376,6 +377,10 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
       void persistAppState({ compactMode: next }).catch((e) =>
         console.error("Failed to persist compactMode:", e),
       );
+      trackUsageEvent("editor_layout_changed", {
+        action: "compact_mode",
+        value: next ? "enabled" : "disabled",
+      });
       return next;
     });
   }, []);

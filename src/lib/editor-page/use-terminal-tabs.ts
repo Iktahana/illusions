@@ -7,6 +7,7 @@ import type { TerminalTabContextValue } from "@/contexts/TerminalTabContext";
 import type { EditorSettings } from "@/lib/editor-page/use-editor-settings";
 import { isProjectMode, type EditorMode } from "@/lib/project/project-types";
 import { isTerminalTab, type TabState, type TerminalTabState } from "@/lib/tab-manager/tab-types";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 interface UseTerminalTabsParams {
   tabs: TabState[];
@@ -49,6 +50,10 @@ export function useTerminalTabs({
 
   const updateTerminalTabRef = useRef(updateTerminalTab);
   updateTerminalTabRef.current = updateTerminalTab;
+  const sessionTelemetryRef = useRef(
+    new Map<string, { context: "project" | "standalone"; shell_kind: "default" | "custom" }>(),
+  );
+  const finishedSessionsRef = useRef(new Set<string>());
 
   const handleNewTerminalTab = useCallback(() => {
     if (isElectron) {
@@ -62,8 +67,26 @@ export function useTerminalTabs({
       void (async () => {
         const cwd = isProjectMode(editorMode) ? editorMode.rootPath : undefined;
         const shell = settings.terminalDefaultShell || undefined;
-        const result = await ptyApi.spawn({ cwd, shell });
+        const telemetry = {
+          context: isProjectMode(editorMode) ? ("project" as const) : ("standalone" as const),
+          shell_kind: shell ? ("custom" as const) : ("default" as const),
+        };
+        let result;
+        try {
+          result = await ptyApi.spawn({ cwd, shell });
+        } catch (error) {
+          trackUsageEvent("terminal_session_failed", {
+            ...telemetry,
+            reason: classifyTelemetryFailure(error),
+          });
+          const stuckTab = tabsRef.current.find(
+            (tab) => isTerminalTab(tab) && tab.pendingId === pendingId,
+          );
+          if (stuckTab) forceCloseTab(stuckTab.id);
+          return;
+        }
         if ("error" in result) {
+          trackUsageEvent("terminal_session_failed", { ...telemetry, reason: "unknown" });
           console.error("[Terminal] PTY spawn failed:", result.error);
           // PTY spawn failed — remove the specific placeholder tab identified by pendingId.
           const stuckTab = tabsRef.current.find(
@@ -76,6 +99,8 @@ export function useTerminalTabs({
         }
 
         const { sessionId } = result;
+        sessionTelemetryRef.current.set(sessionId, telemetry);
+        trackUsageEvent("terminal_session_started", telemetry);
         // Find the specific placeholder tab by pendingId instead of searching for the last empty sessionId.
         const targetTab = tabsRef.current.find(
           (tab) => isTerminalTab(tab) && tab.pendingId === pendingId,
@@ -106,6 +131,16 @@ export function useTerminalTabs({
       );
 
       if (tab) {
+        if (!finishedSessionsRef.current.has(sessionId)) {
+          const telemetry = sessionTelemetryRef.current.get(sessionId);
+          if (telemetry) {
+            finishedSessionsRef.current.add(sessionId);
+            trackUsageEvent("terminal_session_finished", {
+              ...telemetry,
+              outcome: exitCode === 0 ? "exit_zero" : "exit_nonzero",
+            });
+          }
+        }
         updateTerminalTabRef.current(tab.id, { status: "exited", exitCode });
       }
     });
@@ -133,6 +168,11 @@ export function useTerminalTabs({
   }, []);
 
   const killTerminalSession = useCallback((sessionId: string) => {
+    const telemetry = sessionTelemetryRef.current.get(sessionId);
+    if (telemetry && !finishedSessionsRef.current.has(sessionId)) {
+      finishedSessionsRef.current.add(sessionId);
+      trackUsageEvent("terminal_session_finished", { ...telemetry, outcome: "killed" });
+    }
     void window.electronAPI?.pty?.kill(sessionId);
   }, []);
 

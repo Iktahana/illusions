@@ -5,6 +5,7 @@ import type { ActivityBarView } from "@/components/ActivityBar";
 import { isBottomView } from "@/components/ActivityBar";
 import type { SettingsCategory } from "@/components/SettingsModal";
 import type { SearchTarget } from "./find-search-matches";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export interface PanelState {
   topView: ActivityBarView;
@@ -99,6 +100,7 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
   } | null>(null);
 
   const handleOpenDictionary = useCallback((searchTerm?: string) => {
+    trackUsageEvent("feature_view_opened", { view: "dictionary", surface: "cross_feature" });
     if (searchTerm) {
       setDictionarySearchTrigger((prev) => ({ term: searchTerm, id: prev.id + 1 }));
     }
@@ -123,6 +125,7 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
   }, []);
 
   const handleShowAllSearchResults = useCallback(() => {
+    trackUsageEvent("feature_view_opened", { view: "search", surface: "cross_feature" });
     setTopView("search");
   }, []);
 
