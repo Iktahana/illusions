@@ -634,6 +634,11 @@ export function useFileIO(params: UseFileIOParams): UseFileIOReturn {
         if (outcome.persistFailed) {
           notificationManager.warning(PERSIST_FAILURE_WARNING);
         }
+        if (outcome.formatTransition) {
+          notificationManager.warning(
+            `文書形式を ${outcome.formatTransition.from} から ${outcome.formatTransition.to} に変更しました。原文は保持され、新しい形式のエディターで再読み込みされます。`,
+          );
+        }
         // #1872 (DATA LOSS): the Save-As destination may already be open in
         // another tab. Leaving both tabs alive yields two divergent buffers on
         // the same path that silently overwrite each other (and the path-keyed

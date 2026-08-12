@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import type { EditorTabState, TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
-import { createNewTab, generateTabId, sanitizeMdiContent } from "@/lib/tab-manager/types";
+import { createNewTab, generateTabId } from "@/lib/tab-manager/types";
 
 // ---------------------------------------------------------------------------
 // Pure logic extracted from useAutoSave's setTabs updater (project mode)
@@ -25,14 +25,14 @@ import { createNewTab, generateTabId, sanitizeMdiContent } from "@/lib/tab-manag
 function projectModeAutoSaveUpdater(
   tabs: TabState[],
   tabId: string,
-  sanitized: string,
+  persistedContent: string,
 ): TabState[] {
   return tabs.map((t) =>
     t.id === tabId && isEditorTab(t)
       ? {
           ...t,
-          lastSavedContent: sanitized,
-          isDirty: sanitizeMdiContent(t.content) !== sanitized,
+          lastSavedContent: persistedContent,
+          isDirty: t.content !== persistedContent,
           lastSavedTime: Date.now(),
           lastSaveWasAuto: true,
           fileSyncStatus: "clean" as const,
@@ -48,7 +48,7 @@ function projectModeAutoSaveUpdater(
 function nonProjectModeAutoSaveUpdater(
   tabs: TabState[],
   tabId: string,
-  sanitized: string,
+  persistedContent: string,
   descriptor: EditorTabState["file"],
 ): TabState[] {
   return tabs.map((t) =>
@@ -56,8 +56,8 @@ function nonProjectModeAutoSaveUpdater(
       ? {
           ...t,
           file: descriptor,
-          lastSavedContent: sanitized,
-          isDirty: sanitizeMdiContent(t.content) !== sanitized,
+          lastSavedContent: persistedContent,
+          isDirty: t.content !== persistedContent,
           lastSavedTime: Date.now(),
           lastSaveWasAuto: true,
           fileSyncStatus: "clean" as const,

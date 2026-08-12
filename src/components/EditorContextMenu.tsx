@@ -48,8 +48,8 @@ interface EditorContextMenuProps {
   /** Whether the lint issue under the cursor supports adding its word to the user dictionary. */
   canAddLintIssueToDict?: boolean;
   onContextMenuOpen?: (e: MouseEvent) => void;
-  /** Whether MDI extensions (ruby / tcy) are enabled for this document */
-  mdiExtensionsEnabled?: boolean;
+  /** Whether the active document adapter supports MDI commands (ruby / tcy). */
+  mdiCommandsEnabled?: boolean;
   /** Pass the speech callback when speech feature is available; omit to hide the menu item */
   onStartSpeech?: (() => void) | null;
 }
@@ -93,7 +93,7 @@ export default function EditorContextMenu({
   lintIssueAtCursor,
   canAddLintIssueToDict = false,
   onContextMenuOpen,
-  mdiExtensionsEnabled = true,
+  mdiCommandsEnabled = true,
   onStartSpeech,
 }: EditorContextMenuProps) {
   const { effectiveBindings } = useKeymap();
@@ -178,7 +178,7 @@ export default function EditorContextMenu({
           <Separator />
 
           {/* 書式: ruby / tcy are MDI-extension features; hide when disabled or nothing is selected */}
-          {mdiExtensionsEnabled && hasSelection && (
+          {mdiCommandsEnabled && hasSelection && (
             <>
               <MenuItem
                 icon={<Languages className="w-4 h-4" />}

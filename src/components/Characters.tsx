@@ -5,7 +5,8 @@ import { Plus, X, Sparkles, Loader2 } from "lucide-react";
 
 import { useCharacterExtractionSettings } from "@/contexts/EditorSettingsContext";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
-import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import { documentFormatForExtension, getDocumentAdapter } from "@/lib/document-format";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 import { fetchAppState, persistAppState } from "@/lib/storage/app-state-manager";
 import CharacterCard from "./Characters/CharacterCard";
 import NewCharacterForm from "./Characters/NewCharacterForm";
@@ -13,9 +14,10 @@ import type { Character } from "./Characters/types";
 
 interface CharactersProps {
   content?: string;
+  fileType?: SupportedFileExtension;
 }
 
-function Characters({ content }: CharactersProps) {
+function Characters({ content, fileType = ".mdi" }: CharactersProps) {
   const { characterExtractionBatchSize, characterExtractionConcurrency } =
     useCharacterExtractionSettings();
 
@@ -146,12 +148,10 @@ function Characters({ content }: CharactersProps) {
 
     try {
       const nlpClient = getNlpClient();
-      // #1449: NLP input is always the analysis derivation ([[blank]] markers
-      // removed). Restores the #1483 behavior whose call was dropped in a
-      // later rewrite while the import remained.
-      const tokens = await nlpClient.tokenizeParagraph(
-        MdiDocument.fromRawText(content).toAnalysisText(),
-      );
+      const analysisText = getDocumentAdapter(documentFormatForExtension(fileType)).projectText(
+        content,
+      ).text;
+      const tokens = await nlpClient.tokenizeParagraph(analysisText);
 
       const properNouns = new Map<string, boolean>();
 
@@ -185,7 +185,7 @@ function Characters({ content }: CharactersProps) {
       console.error("NLP auto-extraction failed:", err);
       setExtractionError("固有名詞の抽出に失敗しました");
     }
-  }, [content, characters]);
+  }, [content, characters, fileType]);
 
   /** Auto-extract: use NLP-based extraction (AI extraction will be available via online API in the future) */
   const handleAutoExtract = useCallback(async () => {

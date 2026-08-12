@@ -22,12 +22,10 @@ const schema = new Schema({
       content: "inline*",
       toDOM: () => ["p", 0] as [string, number],
     },
-    // Production schema: content:"inline*" (textblock), NOT atom.
-    // Matches packages/milkdown-plugin-japanese-novel/nodes/blank-paragraph.ts.
-    blankParagraph: {
+    mdiBlank: {
       group: "block",
-      content: "inline*",
-      toDOM: () => ["p", { class: "mdi-blank" }, 0] as [string, Record<string, string>, number],
+      atom: true,
+      toDOM: () => ["p", { class: "mdi-blank" }] as [string, Record<string, string>],
     },
     text: { group: "inline" },
     hardbreak: {
@@ -45,13 +43,14 @@ const schema = new Schema({
       attrs: { value: { default: "" } },
       toDOM: () => ["span"] as [string],
     },
-    ruby: atomNode({ base: { default: "" }, text: { default: "" } }, "ruby"),
-    tcy: atomNode({ value: { default: "" } }, "span"),
-    nobreak: atomNode({ text: { default: "" } }, "span"),
-    kern: atomNode({ amount: { default: "" }, text: { default: "" } }, "span"),
-    mdibreak: atomNode({}, "br"),
+    mdiRuby: atomNode({ base: { default: "" }, ruby: { default: "" } }, "ruby"),
+    mdiBreak: atomNode({}, "br"),
   },
-  marks: {},
+  marks: {
+    mdiTcy: {},
+    mdiNoBreak: {},
+    mdiKern: { attrs: { amount: { default: "0em" } } },
+  },
 });
 
 function atomNode(attrs: Record<string, { default: string }>, tag: string) {
@@ -138,7 +137,7 @@ describe("findSearchMatches enhanced search", () => {
     const source = doc(
       paragraph(
         schema.text("前"),
-        schema.node("ruby", { base: "東京", text: "とう.きょう" }),
+        schema.node("mdiRuby", { base: "東京", ruby: ["とう", "きょう"] }),
         schema.text("後"),
       ),
     );
@@ -152,18 +151,18 @@ describe("findSearchMatches enhanced search", () => {
     expect(findSearchMatches(source, "とうきょう", { searchTarget: "body" })).toEqual([]);
   });
 
-  it("searches displayed MDI atom text but never macro metadata", () => {
+  it("searches text carrying MDI marks but never mark metadata", () => {
     const source = doc(
       paragraph(
-        schema.node("kern", { amount: "0.5em", text: "本文" }),
-        schema.node("nobreak", { text: "禁則" }),
-        schema.node("tcy", { value: "12" }),
+        schema.text("本文", [schema.mark("mdiKern", { amount: "0.5em" })]),
+        schema.text("禁則", [schema.mark("mdiNoBreak")]),
+        schema.text("12", [schema.mark("mdiTcy")]),
       ),
-      schema.node("blankParagraph"),
+      schema.node("mdiBlank"),
     );
 
     expect(findSearchMatches(source, "本文", {})).toMatchObject([
-      { source: "kern", replaceable: false },
+      { source: "text", replaceable: true },
     ]);
     expect(findSearchMatches(source, "禁則", {})).toHaveLength(1);
     expect(findSearchMatches(source, "12", {})).toHaveLength(1);
@@ -171,23 +170,22 @@ describe("findSearchMatches enhanced search", () => {
     expect(findSearchMatches(source, "blank", {})).toEqual([]);
   });
 
-  it("does not count blankParagraph in paragraphNumber to match UI counter (#1823)", () => {
+  it("does not count mdiBlank in paragraphNumber to match UI counter (#1823)", () => {
     const source = doc(
       paragraph(schema.text("段落A")),
-      schema.node("blankParagraph"),
+      schema.node("mdiBlank"),
       paragraph(schema.text("段落B")),
     );
 
-    // 「段落」は両段落にヒットするが、blankParagraph は段落番号を消費しない。
+    // 「段落」は両段落にヒットするが、mdiBlank は段落番号を消費しない。
     const matches = findSearchMatches(source, "段落", {});
     expect(matches).toHaveLength(2);
     expect(matches[0]).toMatchObject({ paragraphNumber: 1 });
     expect(matches[1]).toMatchObject({ paragraphNumber: 2 });
 
-    // blankParagraph に検索語が存在しても段落番号は加算されない（空白行は番号なし）。
     const source2 = doc(
       paragraph(schema.text("前")),
-      schema.node("blankParagraph", null, [schema.text("blank内")]),
+      schema.node("mdiBlank"),
       paragraph(schema.text("後")),
     );
     const matches2 = findSearchMatches(source2, "後", {});
@@ -218,7 +216,7 @@ describe("findSearchMatches enhanced search", () => {
     const source = doc(
       paragraph(
         schema.text("前"),
-        schema.node("ruby", { base: "東京", text: "とうきょう" }),
+        schema.node("mdiRuby", { base: "東京", ruby: "とうきょう" }),
         schema.text("後"),
       ),
     );

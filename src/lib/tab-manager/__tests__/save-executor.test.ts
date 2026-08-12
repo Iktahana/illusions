@@ -1,7 +1,7 @@
 /**
  * Tests for the unified save executor (#1432) and its lock coverage (#1579).
  *
- * #1432: every save flow shares one pipeline — sanitize, project-VFS vs
+ * #1432: every save flow shares one pipeline — project-VFS vs
  * standalone branching, self-watch suppression, tab-state update, file
  * reference persistence, snapshot creation.
  *
@@ -242,7 +242,7 @@ describe("executeTabSave: unified lock acquisition (#1579)", () => {
 // ---------------------------------------------------------------------------
 
 describe("executeTabSave: project mode (VFS write)", () => {
-  it("suppresses the file watcher and writes sanitized content via VFS", async () => {
+  it("suppresses the file watcher and writes adapter-produced content unchanged via VFS", async () => {
     const tab = makeTab({ content: "<div>本文</div>" });
     const h = makeHarness([tab]);
 
@@ -255,8 +255,8 @@ describe("executeTabSave: project mode (VFS write)", () => {
     });
 
     expect(outcome.status).toBe("saved");
-    expect(suppressFileWatchMock).toHaveBeenCalledWith("/p/main.mdi", "本文");
-    expect(vfsWriteFile).toHaveBeenCalledWith("/p/main.mdi", "本文");
+    expect(suppressFileWatchMock).toHaveBeenCalledWith("/p/main.mdi", "<div>本文</div>");
+    expect(vfsWriteFile).toHaveBeenCalledWith("/p/main.mdi", "<div>本文</div>");
     // Standalone path must not be used in project mode
     expect(saveMdiFileMock).not.toHaveBeenCalled();
   });
@@ -476,10 +476,10 @@ describe("executeTabSave: standalone (saveMdiFile)", () => {
     });
 
     expect(outcome.status).toBe("saved");
-    expect(suppressFileWatchMock).toHaveBeenCalledWith("/p/main.mdi", "本文");
+    expect(suppressFileWatchMock).toHaveBeenCalledWith("/p/main.mdi", "<div>本文</div>");
     expect(saveMdiFileMock).toHaveBeenCalledWith({
       descriptor,
-      content: "本文",
+      content: "<div>本文</div>",
       fileType: ".mdi",
     });
     expect(suppressFileWatchMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -685,14 +685,15 @@ describe("executeTabSave: failure and unmount handling", () => {
 
 describe("executeTabSave: Save As recomputes fileType from new descriptor (#1871)", () => {
   it("changes fileType from .mdi to .txt when Save As targets a .txt file", async () => {
-    const tab = makeTab({ file: null, fileType: ".mdi", content: "本文" });
+    const source = "# {東京|とうきょう}\n\n[[blank]]\n\n^12^";
+    const tab = makeTab({ file: null, fileType: ".mdi", content: source });
     const h = makeHarness([tab]);
     const newDescriptor: MdiFileDescriptor = {
       path: "/p/export.txt",
       handle: null,
       name: "export.txt",
     };
-    saveMdiFileMock.mockResolvedValue({ descriptor: newDescriptor, content: "本文" });
+    saveMdiFileMock.mockResolvedValue({ descriptor: newDescriptor, content: source });
 
     const outcome = await executeTabSave({
       tab,
@@ -707,7 +708,16 @@ describe("executeTabSave: Save As recomputes fileType from new descriptor (#1871
     expect(outcome.status).toBe("saved");
     const updated = h.getTab("tab-1");
     expect(updated.fileType).toBe(".txt");
+    expect(outcome).toMatchObject({
+      formatTransition: { from: ".mdi", to: ".txt" },
+    });
     expect(updated.file).toEqual(newDescriptor);
+    expect(updated.content).toBe(source);
+    expect(saveMdiFileMock).toHaveBeenCalledWith({
+      descriptor: null,
+      content: source,
+      fileType: ".mdi",
+    });
   });
 
   it("changes fileType from .txt to .mdi when Save As targets a .mdi file", async () => {

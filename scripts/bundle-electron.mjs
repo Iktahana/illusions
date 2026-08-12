@@ -6,7 +6,8 @@
  */
 
 import * as esbuild from "esbuild";
-import { fileURLToPath, pathToFileURL } from "url";
+import { fileURLToPath } from "url";
+import { createRequire } from "module";
 import { dirname, join } from "path";
 import fs from "fs";
 import { execFileSync, execSync } from "child_process";
@@ -361,13 +362,12 @@ for (const dep of runtimeDeps) {
 // Loading the copied package (rather than the workspace package) verifies both
 // the loader's relative path and the WASM binary itself.
 const bundledMdiCoreDir = join(nodeModulesDest, "@illusions-lab", "mdi-core");
-const bundledMdiWasm = join(bundledMdiCoreDir, "dist", "mdi_core_bg.wasm");
+const bundledMdiWasm = join(bundledMdiCoreDir, "dist", "generated", "node", "mdi_core_bg.wasm");
 if (!fs.existsSync(bundledMdiWasm)) {
   throw new Error(`MDI core WASM was not copied to the Electron runtime: ${bundledMdiWasm}`);
 }
-const bundledMdiCore = await import(
-  pathToFileURL(join(bundledMdiCoreDir, "dist", "mdi_core.js")).href
-);
+const bundledRequire = createRequire(join(bundledMdiCoreDir, "package.json"));
+const bundledMdiCore = bundledRequire("@illusions-lab/mdi-core");
 if (bundledMdiCore.renderText("# MDI runtime smoke test") !== "MDI runtime smoke test\n") {
   throw new Error("Bundled MDI core failed its runtime smoke test");
 }

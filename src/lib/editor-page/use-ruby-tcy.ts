@@ -1,8 +1,14 @@
 import { useCallback, useRef } from "react";
 import type { MutableRefObject } from "react";
 import { Fragment } from "@milkdown/prose/model";
+import { toggleMark } from "@milkdown/prose/commands";
 import type { EditorView } from "@milkdown/prose/view";
 import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
+
+export interface RubyApplicationSegment {
+  base: string;
+  ruby?: string;
+}
 
 interface UseRubyTcyOptions {
   editorViewRef: MutableRefObject<EditorView | null>;
@@ -37,38 +43,24 @@ export function useRubyTcy({
     // without causing extra re-renders (ref identity never changes)
   }, [editorViewRef, setRubySelectedText, setShowRubyDialog]);
 
-  /** Apply Ruby markup by replacing the editor selection with ProseMirror nodes */
+  /** Replace the saved selection with structured Ruby nodes from the MDI plugin. */
   const handleApplyRuby = useCallback(
-    (rubyMarkup: string) => {
+    (segments: readonly RubyApplicationSegment[]) => {
       const view = editorViewRef.current;
       if (!view) return;
       const sel = rubySelectionRef.current;
       if (!sel) return;
       const { state } = view;
-      const rubyNodeType = state.schema.nodes.ruby;
+      const rubyNodeType = state.schema.nodes.mdiRuby;
       if (!rubyNodeType) {
-        // Fallback: insert as plain text if ruby node type is not available
-        dispatchIfEditorViewAlive(view, (aliveView) =>
-          aliveView.state.tr.insertText(rubyMarkup, sel.from, sel.to),
-        );
         rubySelectionRef.current = null;
         return;
       }
-      // Parse ruby markup: mixed text and {base|reading} segments
-      const RUBY_RE = /\{([^|]+)\|([^}]+)\}/g;
-      const nodes: import("@milkdown/prose/model").Node[] = [];
-      let lastIndex = 0;
-      let m: RegExpExecArray | null;
-      while ((m = RUBY_RE.exec(rubyMarkup)) !== null) {
-        if (m.index > lastIndex) {
-          nodes.push(state.schema.text(rubyMarkup.slice(lastIndex, m.index)));
-        }
-        nodes.push(rubyNodeType.create({ base: m[1], text: m[2] }));
-        lastIndex = m.index + m[0].length;
-      }
-      if (lastIndex < rubyMarkup.length) {
-        nodes.push(state.schema.text(rubyMarkup.slice(lastIndex)));
-      }
+      const nodes = segments.map((segment) =>
+        segment.ruby
+          ? rubyNodeType.create({ base: segment.base, ruby: segment.ruby })
+          : state.schema.text(segment.base),
+      );
       const fragment = Fragment.from(nodes);
       dispatchIfEditorViewAlive(view, (aliveView) =>
         aliveView.state.tr.replaceWith(sel.from, sel.to, fragment),
@@ -79,26 +71,17 @@ export function useRubyTcy({
     [editorViewRef],
   );
 
-  /** Wrap selected text with tcy syntax: ^text^ */
+  /** Toggle the semantic TCY mark without constructing MDI delimiters. */
   const handleToggleTcy = useCallback(() => {
     const view = editorViewRef.current;
     if (!view) return;
     const { state } = view;
     const { from, to } = state.selection;
     if (from === to) return;
-    const text = state.doc.textBetween(from, to);
-    if (!text.trim()) return;
-    // Toggle: if already wrapped in ^...^, unwrap; otherwise wrap
-    if (text.startsWith("^") && text.endsWith("^") && text.length >= 2) {
-      const unwrapped = text.slice(1, -1);
-      dispatchIfEditorViewAlive(view, (aliveView) =>
-        aliveView.state.tr.insertText(unwrapped, from, to),
-      );
-    } else {
-      dispatchIfEditorViewAlive(view, (aliveView) =>
-        aliveView.state.tr.insertText(`^${text}^`, from, to),
-      );
-    }
+    if (!state.doc.textBetween(from, to).trim()) return;
+    const markType = state.schema.marks.mdiTcy;
+    if (!markType) return;
+    toggleMark(markType)(state, view.dispatch, view);
     // editorViewRef is a stable ref object; including it here satisfies the React Compiler
   }, [editorViewRef]);
 

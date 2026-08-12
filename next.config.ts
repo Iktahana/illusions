@@ -16,6 +16,10 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_ERROR_REPORT_DSN: process.env.ERROR_REPORT_DSN || "",
   },
   images: { unoptimized: true },
+  // mdi-core's Node export resolves its colocated wasm with __dirname. Keep
+  // that package external during prerender so Turbopack does not rewrite the
+  // loader path; browser bundles continue to select the package's web export.
+  serverExternalPackages: ["@illusions-lab/mdi-core"],
   trailingSlash: true,
   turbopack: {},
   // Note: After NLP backend migration, kuromoji is only used in:

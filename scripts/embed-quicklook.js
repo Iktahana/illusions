@@ -33,6 +33,8 @@ const MDI_WASM_RUNTIME_RELATIVE_PATH = path.join(
   "@illusions-lab",
   "mdi-core",
   "dist",
+  "generated",
+  "node",
   "mdi_core_bg.wasm",
 );
 
@@ -103,6 +105,8 @@ function assertMdiWasmPackaged(context) {
       "@illusions-lab",
       "mdi-core",
       "dist",
+      "generated",
+      "node",
       "mdi_core_bg.wasm",
     ),
   ];

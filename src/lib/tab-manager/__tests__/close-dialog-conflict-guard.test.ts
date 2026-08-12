@@ -11,7 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import type { EditorTabState, TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab } from "@/lib/tab-manager/tab-types";
-import { createNewTab, generateTabId, sanitizeMdiContent } from "@/lib/tab-manager/types";
+import { createNewTab, generateTabId } from "@/lib/tab-manager/types";
 
 // ---------------------------------------------------------------------------
 // Pure logic extracted from useCloseDialog's handleCloseTabSave
@@ -51,17 +51,17 @@ function simulateCloseTabSave(tab: EditorTabState, isProject: boolean): CloseDia
     return ctx;
   }
 
-  const sanitized = sanitizeMdiContent(tab.content);
+  const persistedContent = tab.content;
 
   if (isProject && tab.file?.path) {
-    ctx.savedContent = sanitized;
+    ctx.savedContent = persistedContent;
     ctx.tabClosed = true;
     ctx.pendingCloseCleared = true;
   } else {
     // Non-project path: updateTab with conflict state reset
-    ctx.savedContent = sanitized;
+    ctx.savedContent = persistedContent;
     ctx.updatedTab = {
-      lastSavedContent: sanitized,
+      lastSavedContent: persistedContent,
       isDirty: false,
       fileSyncStatus: "clean",
       conflictDiskContent: null,

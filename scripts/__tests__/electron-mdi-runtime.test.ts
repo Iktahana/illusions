@@ -49,6 +49,8 @@ function wasmPath(
     "@illusions-lab",
     "mdi-core",
     "dist",
+    "generated",
+    "node",
     "mdi_core_bg.wasm",
   );
 }
@@ -103,6 +105,8 @@ describe("packaged Electron MDI runtime", () => {
       "@illusions-lab",
       "mdi-core",
       "dist",
+      "generated",
+      "node",
       "mdi_core_bg.wasm",
     );
     fs.mkdirSync(path.dirname(source), { recursive: true });

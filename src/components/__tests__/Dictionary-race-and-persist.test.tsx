@@ -110,7 +110,6 @@ const STANDALONE_MODE = {
     fontFamily: "sans-serif",
     charsPerLine: 40,
     showParagraphNumbers: false,
-    mdiExtensionsEnabled: true,
     posHighlightEnabled: false,
     posHighlightColors: {},
   },

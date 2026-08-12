@@ -12,7 +12,6 @@
  * coverage instead of only running inside the full page component.
  */
 
-import { sanitizeMdiContent } from "./types";
 import { isEditorTab } from "./tab-types";
 import type { TabState, FileSyncStatus } from "./tab-types";
 
@@ -33,10 +32,7 @@ export function computeHistoryRestoreTabUpdate(
 ): HistoryRestoreTabUpdate {
   const editorTab = targetTab && isEditorTab(targetTab) ? targetTab : null;
   const lastSaved = editorTab ? (editorTab.lastSavedContent ?? "") : "";
-  const fileTypeOpts = editorTab ? { fileType: editorTab.fileType } : undefined;
-  const isClean =
-    sanitizeMdiContent(restoredContent, fileTypeOpts) ===
-    sanitizeMdiContent(lastSaved, fileTypeOpts);
+  const isClean = restoredContent === lastSaved;
 
   return {
     fileSyncStatus: isClean ? "clean" : "dirty",

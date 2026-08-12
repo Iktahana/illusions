@@ -34,31 +34,33 @@ describe("extractVisibleText", () => {
   });
 
   it("MDI 空行マーカー [[blank]] を行ごと削除する", () => {
-    expect(extractVisibleText("前の文。\n[[blank]]\n次の文。")).toBe("前の文。\n\n次の文。");
+    expect(extractVisibleText("前の文。\n[[blank]]\n次の文。")).toBe("前の文。\n次の文。");
   });
 
-  it("serializer エスケープ形 \\[\\[blank]] も行ごと削除する（可視文字に計上しない）", () => {
-    expect(extractVisibleText("前の文。\n\\[\\[blank]]\n次の文。")).toBe("前の文。\n\n次の文。");
+  it("エスケープされた [[blank]] は MDI 2.0 のリテラル本文として保持する", () => {
+    expect(extractVisibleText("前の文。\n\\[\\[blank]]\n次の文。")).toBe(
+      "前の文。\n[[blank]]\n次の文。",
+    );
   });
 
-  it("HTML タグを除去して内容を残す", () => {
-    expect(extractVisibleText("<b>太字</b>")).toBe("太字");
+  it("HTML ブロックは MDI 2.0 のテキスト投影に従う", () => {
+    expect(extractVisibleText("<b>太字</b>")).toBe("<b>太字</b>");
   });
 
-  it("インラインコードを全削除する", () => {
-    expect(extractVisibleText("`use const here`")).toBe("");
+  it("インラインコードの内容を保持する", () => {
+    expect(extractVisibleText("`use const here`")).toBe("use const here");
   });
 
-  it("画像を全削除する（alt も含め）", () => {
-    expect(extractVisibleText("![alt](image.png)")).toBe("");
+  it("画像の代替テキストを保持する", () => {
+    expect(extractVisibleText("![alt](image.png)")).toBe("alt");
   });
 
   it("リンクをテキスト部分のみにする", () => {
     expect(extractVisibleText("[クリック](https://example.com)")).toBe("クリック");
   });
 
-  it("コードブロックを全削除する", () => {
-    expect(extractVisibleText("```\nconst x = 1;\n```")).toBe("");
+  it("コードブロックの内容を保持する", () => {
+    expect(extractVisibleText("```\nconst x = 1;\n```")).toBe("const x = 1;");
   });
 
   it("強調記号を除去して内容を残す (**)", () => {
@@ -244,10 +246,9 @@ describe("computeTextStatistics", () => {
     expect(stats.manuscriptPages).toBe(1);
   });
 
-  it("[[blank]] マーカー（エスケープ形含む）は可視文字数に計上しない", () => {
-    // 「あ」2文字のみが可視。マーカー \[\[blank]] の記号類は数えない。
+  it("エスケープされた [[blank]] はリテラル本文として計上する", () => {
     const stats = computeTextStatistics("あ\n\\[\\[blank]]\nあ");
-    expect(stats.visibleTextCharCount).toBe(2);
+    expect(stats.visibleTextCharCount).toBe(11);
   });
 
   it("400字 → 1ページ", () => {
@@ -287,19 +288,19 @@ describe("computeTextStatistics", () => {
     expect(stats.visibleTextCharCount).toBe(2);
   });
 
-  it("HTML タグ <b>太字</b> は本文文字数 2", () => {
+  it("HTML ブロックは MDI 2.0 の投影どおり本文文字数 9", () => {
     const stats = computeTextStatistics("<b>太字</b>");
-    expect(stats.visibleTextCharCount).toBe(2);
+    expect(stats.visibleTextCharCount).toBe(9);
   });
 
-  it("画像構文 ![alt](image.png) は本文文字数 0", () => {
+  it("画像構文 ![alt](image.png) は alt の本文文字数 3", () => {
     const stats = computeTextStatistics("![alt](image.png)");
-    expect(stats.visibleTextCharCount).toBe(0);
+    expect(stats.visibleTextCharCount).toBe(3);
   });
 
-  it("インラインコード は本文文字数 0", () => {
+  it("インラインコードはコード内容の本文文字数 12", () => {
     const stats = computeTextStatistics("`use const here`");
-    expect(stats.visibleTextCharCount).toBe(0);
+    expect(stats.visibleTextCharCount).toBe(12);
   });
 
   it("「あ」×1行 × 40行 → 原稿用紙換算 2 枚", () => {
@@ -333,7 +334,7 @@ describe("extractVisibleText (fileType)", () => {
   it(".mdi: # や *foo* は記法として除去され、[[blank]] は行ごと削除される", () => {
     const input = "# 見出し\n*foo*\n[[blank]]";
     const result = extractVisibleText(input, ".mdi");
-    expect(result).toBe("見出し\nfoo\n");
+    expect(result).toBe("見出し\nfoo");
   });
 
   it(".md: Markdown 記法は除去されるが [[blank]] はプレーンテキストとして残る", () => {

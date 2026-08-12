@@ -5,7 +5,7 @@
  *
  * Every save flow (manual save, Save As, background auto-save, close-tab
  * save, window-quit save) previously re-implemented the same pipeline:
- * content sanitize → project-VFS vs standalone branching → file-watcher
+ * adapter-produced content → project-VFS vs standalone branching → file-watcher
  * self-write suppression → tab-state update → file-reference persistence →
  * history snapshot. This module owns that pipeline once; the calling hooks
  * (use-file-io / use-auto-save / use-close-dialog /
@@ -18,7 +18,6 @@
  * they are serialized too.
  */
 
-import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import { saveMdiFile } from "../project/mdi-file";
 import { getProjectFileService } from "../services/project-file-service";
 import { suppressFileWatch } from "../services/file-watcher";
@@ -29,6 +28,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SnapshotType } from "../services/history-policy";
 import type { EditorTabState, TabState } from "./tab-types";
+import type { SupportedFileExtension } from "../project/project-types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,6 +50,10 @@ export type SaveOutcome =
       descriptor: MdiFileDescriptor | null;
       savedContent: string;
       persistFailed: boolean;
+      formatTransition?: {
+        from: SupportedFileExtension;
+        to: SupportedFileExtension;
+      };
     }
   /** User cancelled the Save As dialog. */
   | { status: "cancelled" }
@@ -158,7 +162,7 @@ export function getSaveLockKey(tab: EditorTabState, options?: { forceDialog?: bo
 /**
  * Execute a save for a single editor tab.
  *
- * Owns the shared pipeline: lock acquisition, conflict re-check, sanitize,
+ * Owns the shared pipeline: lock acquisition, conflict re-check, persistence,
  * project-VFS vs standalone branching, self-watch suppression, tab-state
  * update, file-reference persistence, and snapshot creation.
  *
@@ -212,10 +216,9 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
 
     setIsSaving(true);
 
-    // Single MDI entry API (#1449): normalize editor output, persist raw text.
-    const sanitized = MdiDocument.fromEditorOutput(tab.content, {
-      fileType: tab.fileType,
-    }).toRawText();
+    // The active format adapter already produced the final persisted source.
+    // Never run a second application-local MDI parser or sanitizer here.
+    const persistedContent = tab.content;
 
     /**
      * Apply the post-save tab state. Uses a functional updater comparing
@@ -230,14 +233,12 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
           if (t.id !== tab.id || !isEditorTab(t)) return t;
           // Recompute fileType from the new descriptor name (Save As may change extension).
           const newFileType = descriptor ? inferFileType(descriptor.name) : t.fileType;
-          const newIsDirty =
-            MdiDocument.fromEditorOutput(t.content, { fileType: newFileType }).toRawText() !==
-            sanitized;
+          const newIsDirty = t.content !== persistedContent;
           return {
             ...t,
             ...(descriptor ? { file: descriptor } : null),
             ...(descriptor ? { fileType: newFileType } : null),
-            lastSavedContent: sanitized,
+            lastSavedContent: persistedContent,
             isDirty: newIsDirty,
             lastSavedTime: Date.now(),
             lastSaveWasAuto: isAutoSave,
@@ -252,8 +253,8 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
     // --- Project mode: direct VFS write with self-watch suppression --------
     if (!forceDialog && isProject && tab.file?.path) {
       const vfs = getProjectFileService();
-      suppressFileWatch(tab.file.path, sanitized);
-      await vfs.writeFile(tab.file.path, sanitized);
+      suppressFileWatch(tab.file.path, persistedContent);
+      await vfs.writeFile(tab.file.path, persistedContent);
 
       if (updateProjectMetadata) {
         // Update project.json lastModified so workspace metadata stays in
@@ -272,12 +273,12 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
 
       applySavedTabState(null);
       if (snapshotType && isMounted()) {
-        await tryCreateSnapshot(snapshotType, tab.file.path, tab.file.name, sanitized);
+        await tryCreateSnapshot(snapshotType, tab.file.path, tab.file.name, persistedContent);
       }
       return {
         status: "saved",
         descriptor: tab.file,
-        savedContent: sanitized,
+        savedContent: persistedContent,
         persistFailed: false,
       };
     }
@@ -290,10 +291,14 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
       : tab.file;
 
     if (descriptor?.path) {
-      suppressFileWatch(descriptor.path, sanitized);
+      suppressFileWatch(descriptor.path, persistedContent);
     }
 
-    const result = await saveMdiFile({ descriptor, content: sanitized, fileType: tab.fileType });
+    const result = await saveMdiFile({
+      descriptor,
+      content: persistedContent,
+      fileType: tab.fileType,
+    });
     if (!result) {
       // User cancelled the save dialog
       setIsSaving(false);
@@ -304,22 +309,30 @@ export async function executeTabSave(params: ExecuteTabSaveParams): Promise<Save
 
     let persistFailed = false;
     if (persistFileReference && isMounted()) {
-      persistFailed = !(await persistFileReference(result.descriptor, sanitized));
+      persistFailed = !(await persistFileReference(result.descriptor, persistedContent));
     }
 
     if (snapshotType && isMounted()) {
       const sourcePath =
         result.descriptor.path ?? (snapshotPathFallback === "name" ? result.descriptor.name : null);
       if (sourcePath !== null) {
-        await tryCreateSnapshot(snapshotType, sourcePath, result.descriptor.name, sanitized);
+        await tryCreateSnapshot(snapshotType, sourcePath, result.descriptor.name, persistedContent);
       }
     }
 
     return {
       status: "saved",
       descriptor: result.descriptor,
-      savedContent: sanitized,
+      savedContent: persistedContent,
       persistFailed,
+      ...(inferFileType(result.descriptor.name) !== tab.fileType
+        ? {
+            formatTransition: {
+              from: tab.fileType,
+              to: inferFileType(result.descriptor.name),
+            },
+          }
+        : null),
     };
   } catch (error) {
     setIsSaving(false);

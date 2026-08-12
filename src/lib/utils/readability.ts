@@ -12,7 +12,8 @@
  *   const enhanced = enrichReadabilityWithMorphology(base, tokens);
  */
 
-import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import { getMdiTextBlocks } from "@illusions-lab/mdi";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 import type { Token } from "@/lib/nlp-client/types";
 import type { DictLookup } from "@/lib/dict/dict-types";
 import type {
@@ -27,13 +28,19 @@ import type {
 /**
  * 文字数カウント用にMarkdownを整形する
  *
- * `[[blank]]` マーカー行は `MdiDocument.toAnalysisText()` で除去してから
- * Markdown 記法を取り除く（#1483 で導入された挙動。#1234 のリライトで
- * 呼び出しが脱落していたため #1449 で復元）。
+ * MDI は Rust-owned text projection を使用し、Markdown と plain text は
+ * それぞれ独立した処理経路を使う。
  */
-export function cleanMarkdown(markdown: string): string {
-  return MdiDocument.fromRawText(markdown)
-    .toAnalysisText()
+export function cleanMarkdown(markdown: string, fileType: SupportedFileExtension = ".md"): string {
+  if (fileType === ".txt") return markdown;
+  if (fileType === ".mdi") {
+    return getMdiTextBlocks(markdown)
+      .blocks.map((block) => block.text)
+      .join("\n\n")
+      .trim();
+  }
+
+  return markdown
     .replace(/```[\s\S]*?```/g, "")
     .replace(/`[^`]+`/g, "")
     .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1")

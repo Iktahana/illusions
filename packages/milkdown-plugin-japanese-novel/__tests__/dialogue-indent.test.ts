@@ -18,7 +18,7 @@ function textChild(text: string): MockChild {
 }
 
 function rubyChild(base: string): MockChild {
-  return { isText: false, type: { name: "ruby" }, attrs: { base, text: "" } };
+  return { isText: false, type: { name: "mdiRuby" }, attrs: { base, ruby: "" } };
 }
 
 describe("getParagraphLeadingChar", () => {
@@ -35,7 +35,7 @@ describe("getParagraphLeadingChar", () => {
   });
 
   it("returns empty string for a non-text non-ruby leading node", () => {
-    const atom: MockChild = { isText: false, type: { name: "mdibreak" }, attrs: {} };
+    const atom: MockChild = { isText: false, type: { name: "mdiBreak" }, attrs: {} };
     expect(getParagraphLeadingChar(makeParagraph(atom))).toBe("");
   });
 });

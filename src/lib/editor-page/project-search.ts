@@ -7,6 +7,8 @@ import {
   type SearchTextProjection,
 } from "./find-search-matches";
 import type { VirtualFileSystem } from "@/lib/vfs/types";
+import { getMdiTextBlocks, parseMdiTextPosition, type MdiNode } from "@illusions-lab/mdi";
+import { Utf8SourceOffsets } from "@/lib/mdi/utf8-source-offsets";
 
 export interface RawDocumentSearchMatch extends SearchMatch {
   rawFrom: number;
@@ -70,8 +72,7 @@ interface UndoProjectReplacementParams {
 
 const SEARCHABLE_EXTENSIONS = new Set([".mdi", ".md", ".txt"]);
 const PROJECT_SEARCH_YIELD_INTERVAL = 8;
-const MDI_TOKEN_RE =
-  /<!--[\s\S]*?-->|\{[^{}|\n]+\|[^{}\n]+\}|\^[^^\n]+\^|\[\[(?:blank|br|no-break:[^\]\n]*|kern:[^:\]\n]+:[^\]\n]*)\]\]/g;
+const GRAPHEME_SEGMENTER = new Intl.Segmenter("ja", { granularity: "grapheme" });
 
 export function isSearchableProjectPath(path: string): boolean {
   if (hasHiddenPathSegment(path)) return false;
@@ -344,88 +345,168 @@ function createMdiProjections(
   body: SearchTextProjection;
   rubyReadings: SearchTextProjection[];
 } {
+  const projection = getMdiTextBlocks(content);
+  const offsets = new Utf8SourceOffsets(content);
   const body: SearchTextProjection = { text: "", segments: [] };
   const rubyReadings: SearchTextProjection[] = [];
-  let cursor = 0;
 
-  MDI_TOKEN_RE.lastIndex = 0;
-  for (const tokenMatch of content.matchAll(MDI_TOKEN_RE)) {
-    const rawFrom = tokenMatch.index;
-    const token = tokenMatch[0];
-    if (rawFrom > cursor) {
-      appendProjectionSegment(body, content.slice(cursor, rawFrom), cursor, rawFrom, "text", true);
+  projection.blocks.forEach((block, blockIndex) => {
+    if (blockIndex > 0) body.text += "\n\n";
+    const graphemes = [...GRAPHEME_SEGMENTER.segment(block.text)];
+    let graphemeCursor = 0;
+    const fallbackFrom = block.span ? offsets.toUtf16(block.span.startByte) : 0;
+    const fallbackTo = block.span ? offsets.toUtf16(block.span.endByte) : fallbackFrom;
+    const semanticRanges = collectSemanticRanges(block.node, content);
+    for (const run of block.sourceMap.runs) {
+      const start = parseMdiTextPosition(run.range.start).character - 1;
+      const end = parseMdiTextPosition(run.range.end).character - 1;
+      if (start > graphemeCursor) {
+        appendProjectionSegment(
+          body,
+          graphemes
+            .slice(graphemeCursor, start)
+            .map(({ segment }) => segment)
+            .join(""),
+          fallbackFrom,
+          fallbackTo,
+          "text",
+          false,
+        );
+      }
+      let groupStart = start;
+      let currentRange = semanticRangeAt(semanticRanges, run.sourceBoundaries[0]);
+      for (let index = start + 1; index <= end; index += 1) {
+        const boundaryIndex = index - start;
+        const nextRange =
+          index < end
+            ? semanticRangeAt(semanticRanges, run.sourceBoundaries[boundaryIndex])
+            : undefined;
+        if (nextRange === currentRange && index < end) continue;
+
+        const fromByte = run.sourceBoundaries[groupStart - start];
+        const toByte = run.sourceBoundaries[boundaryIndex];
+        let text = graphemes
+          .slice(groupStart, index)
+          .map(({ segment }) => segment)
+          .join("");
+        if (currentRange?.comment) {
+          if (!excludeComments) text = stripHtmlCommentDelimiters(text);
+          else text = "";
+        }
+        appendProjectionSegment(
+          body,
+          text,
+          fromByte === undefined ? fallbackFrom : offsets.toUtf16(fromByte),
+          toByte === undefined ? fallbackTo : offsets.toUtf16(toByte),
+          currentRange?.source ?? "text",
+          currentRange?.replaceable ?? (fromByte !== undefined && toByte !== undefined),
+        );
+        groupStart = index;
+        currentRange = nextRange;
+      }
+      graphemeCursor = end;
+    }
+    if (graphemeCursor < graphemes.length) {
+      appendProjectionSegment(
+        body,
+        graphemes
+          .slice(graphemeCursor)
+          .map(({ segment }) => segment)
+          .join(""),
+        fallbackFrom,
+        fallbackTo,
+        "text",
+        false,
+      );
     }
 
-    appendMdiToken(body, rubyReadings, token, rawFrom, rawFrom + token.length, excludeComments);
-    cursor = rawFrom + token.length;
-  }
-
-  if (cursor < content.length) {
-    appendProjectionSegment(body, content.slice(cursor), cursor, content.length, "text", true);
-  }
+    const annotationGroups = new Map<SemanticSourceRange | undefined, typeof block.annotations>();
+    for (const annotation of block.annotations) {
+      const owner = annotation.span
+        ? semanticRanges.find(
+            (range) =>
+              range.source === "ruby-base" &&
+              annotation.span!.startByte >= range.startByte &&
+              annotation.span!.endByte <= range.endByte,
+          )
+        : undefined;
+      const group = annotationGroups.get(owner) ?? [];
+      group.push(annotation);
+      annotationGroups.set(owner, group);
+    }
+    for (const annotations of annotationGroups.values()) {
+      const reading: SearchTextProjection = { text: "", segments: [] };
+      const boundaries = annotations.flatMap((annotation) =>
+        annotation.sourceMap.runs.flatMap((run) => run.sourceBoundaries),
+      );
+      if (boundaries.length >= 2) {
+        appendProjectionSegment(
+          reading,
+          annotations.map((annotation) => annotation.text).join(""),
+          offsets.toUtf16(boundaries[0]),
+          offsets.toUtf16(boundaries[boundaries.length - 1]),
+          "ruby-text",
+          false,
+        );
+      }
+      if (reading.text) rubyReadings.push(reading);
+    }
+  });
 
   return { body, rubyReadings };
 }
 
-function appendMdiToken(
-  body: SearchTextProjection,
-  rubyReadings: SearchTextProjection[],
-  token: string,
-  rawFrom: number,
-  rawTo: number,
-  excludeComments: boolean,
-): void {
-  if (token.startsWith("<!--")) {
-    if (!excludeComments) {
-      appendProjectionSegment(
-        body,
-        stripHtmlCommentDelimiters(token),
-        rawFrom,
-        rawTo,
-        "comment",
-        false,
-      );
+interface SemanticSourceRange {
+  startByte: number;
+  endByte: number;
+  source: SearchMatchSource;
+  replaceable: boolean;
+  comment?: boolean;
+}
+
+function collectSemanticRanges(node: MdiNode, source: string): SemanticSourceRange[] {
+  const ranges: SemanticSourceRange[] = [];
+  const sourceBytes = new TextEncoder().encode(source);
+  const decoder = new TextDecoder();
+  const visit = (current: MdiNode): void => {
+    const span = current.span;
+    if (span) {
+      const semantic = semanticSource(current.type);
+      const comment =
+        current.type === "html" &&
+        decoder.decode(sourceBytes.slice(span.startByte, span.endByte)).trim().startsWith("<!--");
+      if (semantic || comment) {
+        ranges.push({
+          startByte: span.startByte,
+          endByte: span.endByte,
+          source: semantic ?? "comment",
+          replaceable: false,
+          ...(comment ? { comment: true } : {}),
+        });
+        return;
+      }
     }
-    return;
-  }
+    current.children?.forEach(visit);
+  };
+  visit(node);
+  return ranges.sort((left, right) => left.startByte - right.startByte);
+}
 
-  const ruby = /^\{([^{}|\n]+)\|([^{}\n]+)\}$/.exec(token);
-  if (ruby) {
-    appendProjectionSegment(body, ruby[1], rawFrom, rawTo, "ruby-base", false);
-    const reading: SearchTextProjection = { text: "", segments: [] };
-    appendProjectionSegment(
-      reading,
-      ruby[2].replace(/\./g, ""),
-      rawFrom,
-      rawTo,
-      "ruby-text",
-      false,
-    );
-    rubyReadings.push(reading);
-    return;
-  }
+function semanticSource(type: string): SearchMatchSource | undefined {
+  if (type === "ruby") return "ruby-base";
+  if (type === "tcy") return "tcy";
+  if (type === "noBreak") return "nobreak";
+  if (type === "kern") return "kern";
+  if (type === "break") return "mdi-break";
+  return undefined;
+}
 
-  const tcy = /^\^([^^\n]+)\^$/.exec(token);
-  if (tcy) {
-    appendProjectionSegment(body, tcy[1], rawFrom, rawTo, "tcy", false);
-    return;
-  }
-
-  const noBreak = /^\[\[no-break:([^\]\n]*)\]\]$/.exec(token);
-  if (noBreak) {
-    appendProjectionSegment(body, noBreak[1], rawFrom, rawTo, "nobreak", false);
-    return;
-  }
-
-  const kern = /^\[\[kern:[^:\]\n]+:([^\]\n]*)\]\]$/.exec(token);
-  if (kern) {
-    appendProjectionSegment(body, kern[1], rawFrom, rawTo, "kern", false);
-    return;
-  }
-
-  if (token === "[[blank]]" || token === "[[br]]") {
-    appendProjectionSegment(body, "\n", rawFrom, rawTo, "mdibreak", false);
-  }
+function semanticRangeAt(
+  ranges: readonly SemanticSourceRange[],
+  byteOffset: number | undefined,
+): SemanticSourceRange | undefined {
+  if (byteOffset === undefined) return undefined;
+  return ranges.find((range) => byteOffset >= range.startByte && byteOffset < range.endByte);
 }
 
 function* iterateHtmlComments(

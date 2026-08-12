@@ -5,13 +5,10 @@
  * Handles kuromoji initialization, noise cleaning, tokenization
  * with correct character positions, and word frequency analysis.
  *
- * MDI marker contract (#1449): document-level analysis callers derive their
- * input via `MdiDocument.fromRawText(content).toAnalysisText()` (single MDI
- * entry API in packages/milkdown-plugin-japanese-novel/mdi-document.ts), so
- * `[[blank]]` marker lines never reach this processor. The processor itself
- * deliberately does NOT strip markers: token character positions must map
- * back to the exact text the caller passed in (e.g. lint rules tokenize
- * editor paragraphs verbatim), and stripping here would silently shift them.
+ * Document-level callers project source through the active document adapter
+ * before invoking this processor. The processor deliberately does not parse
+ * or strip MDI/Markdown syntax: token offsets always map to the exact text the
+ * caller supplied.
  */
 
 import kuromoji from "kuromoji";

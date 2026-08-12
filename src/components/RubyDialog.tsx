@@ -7,6 +7,7 @@ import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { getDictAccess } from "@/lib/dict/dict-access";
 import { getDictService } from "@/lib/dict/dict-service";
 import { buildBatchReadingCandidates } from "@/lib/utils/ruby-readings";
+import type { RubyApplicationSegment } from "@/lib/editor-page/use-ruby-tcy";
 
 import type { Token } from "@/lib/nlp-client/types";
 import type { DictLookup, DictEntry } from "@/lib/dict/dict-types";
@@ -23,7 +24,7 @@ interface RubyDialogProps {
   isOpen: boolean;
   onClose: () => void;
   selectedText: string;
-  onApply: (rubyMarkup: string) => void;
+  onApply: (segments: readonly RubyApplicationSegment[]) => void;
 }
 
 /** Regex to detect kanji characters */
@@ -52,16 +53,14 @@ function tokensToSegments(tokens: Token[]): RubySegment[] {
   return segments;
 }
 
-/** Build MDI ruby syntax from segments */
-function buildRubyMarkup(segments: RubySegment[]): string {
-  return segments
-    .map((seg) => {
-      if (seg.hasKanji && seg.reading && seg.reading !== seg.surface) {
-        return `{${seg.surface}|${seg.reading}}`;
-      }
-      return seg.surface;
-    })
-    .join("");
+/** Build structured editor input without constructing MDI delimiters. */
+function buildRubyApplication(segments: RubySegment[]): RubyApplicationSegment[] {
+  return segments.map((segment) => ({
+    base: segment.surface,
+    ...(segment.hasKanji && segment.reading && segment.reading !== segment.surface
+      ? { ruby: segment.reading }
+      : {}),
+  }));
 }
 
 /**
@@ -189,12 +188,17 @@ export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: R
   }, []);
 
   const handleApply = useCallback(() => {
-    const markup = buildRubyMarkup(segments);
-    onApply(markup);
+    onApply(buildRubyApplication(segments));
     onClose();
   }, [segments, onApply, onClose]);
 
-  const preview = buildRubyMarkup(segments);
+  const preview = segments
+    .map((segment) =>
+      segment.hasKanji && segment.reading && segment.reading !== segment.surface
+        ? `${segment.surface}（${segment.reading}）`
+        : segment.surface,
+    )
+    .join("");
 
   return (
     <GlassDialog

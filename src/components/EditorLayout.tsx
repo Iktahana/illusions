@@ -56,6 +56,7 @@ import type { ExportMetadata } from "@/lib/export/types";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
 import { decideResponsivePanels } from "@/lib/editor-page/responsive-layout";
 import { useWindowWidth } from "@/lib/editor-page/use-window-width";
+import { documentFormatForExtension } from "@/lib/document-format";
 import { DockviewReact } from "dockview-react";
 type SidebarPanelSharedProps = Omit<React.ComponentProps<typeof SidebarPanel>, "view">;
 
@@ -530,12 +531,12 @@ export default function EditorLayout({
                         editor: ({ api: panelApi, params: panelParams }) => {
                           const panelBufferId = panelParams?.bufferId ?? "";
                           const panelFilePath = panelParams?.filePath ?? "";
-                          const panelFileType = (panelParams?.fileType ?? ".mdi") as string;
+                          const panelFileType = (panelParams?.fileType ??
+                            ".mdi") as SupportedFileExtension;
                           const panelEditorKey = panelParams?.editorKey ?? 0;
                           const panelActiveTabId = panelParams?.activeTabId ?? "";
                           const isActivePanel = panelBufferId === panelActiveTabId;
-                          const panelMdiEnabled = panelFileType === ".mdi";
-                          const panelGfmEnabled = panelFileType !== ".txt";
+                          const panelDocumentFormat = documentFormatForExtension(panelFileType);
 
                           const liveTab = mainArea.tabsRef.current.find(
                             (tab) => tab.id === panelBufferId,
@@ -643,8 +644,7 @@ export default function EditorLayout({
                                   onIgnoreCorrection={mainArea.handleIgnoreCorrection}
                                   onAddToUserDictionary={mainArea.handleAddToUserDictionary}
                                   dictEntryRuleIds={mainArea.dictEntryRuleIds}
-                                  mdiExtensionsEnabled={panelMdiEnabled}
-                                  gfmEnabled={panelGfmEnabled}
+                                  documentFormat={panelDocumentFormat}
                                   externalContent={panelPendingExternalContent}
                                   onExternalContentApplied={() => {
                                     mainArea.updateTab(panelBufferId, {
