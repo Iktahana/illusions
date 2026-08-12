@@ -20,12 +20,17 @@ import { history } from "@milkdown/plugin-history";
 import { clipboard } from "@milkdown/plugin-clipboard";
 import { cursor } from "@milkdown/plugin-cursor";
 import { Milkdown, useEditor } from "@milkdown/react";
-import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
-import { posHighlight } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
-import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import {
+  changeLineLength,
+  changeWritingMode,
+  verticalWriting,
+} from "@illusions-lab/milkdown-plugin-vertical-writing";
+import { novelEditorFeatures } from "@/lib/editor-page/novel-editor-features";
+import { posHighlight } from "@/lib/editor-page/pos-highlight";
+import { linting } from "@/lib/editor-page/linting-plugin";
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
-import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
+import { AllSelection } from "@milkdown/prose/state";
 import { $prose, replaceAll } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
@@ -34,21 +39,13 @@ import type { EditorSelectionState } from "@/lib/editor-page/use-selection-track
 import EditorContextMenu, { type ContextMenuAction } from "../EditorContextMenu";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { commitPendingComposition } from "@/lib/editor-page/commit-pending-composition";
-import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
-import {
-  getScrollProgress,
-  setScrollProgress,
-} from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
-import { getLayoutCharsPerLine } from "@/lib/editor-page/chars-per-line-layout";
-import { applyVerticalWheelScroll } from "@/lib/editor-page/vertical-wheel-scroll";
 import type { LintIssue } from "@/lib/linting";
-import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import type { RuleRunnerLike } from "@/lib/editor-page/linting-plugin";
 import {
   useTypographySettings,
   useLintingSettings,
   usePosHighlightSettings,
   usePowerSettings,
-  useScrollSettings,
   useKeyboardInputSettings,
 } from "@/contexts/EditorSettingsContext";
 import { usePosHighlightActivation } from "@/lib/editor-page/use-pos-highlight-activation";
@@ -91,8 +88,6 @@ interface MilkdownEditorProps {
   externalContent?: string | null;
   /** Called after externalContent has been applied and scroll restored (best-effort). */
   onExternalContentApplied?: () => void;
-  /** Called after layout reflow completes (style application + browser paint). */
-  onLayoutReady?: () => void;
   /**
    * Register an on-demand flush that synchronously serializes the *live*
    * editor doc and returns it (#1840). The content update path
@@ -128,7 +123,6 @@ export default function MilkdownEditor({
   overrideCharsPerLine,
   externalContent,
   onExternalContentApplied,
-  onLayoutReady,
   registerFlush,
 }: MilkdownEditorProps) {
   const {
@@ -145,23 +139,15 @@ export default function MilkdownEditor({
   const { posHighlightEnabled, posHighlightColors, posHighlightDisabledTypes } =
     usePosHighlightSettings();
   const { powerSaveMode } = usePowerSettings();
-  const { verticalScrollBehavior, scrollSensitivity } = useScrollSettings();
   const { allowOptionKeySpecialCharacterInput } = useKeyboardInputSettings();
-  const { measureRef: charMeasureRef, charWidth } = useCharWidth({
-    fontFamily,
-    fontScale,
-    lineHeight,
-    isVertical,
-  });
   const editorRef = useRef<HTMLDivElement>(null);
-  const measureBoxRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
   const adapter = useMemo(() => getDocumentAdapter(documentFormat), [documentFormat]);
   const [adapterReady, setAdapterReady] = useState(documentFormat !== "mdi");
   const [documentDiagnostics, setDocumentDiagnostics] = useState<readonly DocumentDiagnostic[]>([]);
   const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
-  // Keep unsaved content across editor reconstruction (for example vertical mode changes).
+  // Keep unsaved content across format-driven editor reconstruction.
   const currentContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
@@ -188,31 +174,12 @@ export default function MilkdownEditor({
     onNlpErrorRef.current = onNlpError;
   }, [onNlpError]);
 
-  // 縦書き用のスクロール制御プラグインを作成
   const isVerticalRef = useRef(isVertical);
+  const charsPerLineRef = useRef(charsPerLine);
+  charsPerLineRef.current = charsPerLine;
   useEffect(() => {
     isVerticalRef.current = isVertical;
   }, [isVertical]);
-
-  // 縦書き時は handleScrollToSelection を抑制（ユーザーが手動でスクロールする）
-  const verticalScrollPlugin = useMemo(
-    () =>
-      $prose(
-        () =>
-          new Plugin({
-            key: new PluginKey("verticalScrollControl"),
-            props: {
-              handleScrollToSelection() {
-                if (isVerticalRef.current) {
-                  return true; // デフォルトのスクロールを完全に禁止
-                }
-                return false;
-              },
-            },
-          }),
-      ),
-    [],
-  );
 
   const isPlainText = documentFormat === "plain-text";
   const refreshDocumentDiagnostics = useCallback(
@@ -280,17 +247,15 @@ export default function MilkdownEditor({
 
       editor = adapter.configureEditor(editor);
 
-      // Keep application-owned editor behavior while disabling every legacy
-      // MDI parser and schema. The format adapter owns document semantics.
-      editor = editor.use(
-        japaneseNovel({
-          isVertical,
-          showManuscriptLine: false,
-          plainText: isPlainText,
-        }),
-      );
+      editor = editor.use(novelEditorFeatures({ plainText: isPlainText }));
 
       editor = editor
+        .use(
+          verticalWriting({
+            mode: isVerticalRef.current ? "vertical-rl" : "horizontal-tb",
+            lineLength: charsPerLineRef.current > 0 ? charsPerLineRef.current : undefined,
+          }),
+        )
         .use(history)
         .use(clipboard)
         .use(cursor)
@@ -301,7 +266,6 @@ export default function MilkdownEditor({
             createMacOptionInputGuardPlugin(() => allowOptionKeySpecialCharacterInputRef.current),
           ),
         )
-        .use(verticalScrollPlugin)
         .use($prose(() => searchHighlightPlugin))
         .use($prose(() => speechHighlightPlugin))
         .use(
@@ -323,15 +287,20 @@ export default function MilkdownEditor({
 
       return editor;
     },
-    [
-      adapter,
-      adapterReady,
-      isPlainText,
-      isVertical,
-      refreshDocumentDiagnostics,
-      verticalScrollPlugin,
-    ],
+    [adapter, adapterReady, isPlainText, refreshDocumentDiagnostics],
   );
+
+  // Presentation changes are hot actions. They must never recreate Milkdown,
+  // so document, selection, IME composition and history stay in the same view.
+  useEffect(() => {
+    if (!editorViewInstance) return;
+    get()?.action(changeWritingMode(isVertical ? "vertical-rl" : "horizontal-tb"));
+  }, [editorViewInstance, get, isVertical]);
+
+  useEffect(() => {
+    if (!editorViewInstance) return;
+    get()?.action(changeLineLength(charsPerLine > 0 ? charsPerLine : null));
+  }, [charsPerLine, editorViewInstance, get]);
 
   // EditorView インスタンスを取得する
   useEffect(() => {
@@ -381,20 +350,14 @@ export default function MilkdownEditor({
     const editor = get();
     if (!editor) return;
 
-    // Save scroll progress before replacing content
-    const container = scrollContainerRef.current;
-    let savedProgress: number | null = null;
-    if (container) {
-      savedProgress = getScrollProgress({ container, isVertical });
-    }
+    const container = editorViewInstance?.dom.closest(".milkdown") as HTMLElement | null;
+    const savedScroll = container ? { left: container.scrollLeft, top: container.scrollTop } : null;
 
     try {
       editor.action(replaceAll(externalContent));
-      // Restore scroll progress after layout settles
-      if (container && savedProgress != null) {
-        const progress = savedProgress;
+      if (container && savedScroll) {
         requestAnimationFrame(() => {
-          setScrollProgress({ container, isVertical }, progress);
+          container.scrollTo(savedScroll);
           onExternalContentAppliedRef.current?.();
         });
       } else {
@@ -403,7 +366,7 @@ export default function MilkdownEditor({
     } catch (error) {
       console.warn("外部コンテンツの適用に失敗しました:", error);
     }
-  }, [externalContent, get, isVertical, scrollContainerRef]);
+  }, [editorViewInstance, externalContent, get]);
 
   // 保存直前にライブ doc を即時シリアライズして返す（#1840）。
   // markdownUpdated は debounce(200ms, maxWait なし) のため、連続入力中は
@@ -476,7 +439,7 @@ export default function MilkdownEditor({
   useEffect(() => {
     if (!editorViewInstance) return;
 
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+    import("@/lib/editor-page/linting-plugin")
       .then(({ updateLintingSettings }) => {
         if (!isEditorViewAlive(editorViewInstance)) return;
         updateLintingSettings(
@@ -492,158 +455,6 @@ export default function MilkdownEditor({
         console.error("[Editor] Failed to update linting settings:", err);
       });
   }, [editorViewInstance, lintingEnabled, lintingRuleRunner]);
-
-  // 縦書き時: ホイール/トラックパッドの入力を横スクロールへ変換する。
-  // 縦書きはコンテナの overflowY が hidden で縦スクロールが無いため、縦スワイプも
-  // 横スワイプも scrollLeft に集約する（横スワイプを scrollTop に流すと「横に払うと
-  // 本文が横へ動かず上下に引っ張られる」体感になっていた, #1639）。
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !isVertical) return;
-
-    const handleWheel = (event: WheelEvent) => {
-      applyVerticalWheelScroll(container, event, {
-        behavior: verticalScrollBehavior,
-        sensitivity: scrollSensitivity,
-      });
-    };
-
-    container.addEventListener("wheel", handleWheel, { passive: false });
-
-    return () => {
-      container.removeEventListener("wheel", handleWheel);
-    };
-  }, [isVertical, scrollContainerRef, verticalScrollBehavior, scrollSensitivity]);
-
-  // 不要なアニメーションを避けるため、直前のスタイル値を保持する
-  const prevStyleRef = useRef({
-    charsPerLine,
-    isVertical,
-    fontFamily,
-    fontScale,
-    lineHeight,
-    charWidth,
-  });
-  const isFirstRenderRef = useRef(true);
-
-  // 1行あたりの文字数制限を、スクロールルートではなく内側の measure box に適用する
-  useEffect(() => {
-    const measureBox = measureBoxRef.current;
-    const editorDom = editorViewInstance?.dom ?? null;
-    const milkdownRoot = editorDom?.closest(".milkdown") as HTMLElement | null;
-    if (!measureBox || !milkdownRoot || !editorDom) return;
-
-    const prev = prevStyleRef.current;
-    const styleChanged =
-      prev.charsPerLine !== charsPerLine ||
-      prev.isVertical !== isVertical ||
-      prev.fontFamily !== fontFamily ||
-      prev.fontScale !== fontScale ||
-      prev.lineHeight !== lineHeight ||
-      prev.charWidth !== charWidth;
-
-    // 直前値を更新
-    prevStyleRef.current = {
-      charsPerLine,
-      isVertical,
-      fontFamily,
-      fontScale,
-      lineHeight,
-      charWidth,
-    };
-
-    // スタイルが変わっていない場合はアニメーションをしない（保存による再構築など）
-    // charWidth が 0→計測値 へ初期化される遷移ではアニメーション不要
-    const isFirstRender = isFirstRenderRef.current;
-    const isCharWidthInit = prev.charWidth === 0 && charWidth > 0;
-    const shouldAnimate = styleChanged && !isFirstRender && !isCharWidthInit;
-    isFirstRenderRef.current = false;
-
-    const applyStyles = () => {
-      editorDom.classList.remove("milkdown-japanese-vertical", "milkdown-japanese-horizontal");
-      editorDom.classList.add(
-        isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal",
-      );
-
-      measureBox.style.width = "";
-      measureBox.style.maxWidth = "";
-      measureBox.style.height = "";
-      measureBox.style.maxHeight = "";
-      measureBox.style.minHeight = "";
-      measureBox.style.minWidth = "";
-      measureBox.style.margin = "";
-
-      milkdownRoot.style.width = isVertical ? "max-content" : "100%";
-      milkdownRoot.style.maxWidth = isVertical ? "" : "100%";
-      milkdownRoot.style.height = "";
-      milkdownRoot.style.maxHeight = "";
-      milkdownRoot.style.minHeight = "";
-
-      editorDom.style.width = isVertical ? "max-content" : "100%";
-      editorDom.style.maxWidth = isVertical ? "" : "100%";
-      editorDom.style.height = "";
-      editorDom.style.maxHeight = "";
-      editorDom.style.minHeight = "";
-      editorDom.style.minWidth = "";
-      editorDom.style.margin = "";
-
-      if (charsPerLine > 0 && charWidth > 0) {
-        const layoutCharsPerLine = getLayoutCharsPerLine(charsPerLine, isVertical);
-        if (isVertical) {
-          const targetHeight = charWidth * layoutCharsPerLine;
-          measureBox.style.height = `${targetHeight}px`;
-          measureBox.style.maxHeight = `${targetHeight}px`;
-          measureBox.style.minHeight = `${targetHeight}px`;
-          milkdownRoot.style.height = `${targetHeight}px`;
-          milkdownRoot.style.maxHeight = `${targetHeight}px`;
-          milkdownRoot.style.minHeight = `${targetHeight}px`;
-          editorDom.style.height = `${targetHeight}px`;
-          editorDom.style.maxHeight = `${targetHeight}px`;
-          editorDom.style.minHeight = `${targetHeight}px`;
-        } else {
-          const targetWidth = charWidth * layoutCharsPerLine;
-          measureBox.style.width = `${targetWidth}px`;
-          measureBox.style.maxWidth = `${targetWidth}px`;
-        }
-      }
-    };
-
-    if (shouldAnimate) {
-      editorDom.style.transition = "opacity 0.15s ease-out";
-      editorDom.style.opacity = "0";
-
-      const timer = setTimeout(() => {
-        applyStyles();
-
-        requestAnimationFrame(() => {
-          editorDom.style.transition = "opacity 0.25s ease-in";
-          editorDom.style.opacity = "1";
-          onLayoutReady?.();
-        });
-      }, 150);
-
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      applyStyles();
-      // charWidth が未計測（0）の間はエディタを透明のまま維持し、
-      // 幅制約なしの状態が一瞬描画されるのを防ぐ
-      if (charWidth > 0 || charsPerLine <= 0) {
-        editorDom.style.opacity = "1";
-        onLayoutReady?.();
-      }
-    }
-  }, [
-    charsPerLine,
-    charWidth,
-    editorViewInstance,
-    isVertical,
-    fontFamily,
-    fontScale,
-    lineHeight,
-    onLayoutReady,
-  ]);
 
   // Union of all Milkdown command keys used in handleFormat.
   // Each .key property is a branded CmdKey<T> string exported by @milkdown.
@@ -922,55 +733,24 @@ export default function MilkdownEditor({
     <div
       ref={editorRef}
       onClick={handleEditorClick}
-      className={clsx(
-        "editor-content-area relative",
-        isVertical ? "py-8 h-full min-h-full min-w-full" : "p-8 min-h-full",
-      )}
+      className="editor-content-area relative h-full min-h-0 w-full"
       style={{
         fontSize: `${fontScale}%`,
         fontFamily: `"${fontFamily}", serif`,
         lineHeight: lineHeight,
-        ...(isVertical && {
-          width: "max-content",
-          display: "flex",
-          justifyContent: "flex-end",
-          alignItems: "center",
-        }),
       }}
     >
-      {/* Hidden character width measurement element — CSS class provides letter-spacing
-          and font-feature-settings; inline styles override the class's font-family/size
-          so the measurement matches the user's actual typography settings.
-          Use fixed positioning so the measurement node can never affect any scroll container. */}
-      <span
-        ref={charMeasureRef as React.RefObject<HTMLSpanElement>}
-        aria-hidden="true"
-        className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          visibility: "hidden",
-          pointerEvents: "none",
-          whiteSpace: "nowrap",
-          fontFamily: `"${fontFamily}", serif`,
-          fontSize: `${fontScale}%`,
-          lineHeight: lineHeight,
-        }}
-      >
-        {MEASURE_TEXT}
-      </span>
       <style jsx>{`
         div :global(.milkdown .ProseMirror) {
           font-family: "${fontFamily}", serif;
           line-height: ${lineHeight};
           ${showParagraphNumbers ? "counter-reset: paragraph;" : ""}
         }
-        div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p) {
+        div :global(.milkdown[data-writing-mode="horizontal-tb"] .ProseMirror p) {
           text-indent: ${textIndent}em;
           margin-block-end: ${paragraphSpacing}em;
         }
-        div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p) {
+        div :global(.milkdown:not([data-writing-mode="horizontal-tb"]) .ProseMirror p) {
           text-indent: ${textIndent}em;
           margin-block-end: ${paragraphSpacing}em;
         }
@@ -989,7 +769,10 @@ export default function MilkdownEditor({
           display: inline-block;
           width: ${textIndent}em;
         }
-        div :global(.milkdown .ProseMirror.milkdown-japanese-horizontal p:not(.mdi-blank)::before) {
+        div
+          :global(
+            .milkdown[data-writing-mode="horizontal-tb"] .ProseMirror p:not(.mdi-blank)::before
+          ) {
           ${
             showParagraphNumbers
               ? `
@@ -1014,7 +797,12 @@ export default function MilkdownEditor({
               : "content: none;"
           }
         }
-        div :global(.milkdown .ProseMirror.milkdown-japanese-vertical p:not(.mdi-blank)::before) {
+        div
+          :global(
+            .milkdown:not([data-writing-mode="horizontal-tb"])
+              .ProseMirror
+              p:not(.mdi-blank)::before
+          ) {
           ${
             showParagraphNumbers
               ? `
@@ -1050,52 +838,18 @@ export default function MilkdownEditor({
         }
       `}</style>
       <style jsx global>{`
-        /* 初期表示は透明にし、レイアウト確定後にJSでフェードインする */
-        .editor-content-area .editor-measure-box {
-          position: relative;
-        }
-        .editor-content-area .editor-measure-box > .milkdown {
+        .editor-content-area > .milkdown {
+          --milkdown-vertical-writing-viewport-size: 100%;
           width: 100%;
-          max-width: 100%;
+          height: 100%;
         }
-        .editor-content-area
-          .editor-measure-box
-          > .milkdown
-          .ProseMirror.milkdown-japanese-horizontal {
-          width: 100%;
-          max-width: 100%;
-        }
-        .editor-content-area
-          .editor-measure-box
-          > .milkdown
-          .ProseMirror.milkdown-japanese-vertical {
-          min-height: 100%;
-        }
-        .editor-content-area .milkdown .ProseMirror {
-          opacity: 0;
+        .editor-content-area > .milkdown > .editor {
+          margin-inline: auto;
+          padding-block: 2rem;
+          padding-inline: 4rem;
         }
       `}</style>
-      <div
-        className={clsx(
-          "editor-layout-frame flex",
-          isVertical
-            ? "min-w-full w-max justify-end"
-            : "min-h-full w-full justify-center items-start",
-        )}
-      >
-        <div
-          ref={measureBoxRef}
-          className={clsx("editor-measure-box shrink-0", !isVertical && "w-full max-w-full")}
-        >
-          {adapterReady ? <Milkdown /> : <div aria-busy="true" />}
-        </div>
-      </div>
-      {/* 縦書きの右端（文書の先頭側）の余白。スクロールコンテナの padding-right は
-          Chromium が scrollWidth に含めず実機 Electron で消えるため、scrollWidth に
-          確実に算入される in-flow なフレックススペーサーで右余白を作る（#1639）。 */}
-      {isVertical && (
-        <div aria-hidden="true" style={{ flex: "0 0 64px", minWidth: 64, alignSelf: "stretch" }} />
-      )}
+      {adapterReady ? <Milkdown /> : <div aria-busy="true" />}
       {documentDiagnostics.length > 0 && (
         <aside
           aria-label="MDI diagnostics"

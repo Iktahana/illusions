@@ -53,7 +53,7 @@ import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { HtmlExportOptions } from "@/lib/export/html-shared";
 import type { ExportMetadata } from "@/lib/export/types";
-import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import type { RuleRunnerLike } from "@/lib/editor-page/linting-plugin";
 import { decideResponsivePanels } from "@/lib/editor-page/responsive-layout";
 import { useWindowWidth } from "@/lib/editor-page/use-window-width";
 import { documentFormatForExtension } from "@/lib/document-format";

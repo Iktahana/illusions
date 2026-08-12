@@ -3,8 +3,8 @@ import { Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core"
 import { commonmark } from "@milkdown/preset-commonmark";
 import { $remark } from "@milkdown/utils";
 import type { EditorView } from "@milkdown/prose/view";
-import { japaneseNovel } from "../index";
-import { remarkPlainTextPlugin } from "../syntax/remark-plain-text";
+import { novelEditorFeatures } from "../index";
+import { remarkPlainTextPlugin } from "../../../document-format/remark-plain-text";
 
 const mountedRoots: HTMLElement[] = [];
 afterEach(() => {
@@ -22,12 +22,7 @@ async function makeView(markdown: string): Promise<{ editor: Editor; view: Edito
       ctx.set(defaultValueCtx, markdown);
     })
     .use(commonmark)
-    .use(
-      japaneseNovel({
-        isVertical: false,
-        showManuscriptLine: false,
-      }),
-    )
+    .use(novelEditorFeatures())
     .create();
 
   let view!: EditorView;
@@ -49,13 +44,7 @@ async function makePlainTextView(source: string): Promise<{ editor: Editor; view
     })
     .use(commonmark)
     .use($remark("plainText", () => remarkPlainTextPlugin))
-    .use(
-      japaneseNovel({
-        isVertical: false,
-        showManuscriptLine: false,
-        plainText: true,
-      }),
-    )
+    .use(novelEditorFeatures({ plainText: true }))
     .create();
 
   let view!: EditorView;

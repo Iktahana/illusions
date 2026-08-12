@@ -11,13 +11,10 @@ import type { EditorView } from "@milkdown/prose/view";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import type { Token as NlpToken } from "@/lib/nlp-client/types";
 import { LRUCache } from "@/shared/lib/lru-cache";
-import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
+import { getAtomOffset, collectParagraphs } from "../paragraph-helpers";
 import { getPosColor, DEFAULT_POS_COLORS } from "./pos-colors";
 import type { PosColorConfig } from "./types";
-import {
-  dispatchIfEditorViewAlive,
-  isEditorViewAlive,
-} from "../../../src/shared/lib/editor-view-safety";
+import { dispatchIfEditorViewAlive, isEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 export const posHighlightKey = new PluginKey("posHighlight");
 

@@ -6,17 +6,15 @@ import { nord } from "@milkdown/theme-nord";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
 import { initializeMdi, mdi } from "@illusions-lab/milkdown-plugin-mdi";
+import { verticalWriting } from "@illusions-lab/milkdown-plugin-vertical-writing";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import { $prose } from "@milkdown/utils";
 import { Plugin, PluginKey } from "@milkdown/prose/state";
 import { Loader2 } from "lucide-react";
 
-import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
-import {
-  posHighlight,
-  updatePosHighlightSettings,
-} from "@/packages/milkdown-plugin-japanese-novel/pos-highlight";
+import { novelEditorFeatures } from "@/lib/editor-page/novel-editor-features";
+import { posHighlight, updatePosHighlightSettings } from "@/lib/editor-page/pos-highlight";
 
 import type { EditorView } from "@milkdown/prose/view";
 
@@ -63,12 +61,8 @@ function PreviewEditor({
         .use(commonmark)
         .use(gfm)
         .use(mdi())
-        .use(
-          japaneseNovel({
-            isVertical: false,
-            showManuscriptLine: false,
-          }),
-        )
+        .use(verticalWriting({ mode: "horizontal-tb" }))
+        .use(novelEditorFeatures())
         .use(readOnlyPlugin)
         .use(
           posHighlight({

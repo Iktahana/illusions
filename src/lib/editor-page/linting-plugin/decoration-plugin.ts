@@ -15,7 +15,7 @@ import type { Token } from "@/lib/nlp-client/types";
 import type { IgnoredCorrection } from "@/lib/project/project-types";
 import { LRUCache } from "@/shared/lib/lru-cache";
 import { hashString } from "@/shared/lib/hash-string";
-import { getAtomOffset, collectParagraphs } from "../shared/paragraph-helpers";
+import { getAtomOffset, collectParagraphs } from "../paragraph-helpers";
 import { getDictAccess } from "@/lib/dict/dict-access";
 import type { GenjiHealth } from "@/lib/dict/dict-access";
 import { collectDictCandidateTerms } from "@/lib/linting/dict-candidate-terms";
@@ -32,10 +32,7 @@ import type {
 } from "./types";
 import { isSilentCancelError } from "./worker/protocol";
 import type { DictSnapshotPayload } from "./worker/protocol";
-import {
-  dispatchIfEditorViewAlive,
-  isEditorViewAlive,
-} from "../../../src/shared/lib/editor-view-safety";
+import { dispatchIfEditorViewAlive, isEditorViewAlive } from "@/shared/lib/editor-view-safety";
 
 export const lintingKey = new PluginKey<LintingPluginState>("linting");
 

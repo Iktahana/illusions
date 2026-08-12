@@ -1,15 +1,8 @@
-/**
- * milkdown-plugin-japanese-novel styles.
- * Import via: import 'milkdown-plugin-japanese-novel/style.css'
- */
+/** Application-owned typography. Layout and scrolling belong to the vertical-writing plugin. */
 
 @import url("https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap");
-@import "./vertical.css";
-@import "./horizontal.css";
-@import "./manuscript.css";
 
-/* Unified base styles for both horizontal and vertical writing */
-.milkdown-japanese-base {
+.novel-editor-content {
   font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", "MS 明朝", serif;
   font-weight: 400;
   font-size: 1em;
@@ -20,11 +13,11 @@
 }
 
 /* Ruby (振仮名) unified base styling */
-.milkdown-japanese-base ruby {
+.novel-editor-content ruby {
   ruby-align: center;
 }
 
-.milkdown-japanese-base rt {
+.novel-editor-content rt {
   font-size: 0.5em;
   letter-spacing: 0;
 }
@@ -41,29 +34,63 @@
  * sibling, so their trailing break — and intentional `[[blank]]` paragraphs
  * (handled separately via `p.mdi-blank::before`) — are unaffected.
  */
-.milkdown-japanese-base img.ProseMirror-separator + br.ProseMirror-trailingBreak {
+.novel-editor-content img.ProseMirror-separator + br.ProseMirror-trailingBreak {
   display: none;
 }
 
 /* Tate-chu-yoko: horizontal digits/punctuation */
-.milkdown-japanese-base .tcy {
+.novel-editor-content .tcy {
   text-combine-upright: all;
 }
 
 /* No-break: prevent line breaks in proper nouns */
-.milkdown-japanese-base .mdi-nobr {
+.novel-editor-content .mdi-nobr {
   white-space: nowrap;
   word-break: keep-all;
 }
 
 /* Kerning: adjust letter spacing */
-.milkdown-japanese-base .mdi-kern {
+.novel-editor-content .mdi-kern {
   letter-spacing: var(--mdi-kern, 0em);
 }
 
 /* Blank paragraph (強制空段落 `[[blank]]`): when empty, render a line-box of natural height
    via a zero-width space so paragraph counters don't stack. As soon as the user types,
    `:empty` no longer matches and the actual content takes over. */
-.milkdown-japanese-base p.mdi-blank:empty::before {
+.novel-editor-content p.mdi-blank:empty::before {
   content: "\200B";
+}
+
+.novel-editor-content {
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-break: strict;
+}
+
+.milkdown[data-writing-mode="horizontal-tb"] .novel-editor-content {
+  text-align: left;
+}
+
+.milkdown:not([data-writing-mode="horizontal-tb"]) .novel-editor-content {
+  text-align: justify;
+  vertical-align: bottom;
+}
+
+.novel-editor-content ul,
+.novel-editor-content ol {
+  margin-block: 0.5em;
+  margin-inline: 0;
+  padding-inline-start: 2em;
+}
+
+.novel-editor-content li {
+  margin-block: 0.25em;
+  margin-inline: 0;
+}
+
+.novel-editor-content blockquote {
+  margin-block: 0.5em;
+  margin-inline: 0;
+  padding-inline-start: 1em;
+  border-inline-start: 3px solid rgb(var(--border-secondary));
 }

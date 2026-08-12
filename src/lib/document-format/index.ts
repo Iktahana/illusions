@@ -5,7 +5,7 @@ import type { Node as ProseNode } from "@milkdown/prose/model";
 import { $remark } from "@milkdown/utils";
 import { getMdi, initializeMdi, mdi } from "@illusions-lab/milkdown-plugin-mdi";
 import { getMdiTextBlocks, parse, type MdiDiagnostic } from "@illusions-lab/mdi";
-import { remarkPlainTextPlugin } from "@/packages/milkdown-plugin-japanese-novel/syntax/remark-plain-text";
+import { remarkPlainTextPlugin } from "./remark-plain-text";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 
 export type DocumentFormat = "mdi" | "markdown" | "plain-text";

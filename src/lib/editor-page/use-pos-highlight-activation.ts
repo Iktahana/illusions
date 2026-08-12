@@ -65,7 +65,7 @@ export function usePosHighlightActivation(params: UsePosHighlightActivationParam
 
     const apply = (activity: WindowActivityState): void => {
       // 動的 import で plugin 本体（kuromoji 含む）を初期バンドルから外す
-      import("@/packages/milkdown-plugin-japanese-novel/pos-highlight")
+      import("@/lib/editor-page/pos-highlight")
         .then(({ updatePosHighlightSettings }) => {
           if (disposed || !isEditorViewAlive(view)) return;
           updatePosHighlightSettings(view, {

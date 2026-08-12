@@ -1311,7 +1311,7 @@ function EditorPageContent() {
   useEffect(() => {
     if (!editorViewInstance) return;
 
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+    import("@/lib/editor-page/linting-plugin")
       .then(({ updateLintingSettings }) => {
         if (!isEditorViewAlive(editorViewInstance)) return;
         updateLintingSettings(editorViewInstance, { ignoredCorrections }, "ignored-correction");
@@ -1325,7 +1325,7 @@ function EditorPageContent() {
   useEffect(() => {
     if (!editorViewInstance) return;
 
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+    import("@/lib/editor-page/linting-plugin")
       .then(({ updateLintingSettings }) => {
         if (!isEditorViewAlive(editorViewInstance)) return;
         updateLintingSettings(editorViewInstance, { knownTerms }, "known-terms-change");

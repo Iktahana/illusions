@@ -29,7 +29,7 @@ import { act } from "react";
 // ---------------------------------------------------------------------------
 
 const updatePosHighlightSettings = vi.fn();
-vi.mock("@/packages/milkdown-plugin-japanese-novel/pos-highlight", () => ({
+vi.mock("@/lib/editor-page/pos-highlight", () => ({
   updatePosHighlightSettings: (...args: unknown[]) => updatePosHighlightSettings(...args),
 }));
 

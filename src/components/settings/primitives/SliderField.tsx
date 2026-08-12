@@ -17,7 +17,7 @@ export interface SliderFieldProps {
 
 /**
  * Range slider with inline value display. Covers fontScale, lineHeight,
- * paragraphSpacing, scrollSensitivity, speechRate, etc.
+ * paragraphSpacing, speechRate, etc.
  */
 export default function SliderField({
   label,

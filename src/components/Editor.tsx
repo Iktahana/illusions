@@ -7,10 +7,6 @@ import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import clsx from "clsx";
 import type { EditorView } from "@milkdown/prose/view";
 import { useSpeech } from "@/lib/hooks/use-speech";
-import {
-  getScrollProgress,
-  setScrollProgress,
-} from "@/packages/milkdown-plugin-japanese-novel/scroll-progress";
 import SelectionCounter from "./SelectionCounter";
 import EditorToolbar from "./editor/EditorToolbar";
 import MilkdownEditor from "./editor/MilkdownEditor";
@@ -21,7 +17,7 @@ import { takeEditorSelectionForSearch } from "@/lib/editor-page/search-selection
 import type { SelectionSearchRange } from "@/lib/editor-page/use-selection-tracking";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { LintIssue } from "@/lib/linting";
-import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import type { RuleRunnerLike } from "@/lib/editor-page/linting-plugin";
 import type { DocumentFormat } from "@/lib/document-format";
 import { useTypographySettings, useSpeechSettings } from "@/contexts/EditorSettingsContext";
 import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
@@ -127,6 +123,7 @@ export default function NovelEditor({
   const editorViewRef = useRef<EditorView | null>(null);
   const speechMapRef = useRef<{ text: string; positions: number[] } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const isVerticalRef = useRef(false);
   // ツールバー検索ボタンの ref（EditorToolbar が利用）。検索窓のアンカーは
   // EditorLayout 側でアクティブエディタ DOM を使うため、ここでは保持のみ。
@@ -151,15 +148,13 @@ export default function NovelEditor({
     onSelectionChange,
     onSelectionRangeChange,
   });
-  const handleScrollContainerRef = useCallback((node: HTMLDivElement | null) => {
-    scrollContainerRef.current = node;
-    setScrollContainerElement(node);
-  }, []);
-
   // Stable callback so MilkdownEditor's view-polling effect (which lists
   // onEditorViewReady in its deps) does not restart on every render (#1567).
   const handleEditorViewReady = useCallback(
     (view: EditorView) => {
+      const root = view.dom.closest(".milkdown") as HTMLDivElement | null;
+      scrollContainerRef.current = root;
+      setScrollContainerElement(root);
       setEditorViewInstance(view);
       onEditorViewReady?.(view);
     },
@@ -330,96 +325,14 @@ export default function NovelEditor({
     return () => container.removeEventListener("click", handleClick);
   }, [startSpeechFromCursor]);
 
-  // Track whether initial vertical scroll has been performed for this pane instance.
-  const hasVerticalInitialScrollRef = useRef(false);
-  // Pending scroll progress to restore after layout reflow (mode switch).
-  const pendingScrollRestoreRef = useRef<number | null>(null);
-
   const handleToggleVertical = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (container) {
-      // Progress is already normalized: 0 = beginning, 1 = end regardless of mode.
-      pendingScrollRestoreRef.current = getScrollProgress({ container, isVertical });
-    }
-    hasVerticalInitialScrollRef.current = false;
     setIsVertical((prev) => !prev);
-  }, [isVertical]);
+  }, []);
 
   useEffect(() => {
     registerWritingModeToggle?.(handleToggleVertical);
     return () => registerWritingModeToggle?.(null);
   }, [handleToggleVertical, registerWritingModeToggle]);
-
-  const handleLayoutReady = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // Mode switch: restore saved reading position
-    if (pendingScrollRestoreRef.current != null) {
-      const restored = setScrollProgress(
-        { container, isVertical },
-        pendingScrollRestoreRef.current,
-      );
-      if (restored) {
-        pendingScrollRestoreRef.current = null;
-        hasVerticalInitialScrollRef.current = true;
-      }
-      // If restore failed (no scrollbar yet), keep pending for next onLayoutReady
-      return;
-    }
-
-    // First entry to vertical mode: scroll to document start (right edge)
-    if (isVertical && !hasVerticalInitialScrollRef.current) {
-      if (setScrollProgress({ container, isVertical: true }, 0)) {
-        hasVerticalInitialScrollRef.current = true;
-        // onLayoutReady fires before the web font (Noto Serif JP) finishes
-        // loading. When the font swaps in, the content width (scrollWidth)
-        // grows but scrollLeft stays put, so the document start (right edge)
-        // drifts out of view and the title sticks to the right frame.
-        // Re-pin to the start once fonts are ready (first vertical entry only).
-        if (typeof document !== "undefined" && document.fonts?.ready) {
-          document.fonts.ready.then(() => {
-            const c = scrollContainerRef.current;
-            if (!c) return;
-            requestAnimationFrame(() => {
-              setScrollProgress({ container: c, isVertical: true }, 0);
-            });
-          });
-        }
-      }
-    }
-  }, [isVertical, scrollContainerRef]);
-
-  // 縦書き: コンテンツ幅の変化（Web フォント読込・行字数再計算など）後も読書位置を維持する。
-  // scrollLeft は数値のまま据え置かれるため、コンテンツが伸びると文書先頭（右端）が
-  // ビューポート外へ隠れてしまう。進捗（0=先頭）ベースで再固定してドリフトを防ぐ。
-  useEffect(() => {
-    if (!isVertical) return;
-    const container = scrollContainerRef.current;
-    const contentDom = editorViewInstance?.dom;
-    if (!container || !contentDom) return;
-
-    let lastProgress = getScrollProgress({ container, isVertical: true });
-    // 自前の再固定スクロールで lastProgress を上書きしないための猶予期限
-    let suppressScrollUntil = 0;
-
-    const handleScroll = () => {
-      if (performance.now() < suppressScrollUntil) return;
-      lastProgress = getScrollProgress({ container, isVertical: true });
-    };
-
-    const observer = new ResizeObserver(() => {
-      suppressScrollUntil = performance.now() + 100;
-      setScrollProgress({ container, isVertical: true }, lastProgress);
-    });
-
-    container.addEventListener("scroll", handleScroll, { passive: true });
-    observer.observe(contentDom);
-    return () => {
-      container.removeEventListener("scroll", handleScroll);
-      observer.disconnect();
-    };
-  }, [isVertical, editorViewInstance, scrollContainerRef]);
 
   // Per-pane local state for auto-calculated chars per line (avoids split panes overwriting each other)
   const [localAutoCharsPerLine, setLocalAutoCharsPerLine] = useState<number | null>(null);
@@ -439,7 +352,7 @@ export default function NovelEditor({
 
   // Calculate optimal chars per line based on editor width and measured char width
   const calculateOptimalCharsPerLine = useCallback(() => {
-    const container = scrollContainerRef.current;
+    const container = viewportRef.current;
     if (!container) return;
 
     // Skip calculation when container is not visible (e.g., hidden dockview panel)
@@ -475,13 +388,13 @@ export default function NovelEditor({
         setLocalAutoCharsPerLine(clamped);
       }
     }
-  }, [autoCharWidth, isVertical, scrollContainerRef]);
+  }, [autoCharWidth, isVertical]);
 
   // Use ResizeObserver on scroll container to auto-adjust chars per line.
   // This catches both window resizes and Dockview split pane resizes.
   useEffect(() => {
     if (!autoCharsPerLine) return;
-    const container = scrollContainerRef.current;
+    const container = viewportRef.current;
     if (!container) return;
 
     // Calculate on mount
@@ -517,28 +430,14 @@ export default function NovelEditor({
 
       {/* エディタ領域 */}
       <div
-        ref={handleScrollContainerRef}
-        className="flex-1 bg-background-secondary relative min-h-0 pt-12"
-        style={{
-          overflowX: isVertical ? "auto" : "hidden",
-          overflowY: isVertical ? "hidden" : "auto",
-          overscrollBehavior: "contain",
-          // Disable browser scroll anchoring to prevent auto-scroll adjustment during DOM updates in vertical mode
-          overflowAnchor: "none",
-          // In vertical-rl the document start is the RIGHT edge. The scroll container's
-          // end-side (right) padding is dropped from scrollWidth by Chromium on real
-          // Electron, so paddingRight never shows (title sticks to the frame). Keep only
-          // the start-side (left) padding here, and provide the right-side gap as an
-          // in-flow flex spacer inside the content (always counted in scrollWidth). (#1639)
-          // scrollbar-gutter keeps the bottom line clear of the horizontal scrollbar (non-overlay platforms).
-          ...(isVertical ? { paddingLeft: 64, scrollbarGutter: "stable" } : {}),
-        }}
+        ref={viewportRef}
+        className="flex-1 bg-background-secondary relative min-h-0 pt-12 overflow-hidden"
       >
         {/* Hidden character width measurement element for auto chars-per-line calculation */}
         <span
           ref={autoCharMeasureRef as React.RefObject<HTMLSpanElement>}
           aria-hidden="true"
-          className={isVertical ? "milkdown-japanese-vertical" : "milkdown-japanese-horizontal"}
+          className="novel-editor-content"
           style={{
             position: "fixed",
             top: 0,
@@ -549,6 +448,7 @@ export default function NovelEditor({
             fontSize: `${fontScale}%`,
             fontFamily: `"${fontFamily}", serif`,
             lineHeight: lineHeight,
+            writingMode: isVertical ? "vertical-rl" : "horizontal-tb",
           }}
         >
           {MEASURE_TEXT}
@@ -579,7 +479,6 @@ export default function NovelEditor({
               onFind={handleFind}
               externalContent={externalContent}
               onExternalContentApplied={onExternalContentApplied}
-              onLayoutReady={handleLayoutReady}
               registerFlush={registerFlush}
             />
           </ProsemirrorAdapterProvider>

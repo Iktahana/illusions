@@ -181,7 +181,6 @@ filesystem、shell、updater、native dialog などの privileged API は preloa
 
 ```text
 packages/
-  milkdown-plugin-japanese-novel/
   illusions-lint-sdk/
 ```
 

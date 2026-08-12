@@ -6,10 +6,7 @@ import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { notificationManager } from "@/lib/services/notification-manager";
-import {
-  RuleRunnerProxy,
-  type RuleRunnerLike,
-} from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import { RuleRunnerProxy, type RuleRunnerLike } from "@/lib/editor-page/linting-plugin";
 import { syncLoadedRulesets, subscribeRulesetChanges } from "@/lib/linting/external-ruleset-loader";
 import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 
@@ -128,7 +125,7 @@ export function useLinting(
     if (!editorViewInstance || !lintingEnabled || !ruleRunner) return;
 
     setIsLinting(true);
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
+    import("@/lib/editor-page/linting-plugin")
       .then(({ updateLintingSettings }) => {
         if (!isEditorViewAlive(editorViewInstance)) {
           setIsLinting(false);
