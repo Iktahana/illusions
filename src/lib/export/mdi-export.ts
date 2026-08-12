@@ -6,7 +6,7 @@
  * settings to the upstream publication profile.
  */
 import type { ExportProfile } from "@illusions-lab/mdi-export-profile";
-import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import { serializeMdi } from "@illusions-lab/mdi";
 
 import type { UnifiedExportSettings } from "./export-settings";
 import type { ExportMetadata } from "./types";
@@ -15,9 +15,7 @@ export const DEFAULT_LAYOUT_SYSTEM = "japanese-publisher" as const;
 
 /** Preserve raw .md/.txt input; normalize only the editor's escaped .mdi output. */
 export function normalizeExportSource(content: string, fileType = ".mdi"): string {
-  return fileType === ".mdi"
-    ? MdiDocument.fromEditorOutput(content, { fileType: ".mdi" }).toRawText()
-    : content;
+  return fileType === ".mdi" ? serializeMdi(content) : content;
 }
 
 export function toExportProfile(

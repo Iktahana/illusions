@@ -21,7 +21,6 @@ export interface EditorSettings {
   fontFamily: string;
   charsPerLine: number;
   showParagraphNumbers: boolean;
-  mdiExtensionsEnabled: boolean;
   posHighlightEnabled: boolean;
   posHighlightColors: Record<string, string>;
 }
@@ -202,9 +201,8 @@ export function isStandaloneMode(mode: EditorMode): mode is StandaloneMode {
 
 /**
  * Returns default editor settings based on file extension.
- * MDI files have MDI extensions enabled by default.
  */
-export function getDefaultEditorSettings(extension: SupportedFileExtension): EditorSettings {
+export function getDefaultEditorSettings(_extension: SupportedFileExtension): EditorSettings {
   return {
     fontScale: 1.0,
     lineHeight: 1.8,
@@ -213,7 +211,6 @@ export function getDefaultEditorSettings(extension: SupportedFileExtension): Edi
     fontFamily: "serif",
     charsPerLine: 40,
     showParagraphNumbers: false,
-    mdiExtensionsEnabled: extension === ".mdi",
     posHighlightEnabled: false,
     posHighlightColors: {},
   };

@@ -10,7 +10,7 @@ export type SearchMatchSource =
   | "nobreak"
   | "kern"
   | "hardbreak"
-  | "mdibreak"
+  | "mdi-break"
   | "comment"
   | "mixed";
 
@@ -113,9 +113,9 @@ export function findSearchMatches(
     if (!node.isTextblock) return;
 
     const isHeading = node.type.name === "heading";
-    // blankParagraph (MDI [[blank]]) は CSS counter-increment: paragraph から除外
+    // mdiBlank is excluded from the visible paragraph counter.
     // されているため、UI 側の段落番号と一致させるためここでも数えない。
-    const isBlankParagraph = node.type.name === "blankParagraph";
+    const isBlankParagraph = node.type.name === "mdiBlank";
     if (!isHeading && !isBlankParagraph) paragraphNumber += 1;
 
     const bodyProjection = createBodyProjection(node, pos + 1, options.excludeComments);
@@ -272,8 +272,9 @@ function createRubyReadingProjections(
   const projections: SearchTextProjection[] = [];
 
   block.forEach((child, offset) => {
-    if (child.type.name !== "ruby") return;
-    const text = ((child.attrs.text as string) ?? "").replace(/\./g, "");
+    if (child.type.name !== "mdiRuby") return;
+    const reading = child.attrs.ruby;
+    const text = Array.isArray(reading) ? reading.join("") : ((reading as string) ?? "");
     if (!text) return;
 
     const from = blockContentStart + offset;
@@ -309,18 +310,12 @@ function appendSegment(
 
 function getDisplayedAtomText(node: Node): { text: string; source: SearchMatchSource } | null {
   switch (node.type.name) {
-    case "ruby":
+    case "mdiRuby":
       return { text: (node.attrs.base as string) ?? "", source: "ruby-base" };
-    case "tcy":
-      return { text: (node.attrs.value as string) ?? "", source: "tcy" };
-    case "nobreak":
-      return { text: (node.attrs.text as string) ?? "", source: "nobreak" };
-    case "kern":
-      return { text: (node.attrs.text as string) ?? "", source: "kern" };
     case "hardbreak":
       return { text: "\n", source: "hardbreak" };
-    case "mdibreak":
-      return { text: "\n", source: "mdibreak" };
+    case "mdiBreak":
+      return { text: "\n", source: "mdi-break" };
     default:
       return null;
   }

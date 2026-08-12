@@ -34,11 +34,11 @@ const schema = new Schema({
       parseDOM: [{ tag: "p" }],
     },
     text: { group: "inline" },
-    ruby: {
+    mdiRuby: {
       group: "inline",
       inline: true,
       atom: true,
-      attrs: { base: { default: "" }, text: { default: "" } },
+      attrs: { base: { default: "" }, ruby: { default: "" } },
       toDOM: (node) => ["ruby", {}, ["rb", {}, node.attrs.base as string]] as unknown as [string],
       parseDOM: [{ tag: "ruby" }],
     },
@@ -58,7 +58,7 @@ const schema = new Schema({
 // ruby-aware slice for assertions
 function sliceAt(doc: Node, m: { from: number; to: number }): string {
   return doc.textBetween(m.from, m.to, "", (n) =>
-    n.type.name === "ruby" ? (n.attrs.base as string) : "",
+    n.type.name === "mdiRuby" ? (n.attrs.base as string) : "",
   );
 }
 
@@ -98,10 +98,10 @@ describe("findSearchMatches — hardbreak / ruby position correctness", () => {
   it("ruby atoms in a heading do not shift body matches", () => {
     const doc = schema.node("doc", null, [
       schema.node("heading", { level: 1 }, [
-        schema.node("ruby", { base: "花", text: "か" }),
-        schema.node("ruby", { base: "様", text: "よう" }),
-        schema.node("ruby", { base: "年", text: "ねん" }),
-        schema.node("ruby", { base: "華", text: "か" }),
+        schema.node("mdiRuby", { base: "花", ruby: "か" }),
+        schema.node("mdiRuby", { base: "様", ruby: "よう" }),
+        schema.node("mdiRuby", { base: "年", ruby: "ねん" }),
+        schema.node("mdiRuby", { base: "華", ruby: "か" }),
       ]),
       schema.node("paragraph", null, [schema.text("映画のタイトルは『花様年華』だった。")]),
     ]);
@@ -112,7 +112,7 @@ describe("findSearchMatches — hardbreak / ruby position correctness", () => {
 
   it("ruby base text is searchable and highlights the whole atom", () => {
     const doc = schema.node("doc", null, [
-      schema.node("heading", { level: 1 }, [schema.node("ruby", { base: "華", text: "か" })]),
+      schema.node("heading", { level: 1 }, [schema.node("mdiRuby", { base: "華", ruby: "か" })]),
     ]);
     const matches = findSearchMatches(doc, "華", false);
     expect(matches).toHaveLength(1);

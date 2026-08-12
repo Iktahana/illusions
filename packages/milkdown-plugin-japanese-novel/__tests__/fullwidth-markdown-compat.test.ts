@@ -53,11 +53,6 @@ async function makePlainTextView(source: string): Promise<{ editor: Editor; view
       japaneseNovel({
         isVertical: false,
         showManuscriptLine: false,
-        enableRuby: false,
-        enableTcy: false,
-        enableNoBreak: false,
-        enableKern: false,
-        enableMdiBreak: false,
         plainText: true,
       }),
     )

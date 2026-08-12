@@ -1,7 +1,6 @@
 "use client";
 
 import type { MutableRefObject, Dispatch, SetStateAction } from "react";
-import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
 import type { MdiFileDescriptor } from "../project/mdi-file";
 import type { SupportedFileExtension, WorkspaceTab } from "../project/project-types";
 import type { TabId, TabState, EditorTabState, TerminalTabState } from "./tab-types";
@@ -196,28 +195,6 @@ export function inferFileType(fileName: string): SupportedFileExtension {
   if (lower.endsWith(".md")) return ".md";
   if (lower.endsWith(".txt")) return ".txt";
   return ".mdi";
-}
-
-/**
- * Sanitize MDI content before saving.
- * Strips known HTML tags that should not appear in .mdi files,
- * while preserving arbitrary angle-bracket content (e.g. `A<B>C`).
- *
- * Thin wrapper over the single MDI entry API (issue #1449): the actual
- * normalization (bracket-macro escape recovery, `<br />` → `[[blank]]`,
- * HTML tag stripping) lives in
- * `@/packages/milkdown-plugin-japanese-novel/mdi-document`.
- *
- * @param options.fileType - Serializer-escaped bracket macros (`\[\[blank]]` →
- *   `[[blank]]`) are recovered for ".mdi", ".md", and ".txt" (byte-preservation,
- *   issue #1916). Standalone `<br />` → `[[blank]]` conversion applies to ".mdi"
- *   only. For omitted fileType both steps are skipped.
- */
-export function sanitizeMdiContent(
-  content: string,
-  options?: { fileType?: SupportedFileExtension },
-): string {
-  return MdiDocument.fromEditorOutput(content, options).toRawText();
 }
 
 /**

@@ -22,6 +22,7 @@ import type { SelectionSearchRange } from "@/lib/editor-page/use-selection-track
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { LintIssue } from "@/lib/linting";
 import type { RuleRunnerLike } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import type { DocumentFormat } from "@/lib/document-format";
 import { useTypographySettings, useSpeechSettings } from "@/contexts/EditorSettingsContext";
 import { useCharWidth, MEASURE_TEXT } from "@/lib/editor-page/use-char-width";
 import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
@@ -59,9 +60,7 @@ interface EditorProps {
   onAddToUserDictionary?: (issue: LintIssue) => void;
   /** 辞書追加を示唆するルール ID 集合（辞書系ルールのみメニュー表示） */
   dictEntryRuleIds?: ReadonlySet<string>;
-  // Editor mode controls
-  mdiExtensionsEnabled?: boolean;
-  gfmEnabled?: boolean;
+  documentFormat?: DocumentFormat;
   /** External content to apply to the editor (from file watcher). Best-effort scroll position preservation. */
   externalContent?: string | null;
   /** Called after externalContent has been applied and scroll restored (best-effort). */
@@ -97,8 +96,7 @@ export default function NovelEditor({
   onIgnoreCorrection,
   onAddToUserDictionary,
   dictEntryRuleIds,
-  mdiExtensionsEnabled = true,
-  gfmEnabled = true,
+  documentFormat = "mdi",
   externalContent,
   onExternalContentApplied,
   registerFlush,
@@ -576,8 +574,7 @@ export default function NovelEditor({
               onIgnoreCorrection={onIgnoreCorrection}
               onAddToUserDictionary={onAddToUserDictionary}
               dictEntryRuleIds={dictEntryRuleIds}
-              mdiExtensionsEnabled={mdiExtensionsEnabled}
-              gfmEnabled={gfmEnabled}
+              documentFormat={documentFormat}
               onStartSpeech={startSpeechFromCursor}
               onFind={handleFind}
               externalContent={externalContent}

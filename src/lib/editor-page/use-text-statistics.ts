@@ -60,7 +60,7 @@ export function useTextStatistics(
     [content, fileType],
   );
 
-  const cleanedContent = useMemo(() => cleanMarkdown(content), [content]);
+  const cleanedContent = useMemo(() => cleanMarkdown(content, fileType), [content, fileType]);
 
   const sentenceCount = useMemo(() => countSentences(cleanedContent), [cleanedContent]);
   const charTypeAnalysis = useMemo(() => analyzeCharacterTypes(cleanedContent), [cleanedContent]);

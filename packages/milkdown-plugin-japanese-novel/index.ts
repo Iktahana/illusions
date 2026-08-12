@@ -1,34 +1,17 @@
 /**
  * milkdown-plugin-japanese-novel
- * 日本語小説向け: 縦書き、ルビ、縦中横、原稿用紙風スタイル
+ * 日本語小説向けの application-owned editor behavior and styles.
+ * MDI syntax is owned by @illusions-lab/milkdown-plugin-mdi.
  */
 
 import type { MilkdownPlugin } from "@milkdown/ctx";
 import { $prose, $remark } from "@milkdown/utils";
 import { Plugin, PluginKey } from "@milkdown/prose/state";
-import remarkFrontmatter from "remark-frontmatter";
-import { rubySchema } from "./nodes/ruby";
-import { tcySchema } from "./nodes/tcy";
-import { nobreakSchema } from "./nodes/nobreak";
-import { kernSchema } from "./nodes/kern";
-import { mdibreakSchema } from "./nodes/mdibreak";
-import { blankParagraphSchema } from "./nodes/blank-paragraph";
-import { frontmatterSchema } from "./nodes/frontmatter";
 import { headingAnchorSchema } from "./nodes/heading-anchor";
-import {
-  remarkFullWidthMarkdownPlugin,
-  remarkHeadingAnchorPlugin,
-  remarkRubyPlugin,
-  remarkTcyPlugin,
-  remarkNoBreakPlugin,
-  remarkKernPlugin,
-  remarkMdiBreakPlugin,
-  remarkMdiBlankPlugin,
-} from "./syntax";
+import { remarkFullWidthMarkdownPlugin, remarkHeadingAnchorPlugin } from "./syntax";
 import { createHeadingIdFixerPlugin } from "./plugins/heading-id-fixer";
 import { createHardbreakIndentPlugin } from "./plugins/hardbreak-indent";
 import { createDialogueIndentPlugin } from "./plugins/dialogue-indent";
-import { createClipboardSerializerPlugin } from "./plugins/clipboard-serializer";
 import { defaultJapaneseNovelOptions, type JapaneseNovelOptions } from "./config";
 
 export type { JapaneseNovelOptions } from "./config";
@@ -39,17 +22,7 @@ export { calculateManuscriptPages, countCharacters } from "./utils";
  */
 export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugin[] {
   const opts = { ...defaultJapaneseNovelOptions, ...options };
-  const {
-    isVertical,
-    showManuscriptLine,
-    enableRuby,
-    enableTcy,
-    enableNoBreak,
-    enableKern,
-    enableMdiBreak,
-    enableFrontmatter,
-    plainText,
-  } = opts;
+  const { isVertical, showManuscriptLine, plainText } = opts;
 
   const classes: string[] = ["milkdown-japanese-base"];
   if (isVertical) {
@@ -59,39 +32,6 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
   }
   if (showManuscriptLine) classes.push("manuscript-style");
 
-  const remarkRuby = $remark(
-    "japaneseNovelRuby",
-    () => remarkRubyPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
-    { enable: enableRuby },
-  );
-  const remarkTcy = $remark(
-    "japaneseNovelTcy",
-    () => remarkTcyPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
-    { enable: enableTcy },
-  );
-  const remarkNoBreak = $remark(
-    "japaneseNovelNoBreak",
-    () => remarkNoBreakPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
-    { enable: enableNoBreak },
-  );
-  const remarkKern = $remark(
-    "japaneseNovelKern",
-    () => remarkKernPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
-    { enable: enableKern },
-  );
-  const remarkMdiBreak = $remark(
-    "japaneseNovelMdiBreak",
-    () => remarkMdiBreakPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
-    { enable: enableMdiBreak },
-  );
-  // Gate [[blank]] parsing on the same flag as other MDI block macros so that
-  // .txt/.md files containing literal "[[blank]]" are not consumed and deleted
-  // on save (#1886). enableMdiBreak carries the mdiExtensionsEnabled signal.
-  const remarkMdiBlank = $remark(
-    "japaneseNovelMdiBlank",
-    () => remarkMdiBlankPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
-    { enable: enableMdiBreak },
-  );
   const remarkHeadingAnchor = $remark(
     "japaneseNovelHeadingAnchor",
     () => remarkHeadingAnchorPlugin,
@@ -101,7 +41,6 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     () => remarkFullWidthMarkdownPlugin as (o?: { enable?: boolean }) => (tree: unknown) => void,
     { enable: !plainText },
   );
-  const remarkMdiFrontmatter = $remark("japaneseNovelFrontmatter", () => remarkFrontmatter, "yaml");
 
   const stylePlugin = $prose(() => {
     const classList = [...classes];
@@ -131,32 +70,13 @@ export function japaneseNovel(options: JapaneseNovelOptions = {}): MilkdownPlugi
     return createDialogueIndentPlugin();
   });
 
-  // Gate clipboard MDI conversion per feature so each macro family is only
-  // transformed when its own parser is active. A consumer that enables ONLY
-  // ruby still copies literal `^2024^` / `[[br]]` verbatim, and `.md` / `.txt`
-  // documents (no feature enabled) keep `{花|か}` / `^2024^` as literal text.
-  const clipboardSerializerPlugin = $prose((ctx) => {
-    return createClipboardSerializerPlugin(ctx, {
-      features: { enableRuby, enableTcy, enableNoBreak, enableKern, enableMdiBreak },
-      plainText,
-    });
-  });
-
   const plugins: MilkdownPlugin[] = [
-    ...(enableFrontmatter ? [remarkMdiFrontmatter, frontmatterSchema] : []),
     remarkFullWidthMarkdown,
-    ...(enableRuby ? [remarkRuby, rubySchema] : []),
-    ...(enableTcy ? [remarkTcy, tcySchema] : []),
-    ...(enableMdiBreak ? [remarkMdiBreak, mdibreakSchema] : []),
-    ...(enableNoBreak ? [remarkNoBreak, nobreakSchema] : []),
-    ...(enableKern ? [remarkKern, kernSchema] : []),
-    ...(enableMdiBreak ? [remarkMdiBlank, blankParagraphSchema] : []),
     remarkHeadingAnchor,
     headingAnchorSchema,
     headingIdFixerPlugin,
     hardbreakIndentPlugin,
     dialogueIndentPlugin,
-    clipboardSerializerPlugin,
     stylePlugin,
   ].flat();
 

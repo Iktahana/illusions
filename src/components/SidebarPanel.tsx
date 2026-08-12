@@ -10,7 +10,7 @@ import Outline from "@/components/Outline";
 import { isProjectMode } from "@/lib/project/project-types";
 
 import type { ActivityBarView } from "@/components/ActivityBar";
-import type { EditorMode } from "@/lib/project/project-types";
+import type { EditorMode, SupportedFileExtension } from "@/lib/project/project-types";
 import type { SearchMatch, SearchTarget } from "@/lib/editor-page/find-search-matches";
 import type { AffectedTab } from "@/lib/tab-manager/tab-path-sync";
 import type { EditorView } from "@milkdown/prose/view";
@@ -20,6 +20,8 @@ interface SidebarPanelProps {
   view: ActivityBarView;
   /** Current editor content (Markdown string). */
   content: string;
+  /** Format of the active document. */
+  fileType: SupportedFileExtension;
   /** Current editor mode (project / standalone / null). */
   editorMode: EditorMode;
   /** Whether compact layout is active. */
@@ -86,6 +88,7 @@ interface SidebarPanelProps {
 export default function SidebarPanel({
   view,
   content,
+  fileType,
   editorMode,
   compactMode,
   onChapterClick,
@@ -195,7 +198,7 @@ export default function SidebarPanel({
     case "outline":
       return <Outline content={content} onHeadingClick={onChapterClick} />;
     case "characters":
-      return <Characters content={content} />;
+      return <Characters content={content} fileType={fileType} />;
     case "dictionary":
       return (
         <Dictionary
@@ -207,7 +210,12 @@ export default function SidebarPanel({
       );
     case "wordfreq":
       return (
-        <WordFrequency content={content} filePath={currentFilePath} onWordSearch={onWordSearch} />
+        <WordFrequency
+          content={content}
+          fileType={fileType}
+          filePath={currentFilePath}
+          onWordSearch={onWordSearch}
+        />
       );
     default:
       return null;

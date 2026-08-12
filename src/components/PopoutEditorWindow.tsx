@@ -14,6 +14,7 @@ import ErrorBoundary from "@/shared/ui/ErrorBoundary";
 import NovelEditor from "@/components/Editor";
 import { EditorSettingsProvider } from "@/contexts/EditorSettingsContext";
 import { useEditorSettings } from "@/lib/editor-page/use-editor-settings";
+import { documentFormatForExtension } from "@/lib/document-format";
 
 import type { SupportedFileExtension } from "@/lib/project/project-types";
 
@@ -47,8 +48,7 @@ export default function PopoutEditorWindow({
   // Editor settings (reuse the same hook for consistent appearance)
   const { settings, handlers: settingsHandlers } = useEditorSettings(incrementEditorKey);
 
-  const mdiExtensionsEnabled = fileType === ".mdi";
-  const gfmEnabled = fileType !== ".txt";
+  const documentFormat = documentFormatForExtension(fileType);
 
   // Set window title
   useEffect(() => {
@@ -112,8 +112,7 @@ export default function PopoutEditorWindow({
               key={`popout-${bufferId}-${editorKey}`}
               initialContent={content}
               onChange={handleChange}
-              mdiExtensionsEnabled={mdiExtensionsEnabled}
-              gfmEnabled={gfmEnabled}
+              documentFormat={documentFormat}
             />
           </ErrorBoundary>
         </main>

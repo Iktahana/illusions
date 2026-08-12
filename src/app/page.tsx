@@ -502,8 +502,6 @@ function EditorPageContent() {
     [tabs],
   );
   const activeFileType = activeEditorTab?.fileType ?? ".mdi";
-  const mdiExtensionsEnabled = activeFileType === ".mdi";
-  const gfmEnabled = activeFileType !== ".txt";
 
   // Stable ref so export / shortcut callbacks can read the current value without re-creating
   const isEditorTabActiveRef = useRef<boolean>(!!activeEditorTab);
@@ -1588,6 +1586,7 @@ function EditorPageContent() {
   // Shared props forwarded to every SidebarPanel instance
   const sidebarPanelProps = {
     content,
+    fileType: activeFileType,
     editorMode,
     compactMode,
     onChapterClick: handleChapterClick,

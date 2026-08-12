@@ -1,14 +1,7 @@
 "use client";
 
 import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  commandsCtx,
-  Editor,
-  rootCtx,
-  defaultValueCtx,
-  editorViewCtx,
-  serializerCtx,
-} from "@milkdown/core";
+import { commandsCtx, Editor, rootCtx, defaultValueCtx, editorViewCtx } from "@milkdown/core";
 import { nord } from "@milkdown/theme-nord";
 import {
   commonmark,
@@ -20,7 +13,7 @@ import {
   wrapInBulletListCommand,
   wrapInOrderedListCommand,
 } from "@milkdown/preset-commonmark";
-import { gfm, toggleStrikethroughCommand } from "@milkdown/preset-gfm";
+import { toggleStrikethroughCommand } from "@milkdown/preset-gfm";
 import { clearFormatting } from "@/lib/editor-page/clear-formatting";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { history } from "@milkdown/plugin-history";
@@ -33,8 +26,7 @@ import { linting } from "@/packages/milkdown-plugin-japanese-novel/linting-plugi
 import clsx from "clsx";
 import { EditorView } from "@milkdown/prose/view";
 import { AllSelection, Plugin, PluginKey } from "@milkdown/prose/state";
-import { $prose, $remark, replaceAll } from "@milkdown/utils";
-import { remarkPlainTextPlugin } from "@/packages/milkdown-plugin-japanese-novel/syntax/remark-plain-text";
+import { $prose, replaceAll } from "@milkdown/utils";
 import BubbleMenu, { type FormatType } from "../BubbleMenu";
 import { searchHighlightPlugin } from "@/lib/editor-page/search-highlight-plugin";
 import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
@@ -63,6 +55,12 @@ import { usePosHighlightActivation } from "@/lib/editor-page/use-pos-highlight-a
 import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 import { createMacOptionInputGuardPlugin } from "@/lib/editor-page/mac-option-input-guard";
+import {
+  getDocumentAdapter,
+  type DocumentDiagnostic,
+  type DocumentFormat,
+} from "@/lib/document-format";
+import { sourceLocationAtByteOffset } from "@/lib/mdi/utf8-source-offsets";
 
 interface MilkdownEditorProps {
   initialContent: string;
@@ -83,8 +81,7 @@ interface MilkdownEditorProps {
   onAddToUserDictionary?: (issue: LintIssue) => void;
   /** Rule ids whose detections support adding the flagged word to the user dictionary. */
   dictEntryRuleIds?: ReadonlySet<string>;
-  mdiExtensionsEnabled?: boolean;
-  gfmEnabled?: boolean;
+  documentFormat?: DocumentFormat;
   onStartSpeech?: () => void;
   /** Called when the user triggers "検索" from the context menu. Receives selected text as initial search term. */
   onFind?: (initialTerm?: string) => void;
@@ -125,8 +122,7 @@ export default function MilkdownEditor({
   onIgnoreCorrection,
   onAddToUserDictionary,
   dictEntryRuleIds,
-  mdiExtensionsEnabled = true,
-  gfmEnabled = true,
+  documentFormat = "mdi",
   onStartSpeech,
   onFind,
   overrideCharsPerLine,
@@ -160,12 +156,12 @@ export default function MilkdownEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const measureBoxRef = useRef<HTMLDivElement>(null);
   const [editorViewInstance, setEditorViewInstance] = useState<EditorView | null>(null);
+  const adapter = useMemo(() => getDocumentAdapter(documentFormat), [documentFormat]);
+  const [adapterReady, setAdapterReady] = useState(documentFormat !== "mdi");
+  const [documentDiagnostics, setDocumentDiagnostics] = useState<readonly DocumentDiagnostic[]>([]);
   const [lintIssueAtCursor, setLintIssueAtCursor] = useState<LintIssue | null>(null);
   const isElectron = typeof window !== "undefined" && isElectronRenderer();
-  // 初期内容はマウント時に固定（ファイル切り替えでコンポーネントが再マウントされたときだけ変わる）
-  const initialContentRef = useRef<string>(initialContent);
-  // 最新コンテンツを追跡する。isVertical 切替でエディタが再構築されたとき、
-  // 未保存の変更を保持するために initialContentRef の代わりに使う（#426）。
+  // Keep unsaved content across editor reconstruction (for example vertical mode changes).
   const currentContentRef = useRef<string>(initialContent);
   const onChangeRef = useRef(onChange);
   const onInsertTextRef = useRef(onInsertText);
@@ -218,11 +214,37 @@ export default function MilkdownEditor({
     [],
   );
 
-  // Derive plain-text mode: fileType ".txt" has both GFM and MDI disabled.
-  // This value is captured at editor mount time, which is safe because each
-  // tab has its own editor instance (keyed by bufferId+editorKey) and a tab's
-  // file type never changes during its lifetime.
-  const isPlainText = !gfmEnabled && !mdiExtensionsEnabled;
+  const isPlainText = documentFormat === "plain-text";
+  const refreshDocumentDiagnostics = useCallback(
+    (source: string) => {
+      try {
+        setDocumentDiagnostics(adapter.diagnostics(source));
+      } catch (error) {
+        console.warn("文書 diagnostics の取得に失敗しました:", error);
+        setDocumentDiagnostics([]);
+      }
+    },
+    [adapter],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setAdapterReady(documentFormat !== "mdi");
+    void adapter
+      .initialize()
+      .then(() => {
+        if (!cancelled) {
+          setAdapterReady(true);
+          refreshDocumentDiagnostics(currentContentRef.current);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("文書フォーマットの初期化に失敗しました:", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [adapter, documentFormat, refreshDocumentDiagnostics]);
 
   const { get } = useEditor(
     (root) => {
@@ -236,56 +258,34 @@ export default function MilkdownEditor({
         // listenerCtx 参照より先に listener を読み込む
         .use(listener)
         .config((ctx) => {
-          // Plain-text (.txt) mode: extract raw text directly from ProseMirror
-          // nodes so that tab.content stays as plain text without any markdown
-          // escaping. Non-plain-text mode uses the standard markdown serializer.
           if (isPlainText) {
             ctx.get(listenerCtx).updated((_ctx, doc) => {
-              const lines: string[] = [];
-              doc.forEach((node) => {
-                lines.push(node.textContent);
-              });
-              const content = lines.join("\n");
+              const content = adapter.encodeEditor(_ctx, doc);
               currentContentRef.current = content;
+              refreshDocumentDiagnostics(content);
               onChangeRef.current?.(content);
             });
           } else {
             ctx.get(listenerCtx).markdownUpdated((_ctx, markdown) => {
-              currentContentRef.current = markdown;
-              onChangeRef.current?.(markdown);
+              const content = adapter.capabilities.mdi
+                ? adapter.encodeEditor(_ctx, _ctx.get(editorViewCtx).state.doc)
+                : markdown;
+              currentContentRef.current = content;
+              refreshDocumentDiagnostics(content);
+              onChangeRef.current?.(content);
             });
           }
         })
         .use(commonmark);
 
-      // GFM: conditionally loaded
-      if (gfmEnabled) {
-        editor = editor.use(gfm);
-      }
+      editor = adapter.configureEditor(editor);
 
-      // Plain-text mode: remark plugin converts raw lines to paragraphs,
-      // bypassing all CommonMark syntax interpretation.
-      if (isPlainText) {
-        editor = editor.use($remark("plainText", () => remarkPlainTextPlugin));
-      }
-
-      // MDI extensions: conditionally loaded
-      // All MDI macro families are gated on mdiExtensionsEnabled (true only
-      // for .mdi files) so that .txt/.md content containing [[blank]],
-      // [[no-break:...]], [[kern:...:...]] etc. is preserved byte-for-byte
-      // and not stripped/altered by the serializer (#1886).
+      // Keep application-owned editor behavior while disabling every legacy
+      // MDI parser and schema. The format adapter owns document semantics.
       editor = editor.use(
         japaneseNovel({
           isVertical,
           showManuscriptLine: false,
-          enableRuby: mdiExtensionsEnabled,
-          enableTcy: mdiExtensionsEnabled,
-          enableNoBreak: mdiExtensionsEnabled,
-          enableKern: mdiExtensionsEnabled,
-          enableMdiBreak: mdiExtensionsEnabled,
-          enableFrontmatter: mdiExtensionsEnabled,
-          // .txt: characters like *, #, ** are literal — copy must bypass
-          // markdown stripping / MDI conversion (P2-A).
           plainText: isPlainText,
         }),
       );
@@ -323,7 +323,14 @@ export default function MilkdownEditor({
 
       return editor;
     },
-    [isVertical, verticalScrollPlugin, mdiExtensionsEnabled, gfmEnabled],
+    [
+      adapter,
+      adapterReady,
+      isPlainText,
+      isVertical,
+      refreshDocumentDiagnostics,
+      verticalScrollPlugin,
+    ],
   );
 
   // EditorView インスタンスを取得する
@@ -414,16 +421,7 @@ export default function MilkdownEditor({
         // composition を best-effort でコミットする（#1971）。通常経路は no-op。
         commitPendingComposition(view);
         const doc = view.state.doc;
-        if (isPlainText) {
-          // listener の plain-text 経路（行 = node.textContent）と同一ロジック。
-          const lines: string[] = [];
-          doc.forEach((node) => {
-            lines.push(node.textContent);
-          });
-          result = lines.join("\n");
-        } else {
-          result = ctx.get(serializerCtx)(doc);
-        }
+        result = adapter.encodeEditor(ctx, doc);
       });
       // 注（#1840 / Codex F-01）: ここに来た時点で editor.action は editorViewCtx を
       // 解決できている＝EditorView は ready。ready な view の doc は内容の単一の
@@ -434,6 +432,7 @@ export default function MilkdownEditor({
       if (result != null && result !== currentContentRef.current) {
         // ライブ値を ref と親 state に反映し、後続の isDirty 再計算も正しくする。
         currentContentRef.current = result;
+        refreshDocumentDiagnostics(result);
         onChangeRef.current?.(result);
       }
       return result;
@@ -441,7 +440,7 @@ export default function MilkdownEditor({
       console.warn("コンテンツのフラッシュに失敗しました:", error);
       return null;
     }
-  }, [get, isPlainText]);
+  }, [adapter, get, refreshDocumentDiagnostics]);
 
   // flush を親へ登録/解除する（onEditorViewReady と同じ readiness パターン）。
   // dockview はタブ切替や分割表示でも非アクティブな pane を portal でマウントし続ける
@@ -876,7 +875,7 @@ export default function MilkdownEditor({
           accelerator: "Shift+CmdOrCtrl+V",
         },
         { label: "-", action: "_separator" },
-        ...(selectionState.hasSelection && mdiExtensionsEnabled
+        ...(selectionState.hasSelection && adapter.capabilities.ruby
           ? [
               { label: "ルビ", action: "ruby", accelerator: "Shift+CmdOrCtrl+R" },
               { label: "縦中横", action: "tcy", accelerator: "Shift+CmdOrCtrl+T" },
@@ -901,7 +900,7 @@ export default function MilkdownEditor({
     [
       getLintIssueAtCoords,
       handleContextMenuAction,
-      mdiExtensionsEnabled,
+      adapter.capabilities.ruby,
       selectionState.hasSelection,
       dictEntryRuleIds,
     ],
@@ -924,7 +923,7 @@ export default function MilkdownEditor({
       ref={editorRef}
       onClick={handleEditorClick}
       className={clsx(
-        "editor-content-area",
+        "editor-content-area relative",
         isVertical ? "py-8 h-full min-h-full min-w-full" : "p-8 min-h-full",
       )}
       style={{
@@ -1088,7 +1087,7 @@ export default function MilkdownEditor({
           ref={measureBoxRef}
           className={clsx("editor-measure-box shrink-0", !isVertical && "w-full max-w-full")}
         >
-          <Milkdown />
+          {adapterReady ? <Milkdown /> : <div aria-busy="true" />}
         </div>
       </div>
       {/* 縦書きの右端（文書の先頭側）の余白。スクロールコンテナの padding-right は
@@ -1096,6 +1095,30 @@ export default function MilkdownEditor({
           確実に算入される in-flow なフレックススペーサーで右余白を作る（#1639）。 */}
       {isVertical && (
         <div aria-hidden="true" style={{ flex: "0 0 64px", minWidth: 64, alignSelf: "stretch" }} />
+      )}
+      {documentDiagnostics.length > 0 && (
+        <aside
+          aria-label="MDI diagnostics"
+          className="absolute bottom-2 left-2 z-20 max-w-md rounded border border-amber-500/30 bg-background/95 px-3 py-2 text-xs shadow-lg"
+        >
+          {documentDiagnostics.slice(0, 3).map((diagnostic, index) => {
+            const location = diagnostic.span
+              ? sourceLocationAtByteOffset(currentContentRef.current, diagnostic.span.startByte)
+              : null;
+            return (
+              <div key={`${diagnostic.code}-${diagnostic.span?.startByte ?? index}`}>
+                <span
+                  className={diagnostic.severity === "error" ? "text-red-500" : "text-amber-500"}
+                >
+                  {diagnostic.severity === "error" ? "エラー" : "警告"}
+                </span>{" "}
+                {location ? `L${location.line}:${location.column} ` : ""}
+                {diagnostic.message}
+              </div>
+            );
+          })}
+          {documentDiagnostics.length > 3 && <div>ほか {documentDiagnostics.length - 3} 件</div>}
+        </aside>
       )}
     </div>
   );
@@ -1114,7 +1137,7 @@ export default function MilkdownEditor({
           onContextMenuOpen={(e) =>
             setLintIssueAtCursor(getLintIssueAtCoords(e.clientX, e.clientY))
           }
-          mdiExtensionsEnabled={mdiExtensionsEnabled}
+          mdiCommandsEnabled={adapter.capabilities.mdi}
           onStartSpeech={onStartSpeech}
         >
           {editorContent}

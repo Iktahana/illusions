@@ -54,7 +54,6 @@ function makeStandalone(overrides: Partial<StandaloneMode>): StandaloneMode {
       fontFamily: "serif",
       charsPerLine: 40,
       showParagraphNumbers: false,
-      mdiExtensionsEnabled: true,
       posHighlightEnabled: false,
       posHighlightColors: {},
     },

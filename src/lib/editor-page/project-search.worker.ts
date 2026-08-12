@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { findRawDocumentMatches } from "./project-search";
+import { initializeMdi } from "@illusions-lab/mdi";
 import type {
   ProjectSearchWorkerRequest,
   ProjectSearchWorkerResponse,
@@ -12,9 +13,10 @@ function post(message: ProjectSearchWorkerResponse): void {
   self.postMessage(message);
 }
 
-self.onmessage = (event: MessageEvent<ProjectSearchWorkerRequest>) => {
+self.onmessage = async (event: MessageEvent<ProjectSearchWorkerRequest>) => {
   const message = event.data;
   try {
+    if (message.fileType.toLowerCase() === ".mdi") await initializeMdi();
     post({
       type: "MATCH_RESULT",
       id: message.id,

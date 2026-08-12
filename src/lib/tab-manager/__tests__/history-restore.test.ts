@@ -43,7 +43,7 @@ function makeTerminalTab(): TerminalTabState {
 }
 
 describe("computeHistoryRestoreTabUpdate", () => {
-  it("marks the tab clean when restored content sanitizes equal to lastSavedContent", () => {
+  it("marks the tab clean when restored content equals lastSavedContent", () => {
     const tab = makeEditorTab({ lastSavedContent: "hello world" });
     const result = computeHistoryRestoreTabUpdate("hello world", tab);
     expect(result).toEqual({ fileSyncStatus: "clean", isDirty: false, conflictDiskContent: null });
@@ -102,21 +102,11 @@ describe("computeHistoryRestoreTabUpdate", () => {
     expect(dirty.conflictDiskContent).toBeNull();
   });
 
-  it("passes the tab's fileType through to sanitization for both sides of the comparison", () => {
-    // Standalone <br /> line: Step 1a (br -> [[blank]] marker) only applies to
-    // ".mdi"; .md/.txt fall through to Step 1b (<br /> -> "\n"). So the same
-    // (restoredContent, lastSavedContent) pair sanitizes to equal strings under
-    // ".mdi" but unequal strings under ".md" — this only holds if fileType
-    // actually reaches sanitizeMdiContent for BOTH restoredContent and
-    // lastSavedContent, not just one side.
+  it("compares the adapter-produced persisted representation without rewriting it", () => {
     const restoredContent = "<br />";
-    const lastSavedContent = "[[blank]]";
-
-    const mdiTab = makeEditorTab({ fileType: ".mdi", lastSavedContent });
-    expect(computeHistoryRestoreTabUpdate(restoredContent, mdiTab).fileSyncStatus).toBe("clean");
-
-    const mdTab = makeEditorTab({ fileType: ".md", lastSavedContent });
-    expect(computeHistoryRestoreTabUpdate(restoredContent, mdTab).fileSyncStatus).toBe("dirty");
+    const tab = makeEditorTab({ fileType: ".mdi", lastSavedContent: "[[blank]]" });
+    expect(computeHistoryRestoreTabUpdate(restoredContent, tab).fileSyncStatus).toBe("dirty");
+    expect(computeHistoryRestoreTabUpdate("[[blank]]", tab).fileSyncStatus).toBe("clean");
   });
 
   it("returns an object with exactly the documented three keys", () => {

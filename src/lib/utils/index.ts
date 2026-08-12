@@ -2,7 +2,9 @@
  * illusions エディタ用のユーティリティ
  */
 
-import { stripMdiInlineSyntax } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import { getMdiTextBlocks } from "@illusions-lab/mdi";
+import { Utf8SourceOffsets } from "@/lib/mdi/utf8-source-offsets";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 import { analyzeReadability, cleanMarkdown } from "./readability";
 export type { EnhancedReadabilityAnalysis, ReadabilitySubScores } from "./readability-types";
 export {
@@ -221,7 +223,31 @@ export interface Chapter {
   anchorId?: string;
 }
 
-export function parseMarkdownChapters(markdown: string): Chapter[] {
+export function parseMarkdownChapters(
+  markdown: string,
+  fileType: SupportedFileExtension = ".mdi",
+): Chapter[] {
+  if (fileType === ".txt") return [];
+  if (fileType === ".mdi") {
+    const offsets = new Utf8SourceOffsets(markdown);
+    return getMdiTextBlocks(markdown).blocks.flatMap((block) => {
+      if (block.kind !== "heading") return [];
+      const charOffset = block.span ? offsets.toUtf16(block.span.startByte) : 0;
+      const depth = block.node.depth;
+      const level = typeof depth === "number" ? depth : 1;
+      const title = block.text.replace(/\r?\n/g, " ");
+      return [
+        {
+          level,
+          title,
+          lineNumber: markdown.slice(0, charOffset).split("\n").length - 1,
+          charOffset,
+          anchorId: generateHeadingId(title),
+        },
+      ];
+    });
+  }
+
   const lines = markdown.split("\n");
   const chapters: Chapter[] = [];
   let charOffset = 0;
@@ -231,13 +257,7 @@ export function parseMarkdownChapters(markdown: string): Chapter[] {
     const match = line.match(/^(#{1,6})\s+(.+)$/);
     if (match) {
       const level = match[1].length;
-      // MDI インライン記法（ルビ {base|ruby} 等）をプレーンテキストに変換する。
-      // 目次にはルビ読みを含まない base テキストのみを表示する。
-      // stripMdiInlineSyntax は [[br]] を改行へ変換するため、見出し行に改行が
-      // 混入し anchorId が %0A 化するのを防ぐべく単一行へ正規化する。
-      const title = stripMdiInlineSyntax(match[2].trim())
-        .replace(/[\r\n]+/g, " ")
-        .trim();
+      const title = match[2].trim();
       const anchorId = generateHeadingId(title);
 
       chapters.push({

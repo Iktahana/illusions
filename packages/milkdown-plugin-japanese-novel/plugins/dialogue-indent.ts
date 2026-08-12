@@ -16,7 +16,7 @@ export function getParagraphLeadingChar(node: Node): string {
   const first = node.firstChild;
   if (!first) return "";
   if (first.isText) return first.text?.charAt(0) ?? "";
-  if (first.type.name === "ruby") {
+  if (first.type.name === "mdiRuby") {
     return ((first.attrs.base as string) ?? "").charAt(0);
   }
   return "";

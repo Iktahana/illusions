@@ -8,7 +8,8 @@ import ContextMenu from "@/shared/ui/ContextMenu";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { getProjectFileService } from "@/lib/services/project-file-service";
-import { MdiDocument } from "@/packages/milkdown-plugin-japanese-novel/mdi-document";
+import { documentFormatForExtension, getDocumentAdapter } from "@/lib/document-format";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 import { getDictAccess } from "@/lib/dict/dict-access";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import {
@@ -51,6 +52,8 @@ interface WordFrequencyCache {
 interface WordFrequencyProps {
   /** エディタのテキストコンテンツ */
   content: string;
+  /** Active document format; controls the analysis projection. */
+  fileType?: SupportedFileExtension;
   /** 単語をクリックしたときに検索ダイアログを開く */
   onWordSearch?: (word: string) => void;
   /** File path (relative) for VFS-based cache; omit for standalone/no-cache mode */
@@ -150,12 +153,11 @@ export function isWordCacheValid(
   );
 }
 
-function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) {
+function WordFrequency({ content, fileType = ".mdi", onWordSearch, filePath }: WordFrequencyProps) {
   const [words, setWords] = useState<WordEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastAnalyzedContent, setLastAnalyzedContent] = useState<string>("");
-  const [cacheTimestamp, setCacheTimestamp] = useState<number>(0);
+  const [lastAnalysisKey, setLastAnalysisKey] = useState<string>("");
 
   // Genji vocabulary enrichment state
   const [genjiSummary, setGenjiSummary] = useState<GenjiVocabularySummary | null>(null);
@@ -176,6 +178,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
   const genRef = useRef(0);
 
   const contextMenu = useContextMenu();
+  const analysisKey = `${fileType}\0${filePath ?? ""}\0${content}`;
 
   const openDictionary = useCallback((word: string, url: string, title: string) => {
     if (window.electronAPI?.openDictionaryPopup) {
@@ -220,14 +223,13 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
 
   // コンテンツを解析 (with VFS cache support)
   const analyzeContent = async (force = false) => {
-    if (!force && content === lastAnalyzedContent && words.length > 0) {
+    if (!force && analysisKey === lastAnalysisKey && words.length > 0) {
       return;
     }
 
     if (!content.trim()) {
       setWords([]);
-      setLastAnalyzedContent("");
-      setCacheTimestamp(0);
+      setLastAnalysisKey(analysisKey);
       return;
     }
 
@@ -256,8 +258,7 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
             // Discard stale result if a newer analysis was started (#1078)
             if (genRef.current !== myGen) return;
             setWords(cache.words);
-            setLastAnalyzedContent(content);
-            setCacheTimestamp(cache.analyzedAt);
+            setLastAnalysisKey(analysisKey);
             setIsLoading(false);
             return;
           }
@@ -268,18 +269,17 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
 
       // Run NLP analysis
       const nlpClient = getNlpClient();
-      // #1449: NLP input is always the analysis derivation ([[blank]] markers removed)
-      const wordEntries = await nlpClient.analyzeWordFrequency(
-        MdiDocument.fromRawText(content).toAnalysisText(),
-      );
+      const analysisText = getDocumentAdapter(documentFormatForExtension(fileType)).projectText(
+        content,
+      ).text;
+      const wordEntries = await nlpClient.analyzeWordFrequency(analysisText);
 
       // Discard stale result if a newer analysis was started (#1078)
       if (genRef.current !== myGen) return;
 
       setWords(wordEntries);
-      setLastAnalyzedContent(content);
+      setLastAnalysisKey(analysisKey);
       const now = Date.now();
-      setCacheTimestamp(now);
 
       // Write cache
       if (canCache) {
@@ -317,15 +317,15 @@ function WordFrequency({ content, onWordSearch, filePath }: WordFrequencyProps) 
     }
   };
 
-  // 初回マウント時と content 変更時に自動解析
+  // Re-run when the buffer, format, or active file changes.
   useEffect(() => {
-    if (content !== lastAnalyzedContent) {
+    if (analysisKey !== lastAnalysisKey) {
       const timer = setTimeout(() => {
         analyzeContent();
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [content, lastAnalyzedContent]);
+  }, [analysisKey, lastAnalysisKey]);
 
   // Genji vocabulary enrichment — run after words list changes
   useEffect(() => {

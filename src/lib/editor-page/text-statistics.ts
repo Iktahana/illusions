@@ -4,6 +4,7 @@
  * All functions are side-effect-free and can be used both in React hooks
  * and in plain Node.js / test environments.
  */
+import { getMdiTextBlocks } from "@illusions-lab/mdi";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,24 +55,17 @@ const LINE_END_PROHIBITED = new Set("（〔［｛〈《「『【".split(""));
  * fileType による除去ルール:
  *  - ".txt" : 記法除去なし。生テキストをそのまま返す（`#`, `*` 等は本文文字）
  *  - ".md"  : Markdown のみ除去（MDI 固有マクロは除去しない）
- *  - ".mdi" : Markdown + MDI の全記法を除去（デフォルト）
+ *  - ".mdi" : Rust-owned MDI text projection を使用（デフォルト）
  *
- * MDI 除去ルール（".mdi" 時のみ、この順番で適用）:
+ * Markdown 除去ルール:
  *  1. コードブロック (` ``` ... ``` `) → 全削除
  *  2. インラインコード (`` `...` ``) → 全削除
  *  3. 画像 (`![alt](url)`) → 全削除（alt 含め）
  *  4. リンク (`[text](url)`) → text のみ残す
- *  5. MDI ルビ (`{親文字|ルビ}`) → 親文字のみ
- *  6. MDI 縦中横 (`^内容^`) → 内容のみ
- *  7. MDI no-break (`[[no-break:文字列]]`) → 文字列のみ
- *  8. MDI kern (`[[kern:量:文字列]]`) → 文字列のみ
- *  9. MDI 空行マーカー (`[[blank]]` / serializer エスケープ形 `\[\[blank]]`) → 行ごと削除
- * 10. HTML タグ (`<tag>`) → タグ記号のみ除去、内容は残す
- * 11. Markdown 見出し記号（行頭の `#+ `）→ 除去（本文は残す）
- * 12. 強調記号 (`**...**`, `__...__`, `*...*`, `_..._`, `~~...~~`) → 内容は残す
- * 13. バックスラッシュエスケープ (`\X`) → バックスラッシュのみ除去
- *
- * ".md" 時はルール 1–4 および 10–13 のみ適用（MDI 固有のルール 5–9 を除く）。
+ *  5. HTML タグ (`<tag>`) → タグ記号のみ除去、内容は残す
+ *  6. Markdown 見出し記号（行頭の `#+ `）→ 除去（本文は残す）
+ *  7. 強調記号 (`**...**`, `__...__`, `*...*`, `_..._`, `~~...~~`) → 内容は残す
+ *  8. バックスラッシュエスケープ (`\X`) → バックスラッシュのみ除去
  */
 export function extractVisibleText(
   rawContent: string,
@@ -80,6 +74,12 @@ export function extractVisibleText(
   // .txt はプレーンテキスト。記法除去なし。
   if (fileType === ".txt") {
     return rawContent;
+  }
+
+  if (fileType === ".mdi") {
+    return getMdiTextBlocks(rawContent)
+      .blocks.map((block) => block.text)
+      .join("\n");
   }
 
   let text = rawContent;
@@ -96,32 +96,13 @@ export function extractVisibleText(
   // 4. リンク → テキスト部分のみ残す
   text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
 
-  if (fileType === ".mdi") {
-    // 5. MDI ルビ {親文字|ルビ} → 親文字のみ
-    text = text.replace(/\{([^|{}]*)\|[^}]*\}/g, "$1");
-
-    // 6. MDI 縦中横 ^内容^ → 内容のみ
-    text = text.replace(/\^([^^]*)\^/g, "$1");
-
-    // 7. MDI no-break [[no-break:文字列]] → 文字列のみ
-    text = text.replace(/\[\[no-break:([^\]]*)\]\]/g, "$1");
-
-    // 8. MDI kern [[kern:量:文字列]] → 文字列のみ
-    text = text.replace(/\[\[kern:[^\]]*?:([^\]]*)\]\]/g, "$1");
-
-    // 9. MDI 空行マーカー [[blank]] → 行ごと削除（可視文字としてカウントしない）。
-    // ライブ編集中の content は serializer が `[` をエスケープするため `\[\[blank]]`
-    // となる。各ブラケット前の `\` を任意マッチさせ、クリーン形・エスケープ形の双方を除去する。
-    text = text.replace(/^[ \t]*\\?\[\\?\[blank\\?\]\\?\][ \t]*$/gm, "");
-  }
-
-  // 10. HTML タグ → タグ記号を除去、内容は残す
+  // 5. HTML タグ → タグ記号を除去、内容は残す
   text = stripHtmlTags(text);
 
-  // 11. Markdown 見出し記号（行頭の # 記号と直後のスペース）
+  // 6. Markdown 見出し記号（行頭の # 記号と直後のスペース）
   text = text.replace(/^#{1,6} /gm, "");
 
-  // 12. 強調記号のみ除去（内容は残す）
+  // 7. 強調記号のみ除去（内容は残す）
   // ** と __ を先に処理してから単体 * と _ を処理する順番を守ること。
   text = text.replace(/~~([^~]*)~~/g, "$1");
   text = text.replace(/\*\*([^*]*)\*\*/g, "$1");
@@ -131,7 +112,7 @@ export function extractVisibleText(
   text = text.replace(/(?<!\*)\*(?!\*)([^*\n]+?)(?<!\*)\*(?!\*)/g, "$1");
   text = text.replace(/(?<!\w)_(?!_)([^_\n]+?)_(?!\w)(?!_)/g, "$1");
 
-  // 13. バックスラッシュエスケープ（バックスラッシュのみ除去）
+  // 8. バックスラッシュエスケープ（バックスラッシュのみ除去）
   text = text.replace(/\\(.)/g, "$1");
 
   return text;

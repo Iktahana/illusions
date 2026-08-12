@@ -45,7 +45,9 @@ describe("@illusions-lab/mdi export boundary", () => {
 
   it("normalizes escaped MDI blank macros without rewriting raw Markdown/TXT source", () => {
     const editorOutput = String.raw`前。\n\n\[\[blank]]\n\n後。`;
-    expect(normalizeExportSource(editorOutput, ".mdi")).toBe(String.raw`前。\n\n[[blank]]\n\n後。`);
+    expect(normalizeExportSource(editorOutput, ".mdi")).toBe(
+      `${String.raw`前。\n\n[[blank]]\n\n後。`}\n`,
+    );
     expect(normalizeExportSource(editorOutput, ".md")).toBe(editorOutput);
     expect(normalizeExportSource(editorOutput, ".txt")).toBe(editorOutput);
   });

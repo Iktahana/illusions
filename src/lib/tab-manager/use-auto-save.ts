@@ -53,7 +53,7 @@ export interface UseAutoSaveParams extends TabManagerCore {
  * Manages the auto-save timer that periodically saves all dirty tabs
  * that have associated file descriptors.
  *
- * Orchestration only: the actual save pipeline (lock, sanitize, VFS vs
+ * Orchestration only: the actual save pipeline (lock, persistence, VFS vs
  * standalone write, watch suppression, tab-state update, snapshot) lives in
  * the shared executor (save-executor.ts, #1432).
  *
