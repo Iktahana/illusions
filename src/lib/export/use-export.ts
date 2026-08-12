@@ -2,11 +2,17 @@
 
 import { useCallback, useEffect } from "react";
 import {
+  trackDocumentOutputAttempt,
+  trackDocumentOutputFailure,
   trackDocumentOutputResult,
   type OutputOperation,
   type OutputResult,
 } from "@/lib/analytics/document-output-events";
-import { trackNoteOutputResult } from "@/lib/analytics/note-output-events";
+import {
+  trackNoteOutputAttempt,
+  trackNoteOutputFailure,
+  trackNoteOutputResult,
+} from "@/lib/analytics/note-output-events";
 import { notificationManager } from "@/lib/services/notification-manager";
 import type { TxtExportFormat, TxtIndentOptions } from "./txt-export-types";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -82,6 +88,20 @@ function trackOutputResult(
   trackDocumentOutputResult(operation, format, result);
 }
 
+function trackOutputAttempt(operation: OutputOperation, format: ExportFormat): void {
+  if (format === "note") trackNoteOutputAttempt(operation);
+  else trackDocumentOutputAttempt(operation, format);
+}
+
+function trackOutputFailure(
+  operation: OutputOperation,
+  format: ExportFormat,
+  error: unknown,
+): void {
+  if (format === "note") trackNoteOutputFailure(operation, error);
+  else trackDocumentOutputFailure(operation, format, error);
+}
+
 /**
  * Hook that provides export functionality and registers Electron menu handlers.
  * Handles PDF, EPUB, DOCX, TXT export with progress notifications.
@@ -140,7 +160,10 @@ export function useExport({
         let indentOptions: TxtIndentOptions | undefined;
         if (onRequestTxtExportOptions) {
           const chosen = await onRequestTxtExportOptions(format as TxtExportFormat, "export");
-          if (chosen === null) return;
+          if (chosen === null) {
+            trackOutputResult("export", format, null);
+            return;
+          }
           indentOptions = chosen;
         }
 
@@ -149,6 +172,7 @@ export function useExport({
         });
 
         try {
+          trackOutputAttempt("export", format);
           if (!window.electronAPI?.exportMdiText) {
             throw new Error("エクスポート機能を利用できません。アプリを再起動してください");
           }
@@ -169,6 +193,7 @@ export function useExport({
           }
           notificationManager.success(`${label}をエクスポートしました`);
         } catch (error) {
+          trackOutputFailure("export", format, error);
           notificationManager.dismiss(progressId);
           const message = error instanceof Error ? error.message : "不明なエラー";
           notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
@@ -196,6 +221,7 @@ export function useExport({
       });
 
       try {
+        trackOutputAttempt("export", format);
         let result: string | { success: false; error: string } | null | undefined;
 
         switch (format) {
@@ -238,6 +264,7 @@ export function useExport({
 
         notificationManager.success(`${label}をエクスポートしました`);
       } catch (error) {
+        trackOutputFailure("export", format, error);
         notificationManager.dismiss(progressId);
         const message = error instanceof Error ? error.message : "不明なエラー";
         notificationManager.error(`${label}のエクスポートに失敗しました: ${message}`);
@@ -269,6 +296,7 @@ export function useExport({
       });
 
       try {
+        trackOutputAttempt("copy", format);
         if (!window.electronAPI?.copyMdiText) {
           throw new Error("クリップボード機能を利用できません。アプリを再起動してください");
         }
@@ -289,6 +317,7 @@ export function useExport({
         }
         notificationManager.success(`${label}をクリップボードにコピーしました`);
       } catch (error) {
+        trackOutputFailure("copy", format, error);
         notificationManager.dismiss(progressId);
         const message = error instanceof Error ? error.message : "不明なエラー";
         notificationManager.error(`${label}のクリップボードへのコピーに失敗しました: ${message}`);

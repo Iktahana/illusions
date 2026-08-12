@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Loader2, History, ChevronDown, ChevronRight } from "lucide-react";
 import clsx from "clsx";
 import { getHistoryService } from "@/lib/services/history-service";
@@ -17,6 +17,7 @@ import {
 
 import type { SnapshotEntry } from "@/lib/services/history-service";
 import type { DiffStats } from "./HistoryPanel/DiffIndicator";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 // -----------------------------------------------------------------------
 // Constants
@@ -199,19 +200,29 @@ export default function HistoryPanel({
   }, [snapshots]);
 
   /** Toggle a bookmark and update local state */
-  const handleToggleBookmark = useCallback(async (snapshotId: string) => {
-    const historyService = getHistoryService();
-    const isNowBookmarked = await historyService.toggleBookmark(snapshotId);
-    setBookmarkSet((prev) => {
-      const next = new Set(prev);
-      if (isNowBookmarked) {
-        next.add(snapshotId);
-      } else {
-        next.delete(snapshotId);
+  const handleToggleBookmark = useCallback(
+    async (snapshotId: string) => {
+      try {
+        const historyService = getHistoryService();
+        const isNowBookmarked = await historyService.toggleBookmark(snapshotId);
+        setBookmarkSet((prev) => {
+          const next = new Set(prev);
+          if (isNowBookmarked) next.add(snapshotId);
+          else next.delete(snapshotId);
+          return next;
+        });
+        trackUsageEvent("history_action_completed", {
+          action: isNowBookmarked ? "bookmark_add" : "bookmark_remove",
+        });
+      } catch (error) {
+        trackUsageEvent("history_action_failed", {
+          action: bookmarkSet.has(snapshotId) ? "bookmark_remove" : "bookmark_add",
+          reason: classifyTelemetryFailure(error),
+        });
       }
-      return next;
-    });
-  }, []);
+    },
+    [bookmarkSet],
+  );
 
   /**
    * Grouped snapshots based on current pagination.
@@ -324,6 +335,7 @@ export default function HistoryPanel({
    */
   const handleRestore = useCallback((snapshot: SnapshotEntry) => {
     if (snapshot.isMissing) {
+      trackUsageEvent("history_action_failed", { action: "restore", reason: "not_found" });
       setError("このスナップショットの履歴ファイルが見つかりません。");
       return;
     }
@@ -364,10 +376,16 @@ export default function HistoryPanel({
 
         if (result.success && result.content !== undefined) {
           onRestore(result.content);
+          trackUsageEvent("history_action_completed", { action: "restore" });
         } else {
+          trackUsageEvent("history_action_failed", { action: "restore", reason: "unknown" });
           setError(result.error ?? "復元に失敗しました");
         }
       } catch (err) {
+        trackUsageEvent("history_action_failed", {
+          action: "restore",
+          reason: classifyTelemetryFailure(err),
+        });
         const message = err instanceof Error ? err.message : String(err);
         setError(`復元に失敗しました: ${message}`);
       } finally {
@@ -387,14 +405,21 @@ export default function HistoryPanel({
       setCreatingSnapshot(true);
       setError(null);
       const historyService = getHistoryService();
-      await historyService.createSnapshot({
+      const created = await historyService.createSnapshot({
         sourcePath,
         displayName,
         content: currentContent,
         type: "manual",
       });
+      if (created) trackUsageEvent("history_action_completed", { action: "create_snapshot" });
+      else
+        trackUsageEvent("history_action_failed", { action: "create_snapshot", reason: "conflict" });
       await loadSnapshots();
     } catch (err) {
+      trackUsageEvent("history_action_failed", {
+        action: "create_snapshot",
+        reason: classifyTelemetryFailure(err),
+      });
       const message = err instanceof Error ? err.message : String(err);
       setError(`スナップショットの作成に失敗しました: ${message}`);
     } finally {
@@ -410,6 +435,7 @@ export default function HistoryPanel({
     async (snapshot: SnapshotEntry) => {
       try {
         if (snapshot.isMissing) {
+          trackUsageEvent("history_action_failed", { action: "compare", reason: "not_found" });
           setError("このスナップショットの履歴ファイルが見つかりません。");
           return;
         }
@@ -421,6 +447,7 @@ export default function HistoryPanel({
         const result = await historyService.restoreSnapshot(snapshot.id);
 
         if (!result.success || result.content == null) {
+          trackUsageEvent("history_action_failed", { action: "compare", reason: "unknown" });
           const reason = result.error ?? "内容が空です";
           console.error("[HistoryCompare] snapshot read failed:", snapshot.id, reason);
           setError(`スナップショットの読み込みに失敗しました: ${reason}`);
@@ -428,6 +455,7 @@ export default function HistoryPanel({
         }
 
         if (!onCompareInEditor) {
+          trackUsageEvent("history_action_failed", { action: "compare", reason: "unavailable" });
           console.error("[HistoryCompare] onCompareInEditor is not wired; diff cannot open.");
           setError("差分ビューを開けませんでした（内部エラー）");
           return;
@@ -439,7 +467,12 @@ export default function HistoryPanel({
           currentContent,
           label,
         });
+        trackUsageEvent("history_action_completed", { action: "compare" });
       } catch (err) {
+        trackUsageEvent("history_action_failed", {
+          action: "compare",
+          reason: classifyTelemetryFailure(err),
+        });
         const message = err instanceof Error ? err.message : String(err);
         console.error("[HistoryCompare] unexpected error:", err);
         setError(`差分の読み込みに失敗しました: ${message}`);

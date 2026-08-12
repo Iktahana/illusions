@@ -53,11 +53,13 @@ export function useAutoRestore({
         // handleOpenRecentProject catches its own errors internally
       }
       if (timeoutId !== undefined) clearTimeout(timeoutId);
-      trackUsageEvent(success ? "project_auto_restore_completed" : "project_auto_restore_failed", {
-        ...(success
-          ? { restore_strategy: "recent" }
-          : { reason: timedOut ? "timeout" : "unknown" }),
-      });
+      if (success) {
+        trackUsageEvent("project_auto_restore_completed", { restore_strategy: "recent" });
+      } else {
+        trackUsageEvent("project_auto_restore_failed", {
+          reason: timedOut ? "timeout" : "unknown",
+        });
+      }
       isAutoRestoringRef.current = false;
       signalVfsReady();
       finishTimerId = setTimeout(() => {

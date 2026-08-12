@@ -232,4 +232,51 @@ describe("registerAnalyticsHandlers", () => {
     expect(loadAppStateMock).not.toHaveBeenCalled();
     expect(trackEventMock).not.toHaveBeenCalled();
   });
+
+  it("rejects missing required properties and non-finite values", async () => {
+    const { isWhitelistedProps } = await loadAnalyticsIpc();
+
+    expect(isWhitelistedProps("search_completed", undefined)).toBe(false);
+    expect(isWhitelistedProps("search_completed", { scope: "current" })).toBe(false);
+    expect(isWhitelistedProps("app_heartbeat", { count: Number.NaN })).toBe(false);
+  });
+
+  it("accepts every declared event with its finite anonymous contract", async () => {
+    const { isWhitelistedProps } = await loadAnalyticsIpc();
+    const contract = await import("../../../src/lib/analytics/usage-event-contract.json");
+
+    for (const [eventName, fields] of Object.entries(contract.default.events)) {
+      const props = Object.fromEntries(
+        Object.entries(fields).map(([key, values]) => [key, (values as string[])[0]]),
+      );
+      expect(
+        isWhitelistedProps(eventName, Object.keys(props).length > 0 ? props : undefined),
+        eventName,
+      ).toBe(true);
+    }
+  });
+
+  it("rejects high-risk content fields on new workflow events", async () => {
+    const { isWhitelistedProps } = await loadAnalyticsIpc();
+    const privateFields = {
+      path: "/Users/alice/novel.mdi",
+      query: "secret search",
+      url: "https://private.example",
+      model_id: "private-model",
+      error: "raw error",
+      content: "manuscript",
+    };
+
+    expect(
+      isWhitelistedProps("search_completed", {
+        scope: "current",
+        case_sensitive: "false",
+        whole_word: "false",
+        regex: "false",
+        target: "all",
+        result_count_bucket: "1",
+        ...privateFields,
+      }),
+    ).toBe(false);
+  });
 });

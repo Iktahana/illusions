@@ -19,6 +19,11 @@ import {
 } from "@/lib/utils/vocabulary-genji";
 import type { WordEntry } from "@/lib/nlp-client/types";
 import type { GenjiVocabularySummary } from "@/lib/utils/vocabulary-genji";
+import {
+  bucketTelemetryCount,
+  classifyTelemetryFailure,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 
 /**
  * Cache schema version. Bump whenever the analysis OUTPUT changes so stale
@@ -259,6 +264,12 @@ function WordFrequency({ content, fileType = ".mdi", onWordSearch, filePath }: W
             if (genRef.current !== myGen) return;
             setWords(cache.words);
             setLastAnalysisKey(analysisKey);
+            trackUsageEvent("word_frequency_completed", {
+              trigger: force ? "manual" : "initial",
+              cache_hit: "true",
+              total_count_bucket: bucketTelemetryCount(cache.totalWords),
+              unique_count_bucket: bucketTelemetryCount(cache.uniqueWords),
+            });
             setIsLoading(false);
             return;
           }
@@ -280,6 +291,14 @@ function WordFrequency({ content, fileType = ".mdi", onWordSearch, filePath }: W
       setWords(wordEntries);
       setLastAnalysisKey(analysisKey);
       const now = Date.now();
+      trackUsageEvent("word_frequency_completed", {
+        trigger: force ? "manual" : "initial",
+        cache_hit: "false",
+        total_count_bucket: bucketTelemetryCount(
+          wordEntries.reduce((sum, word) => sum + word.count, 0),
+        ),
+        unique_count_bucket: bucketTelemetryCount(wordEntries.length),
+      });
 
       // Write cache
       if (canCache) {
@@ -308,6 +327,10 @@ function WordFrequency({ content, fileType = ".mdi", onWordSearch, filePath }: W
       }
     } catch (err) {
       console.error("[WordFrequency] Analysis error:", err);
+      trackUsageEvent("word_frequency_failed", {
+        trigger: force ? "manual" : "initial",
+        reason: classifyTelemetryFailure(err),
+      });
       setError("解析に失敗しました");
     } finally {
       // Only clear the loading spinner for the current generation (#1078)

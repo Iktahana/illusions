@@ -27,7 +27,7 @@ describe("usage analytics facade", () => {
     });
   });
 
-  it("drops undefined props before sending", async () => {
+  it("forwards only the event-specific failure contract", async () => {
     const trackEvent = vi.fn(async () => undefined);
     Object.defineProperty(window, "electronAPI", {
       value: { analytics: { trackEvent } },
@@ -39,13 +39,14 @@ describe("usage analytics facade", () => {
       trigger: "manual",
       mode: "standalone",
       target_kind: "file",
-      reason: undefined,
+      reason: "unknown",
     });
 
     expect(trackEvent).toHaveBeenCalledWith("save_failed", {
       trigger: "manual",
       mode: "standalone",
       target_kind: "file",
+      reason: "unknown",
     });
   });
 

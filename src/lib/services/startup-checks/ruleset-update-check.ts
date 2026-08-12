@@ -23,6 +23,11 @@ import {
   notifyRulesetSyncError,
 } from "../ruleset-sync-feedback";
 import type { StartupCheck, StartupNotice } from "../startup-check-queue";
+import {
+  bucketTelemetryCount,
+  classifyTelemetryFailure,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 
 interface RulesetUpdateInfo {
   id: string;
@@ -55,7 +60,7 @@ function getElectronRulesets(): ElectronRulesetsApi | undefined {
  *
  * トースト表示は設定「すべて更新」（useRulesetStatus.sync）と共有する（#1838）。
  */
-export function runRulesetSync(): void {
+export function runRulesetSync(trigger: "startup" | "manual" = "manual"): void {
   const api = getElectronRulesets();
   if (!api?.sync) return;
 
@@ -64,10 +69,20 @@ export function runRulesetSync(): void {
   api
     .sync()
     .then((summary) => {
+      trackUsageEvent("ruleset_sync_completed", {
+        trigger,
+        change_count_bucket: bucketTelemetryCount(
+          summary.filter((result) => result.status === "installed").length,
+        ),
+      });
       notificationManager.dismiss(progressId);
       notifyRulesetSyncSummary(summary);
     })
     .catch((err: unknown) => {
+      trackUsageEvent("ruleset_sync_failed", {
+        trigger,
+        reason: classifyTelemetryFailure(err),
+      });
       notificationManager.dismiss(progressId);
       console.warn("[ruleset-update-check] sync failed:", err);
       notifyRulesetSyncError(err);
@@ -108,7 +123,7 @@ export const rulesetUpdateCheck: StartupCheck = {
 
     if (autoUpdate) {
       // 軽量資産なのでカウントダウンを挟まず即適用。トーストは runRulesetSync が出す。
-      runRulesetSync();
+      runRulesetSync("startup");
       return null;
     }
 
@@ -118,7 +133,7 @@ export const rulesetUpdateCheck: StartupCheck = {
       type: "info",
       message: `校正ルールセットに更新があります（${updatable.length} 件）。`,
       duration: 0, // 手動で閉じるまで保持
-      actions: [{ label: "更新", onClick: () => runRulesetSync() }],
+      actions: [{ label: "更新", onClick: () => runRulesetSync("manual") }],
     };
   },
 };

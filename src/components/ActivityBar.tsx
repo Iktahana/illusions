@@ -32,6 +32,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export type ActivityBarView =
   | "files"
@@ -240,6 +241,16 @@ export default function ActivityBar({
   onNewTerminal,
   onOpenAccountSettings,
 }: ActivityBarProps) {
+  const trackViewOpened = (view: ActivityBarView) => {
+    if (view === "files" || view === "explorer" || view === "search" || view === "dictionary") {
+      trackUsageEvent("feature_view_opened", { view, surface: "activity_bar" });
+    } else if (view === "wordfreq") {
+      trackUsageEvent("feature_view_opened", {
+        view: "word_frequency",
+        surface: "activity_bar",
+      });
+    }
+  };
   const [topItems, setTopItems] = useState<ActivityBarItem[]>(() =>
     loadOrder(() => localPreferences.getSidebarTopOrder(), DEFAULT_TOP_ITEMS),
   );
@@ -351,6 +362,7 @@ export default function ActivityBar({
               isActive={topView === item.id}
               compactMode={compactMode}
               onClick={() => {
+                if (topView !== item.id) trackViewOpened(item.id);
                 onTopViewChange(topView === item.id ? "none" : item.id);
               }}
             />
@@ -372,6 +384,7 @@ export default function ActivityBar({
               isActive={bottomView === item.id}
               compactMode={compactMode}
               onClick={() => {
+                if (bottomView !== item.id) trackViewOpened(item.id);
                 onBottomViewChange(bottomView === item.id ? "none" : item.id);
               }}
             />

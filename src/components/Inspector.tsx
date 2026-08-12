@@ -18,6 +18,7 @@ import type { ProjectMode } from "@/lib/project/project-types";
 import type { InspectorProps } from "./inspector/types";
 import type { Tab } from "./inspector/types";
 import { isValidTab, getMdiExtension, getBaseName } from "./inspector/types";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 function formatTime(timestamp: number | null): string {
   if (!timestamp || timestamp <= 0) return "未保存";
@@ -85,13 +86,20 @@ export default function Inspector({
   const [showLabels, setShowLabels] = useState(true);
   const tabBarRef = useRef<HTMLDivElement>(null);
   const { effectiveBindings } = useKeymap();
+  const openTrackedTab = useCallback(
+    (tab: Tab, surface: "activity_bar" | "shortcut" | "menu" | "cross_feature") => {
+      setActiveTab(tab);
+      trackUsageEvent("feature_view_opened", { view: tab, surface });
+    },
+    [],
+  );
   const shortcutHandlers = useMemo<Partial<Record<CommandId, () => void>>>(
     () => ({
-      "inspector.corrections": () => setActiveTab("corrections"),
-      "inspector.stats": () => setActiveTab("stats"),
-      "inspector.history": isProject ? () => setActiveTab("history") : undefined,
+      "inspector.corrections": () => openTrackedTab("corrections", "shortcut"),
+      "inspector.stats": () => openTrackedTab("stats", "shortcut"),
+      "inspector.history": isProject ? () => openTrackedTab("history", "shortcut") : undefined,
     }),
-    [isProject],
+    [isProject, openTrackedTab],
   );
   useKeymapListener(shortcutHandlers, effectiveBindings);
 
@@ -144,9 +152,9 @@ export default function Inspector({
   // Switch to corrections tab when triggered externally (e.g. context menu "校正提示を表示")
   useEffect(() => {
     if (switchToCorrectionsTrigger > 0) {
-      setActiveTab("corrections");
+      openTrackedTab("corrections", "cross_feature");
     }
-  }, [switchToCorrectionsTrigger]);
+  }, [openTrackedTab, switchToCorrectionsTrigger]);
 
   // プロジェクトモードでない場合に履歴タブが選択されていたらフォールバック
   useEffect(() => {
@@ -339,7 +347,7 @@ export default function Inspector({
         className={clsx("border-b border-border flex items-center", compactMode ? "h-10" : "h-12")}
       >
         <button
-          onClick={() => setActiveTab("corrections")}
+          onClick={() => openTrackedTab("corrections", "activity_bar")}
           className={clsx(
             "group relative flex-1 h-full flex items-center justify-center text-sm transition-colors",
             showLabels ? "gap-2" : "gap-0",
@@ -356,7 +364,7 @@ export default function Inspector({
           </span>
         </button>
         <button
-          onClick={() => setActiveTab("stats")}
+          onClick={() => openTrackedTab("stats", "activity_bar")}
           className={clsx(
             "group relative flex-1 h-full flex items-center justify-center text-sm transition-colors",
             showLabels ? "gap-2" : "gap-0",
@@ -374,7 +382,7 @@ export default function Inspector({
         </button>
         {isProject && (
           <button
-            onClick={() => setActiveTab("history")}
+            onClick={() => openTrackedTab("history", "activity_bar")}
             className={clsx(
               "group relative flex-1 h-full flex items-center justify-center text-sm transition-colors",
               showLabels ? "gap-2" : "gap-0",

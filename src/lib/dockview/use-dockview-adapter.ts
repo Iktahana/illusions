@@ -17,6 +17,7 @@ import type { TabId, TabState } from "@/lib/tab-manager/tab-types";
 import { isEditorTab, isTerminalTab, isDiffTab } from "@/lib/tab-manager/tab-types";
 import { stableKeyForTab } from "./stable-key";
 import type { UseTabManagerReturn } from "@/lib/tab-manager/types";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 import type {
   EditorPanelParams,
   TerminalPanelParams,
@@ -786,6 +787,7 @@ export function useDockviewAdapter({
         direction,
         referencePanel: activePanel.id,
       };
+      trackUsageEvent("editor_layout_changed", { action: "split", value: "split" });
     },
     [tabs, activeTabId, cloneTab],
   );

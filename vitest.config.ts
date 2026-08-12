@@ -14,7 +14,7 @@ export default defineConfig({
     include: ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
     // stale worktree コピー（.claude/worktrees/agent-*）配下の __tests__ が
     // テスト探索に混入して false-RED を起こすのを防ぐ
-    exclude: [...configDefaults.exclude, ".claude/worktrees/**"],
+    exclude: [...configDefaults.exclude, ".claude/worktrees/**", ".worktrees/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html"],

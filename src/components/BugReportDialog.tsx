@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import GlassDialog from "@/shared/ui/GlassDialog";
 import { notificationManager } from "@/lib/services/notification-manager";
 import {
@@ -9,6 +9,7 @@ import {
   type BugReportCategory,
 } from "@/lib/bug-report/bug-report-types";
 import { collectDiagnostics, submitBugReport } from "@/lib/bug-report/submit-bug-report";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 interface BugReportDialogProps {
   isOpen: boolean;
@@ -34,10 +35,17 @@ export default function BugReportDialog({
   const [reproSteps, setReproSteps] = useState("");
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const wasOpenRef = useRef(false);
 
   // 両入口 (バグ報告 / AI報告) で同一インスタンスを再利用するため、
   // 開くたびにカテゴリを initialCategory へ再同期し、入力もリセットする。
   useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      trackUsageEvent("feedback_opened", {
+        category: initialCategory === "ai-inappropriate" ? "ai_inappropriate" : initialCategory,
+      });
+    }
+    wasOpenRef.current = isOpen;
     if (isOpen) {
       setCategory(initialCategory);
       setTitle("");
@@ -63,12 +71,19 @@ export default function BugReportDialog({
     });
     setIsSubmitting(false);
 
+    const telemetryCategory = category === "ai-inappropriate" ? "ai_inappropriate" : category;
+
     if (result.ok) {
+      trackUsageEvent("feedback_submit_completed", { category: telemetryCategory });
       notificationManager.showMessage("報告を送信しました。ご協力ありがとうございます。", {
         type: "success",
       });
       onClose();
     } else {
+      trackUsageEvent("feedback_submit_failed", {
+        category: telemetryCategory,
+        reason: classifyTelemetryFailure({ status: result.status }),
+      });
       notificationManager.showMessage("送信に失敗しました。時間をおいて再度お試しください。", {
         type: "error",
       });
