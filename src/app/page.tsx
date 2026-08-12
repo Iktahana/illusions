@@ -67,7 +67,6 @@ import { useModeConfigMigration } from "@/lib/editor-page/use-mode-config-migrat
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
 import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
-import { useKnownTerms } from "@/lib/editor-page/use-known-terms";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
 import { findSearchMatches, type SearchRange } from "@/lib/editor-page/find-search-matches";
@@ -1291,10 +1290,6 @@ function EditorPageContent() {
   const { ignoredCorrections, ignoreCorrection, unignoreCorrection, clearIgnoredCorrections } =
     useIgnoredCorrections(editorMode);
 
-  // Known terms (user dictionary + dictionary-ruleset sources) that
-  // dictionary-matching lint rules must not flag as 辞書外語.
-  const knownTerms = useKnownTerms(editorMode);
-
   // Quick "add to user dictionary" action for 辞書外語 detections.
   const { addWordToUserDictionary } = useUserDictionaryActions(editorMode);
 
@@ -1306,34 +1301,6 @@ function EditorPageContent() {
     }),
     [ignoredCorrections, clearIgnoredCorrections, unignoreCorrection],
   );
-
-  // Sync ignoredCorrections to ProseMirror plugin
-  useEffect(() => {
-    if (!editorViewInstance) return;
-
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
-      .then(({ updateLintingSettings }) => {
-        if (!isEditorViewAlive(editorViewInstance)) return;
-        updateLintingSettings(editorViewInstance, { ignoredCorrections }, "ignored-correction");
-      })
-      .catch((err) => {
-        console.error("[page] Failed to sync ignored corrections:", err);
-      });
-  }, [editorViewInstance, ignoredCorrections]);
-
-  // Sync known terms to ProseMirror plugin
-  useEffect(() => {
-    if (!editorViewInstance) return;
-
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
-      .then(({ updateLintingSettings }) => {
-        if (!isEditorViewAlive(editorViewInstance)) return;
-        updateLintingSettings(editorViewInstance, { knownTerms }, "known-terms-change");
-      })
-      .catch((err) => {
-        console.error("[page] Failed to sync known terms:", err);
-      });
-  }, [editorViewInstance, knownTerms]);
 
   // --- Lint handlers hook ---
   const {

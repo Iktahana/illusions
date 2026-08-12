@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { getChaptersFromDOM, parseMarkdownChapters, type Chapter } from "@/lib/utils";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 
 const AUTO_REFRESH_INTERVAL_MS = 10_000;
 
@@ -14,7 +15,7 @@ interface UseChaptersResult {
  * Shared hook for chapter detection with auto-refresh.
  * Prefers DOM-based chapters (more reliable), falls back to Markdown parsing.
  */
-export function useChapters(content: string): UseChaptersResult {
+export function useChapters(content: string, fileType: SupportedFileExtension): UseChaptersResult {
   const [refreshToken, setRefreshToken] = useState(0);
 
   // Auto-refresh every 10 seconds
@@ -28,8 +29,8 @@ export function useChapters(content: string): UseChaptersResult {
     if (domChapters.length > 0 && domChapters.some((ch) => ch.anchorId)) {
       return domChapters;
     }
-    return parseMarkdownChapters(content);
-  }, [content, refreshToken]);
+    return parseMarkdownChapters(content, fileType);
+  }, [content, fileType, refreshToken]);
 
   const refresh = useCallback(() => setRefreshToken((v) => v + 1), []);
 

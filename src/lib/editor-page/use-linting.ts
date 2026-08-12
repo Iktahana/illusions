@@ -2,16 +2,12 @@ import type { EditorView } from "@milkdown/prose/view";
 import { useCallback, useEffect, useState } from "react";
 
 import type { LintIssue, Severity } from "@/lib/linting/types";
-import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
 import { notificationManager } from "@/lib/services/notification-manager";
-import {
-  RuleRunnerProxy,
-  type RuleRunnerLike,
-} from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import { RuleRunnerProxy } from "@/lib/editor-page/linting-plugin/worker/rule-runner-proxy";
+import type { RuleRunnerLike } from "@/lib/editor-page/linting-plugin/worker/protocol";
 import { syncLoadedRulesets, subscribeRulesetChanges } from "@/lib/linting/external-ruleset-loader";
-import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
 
 export interface UseLintingResult {
   /** May be `null` until the worker has been spun up after mount. */
@@ -40,7 +36,7 @@ export function useLinting(
       options?: Record<string, unknown>;
     }
   >,
-  editorViewInstance: EditorView | null,
+  _editorViewInstance: EditorView | null,
   // Reserved for future throttling / mode-aware logic; kept in the
   // signature so callers don't have to be reworked when wired up.
   _powerSaveMode: boolean = false,
@@ -124,32 +120,11 @@ export function useLinting(
   }, [lintingEnabled]);
 
   // Force re-run linting on the full document (not just visible paragraphs)
+  // The UI and worker configuration remain available while the new editor
+  // extension is rebuilt. Until then refresh is intentionally a safe no-op.
   const refreshLinting = useCallback(() => {
-    if (!editorViewInstance || !lintingEnabled || !ruleRunner) return;
-
-    setIsLinting(true);
-    import("@/packages/milkdown-plugin-japanese-novel/linting-plugin")
-      .then(({ updateLintingSettings }) => {
-        if (!isEditorViewAlive(editorViewInstance)) {
-          setIsLinting(false);
-          return;
-        }
-        const nlpClient = ruleRunner.hasMorphologicalRules() ? getNlpClient() : null;
-
-        updateLintingSettings(
-          editorViewInstance,
-          {
-            ruleRunner,
-            nlpClient,
-          },
-          "manual-refresh",
-        );
-      })
-      .catch((err) => {
-        console.error("[useLinting] Failed to refresh linting:", err);
-        setIsLinting(false);
-      });
-  }, [editorViewInstance, lintingEnabled, ruleRunner]);
+    setIsLinting(false);
+  }, []);
 
   // Sync rule configs from settings to the runner, then re-run linting so the
   // displayed issues reflect the new enabled/severity immediately.

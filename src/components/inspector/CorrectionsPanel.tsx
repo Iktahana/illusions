@@ -19,7 +19,7 @@ import { CORRECTION_MODE_IDS, CORRECTION_MODES } from "@/lib/linting/correction-
 import { useRuleSourceMap } from "@/lib/editor-page/use-rule-source-map";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import type { CorrectionModeId } from "@/lib/linting/correction-config";
-import { DEFAULT_POS_COLORS } from "@/packages/milkdown-plugin-japanese-novel/pos-highlight/pos-colors";
+import { DEFAULT_POS_COLORS } from "@/lib/editor-page/pos-highlight-colors";
 import InfoTooltip from "./InfoTooltip";
 import IssueCard from "./IssueCard";
 import IgnoredCorrectionsDialog from "./IgnoredCorrectionsDialog";

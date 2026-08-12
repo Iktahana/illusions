@@ -5,6 +5,7 @@ export type Tab = "chapters" | "style";
 export interface ExplorerProps {
   className?: string;
   content?: string;
+  fileType: SupportedFileExtension;
   onChapterClick?: (anchorId: string) => void;
   onInsertText?: (text: string) => void;
   compactMode?: boolean;
@@ -26,3 +27,4 @@ export interface EditingEntry {
   /** Current file/folder name (used for rename; empty for new) */
   currentName: string;
 }
+import type { SupportedFileExtension } from "@/lib/project/project-types";

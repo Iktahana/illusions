@@ -67,8 +67,6 @@ export interface AppState {
   projects?: ProjectMetadata[];
 
   // 垂直スクロール設定
-  verticalScrollBehavior?: "auto" | "mouse" | "trackpad";
-  scrollSensitivity?: number;
 
   // 自動保存設定
   autoSave?: boolean;

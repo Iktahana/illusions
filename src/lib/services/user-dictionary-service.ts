@@ -28,7 +28,7 @@ const STANDALONE_STORAGE_PREFIX = "illusions-user-dictionary:";
 
 /**
  * Listeners notified after any successful write to the user dictionary. Lets the
- * lint pipeline (see use-known-terms) re-read the dictionary and refresh
+ * lint pipeline re-read the dictionary and refresh
  * 辞書外語 marks the instant the user adds/removes a word — no reload needed.
  */
 const changeListeners = new Set<() => void>();

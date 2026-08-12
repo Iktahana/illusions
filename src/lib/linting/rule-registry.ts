@@ -9,7 +9,7 @@ import type { LintRule, RuleLevel } from "@/lib/linting/types";
  * the JSON-driven factories, which cover L1 (regex) rules only.
  *
  * This is a live registration point, not dead code: `RuleRunnerProxy`
- * (packages/milkdown-plugin-japanese-novel/linting-plugin/worker/rule-runner-proxy.ts)
+ * (src/lib/editor-page/linting-plugin/worker/rule-runner-proxy.ts)
  * registers any morphological rules returned here onto its main-thread
  * RuleRunner. Re-add future L2 rules HERE — not in the JSON-driven factories —
  * so they run on the main thread, where kuromoji tokenization is available

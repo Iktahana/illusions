@@ -16,7 +16,7 @@ describe("note output analytics copy boundary", () => {
     const webMenu = source("src/lib/menu/use-web-menu-handlers.ts");
 
     expect(formattedOutput).toContain("trackNoteOutputResult(operation, result)");
-    expect(editor).toContain('document.execCommand("copy")');
+    expect(editor).toContain("@milkdown/plugin-clipboard");
     expect(editor).not.toContain("note_output_completed");
     expect(editor).not.toContain("trackNoteOutputResult");
     expect(webMenu).not.toContain("note_output_completed");

@@ -14,7 +14,7 @@ vi.mock("@/lib/services/notification-manager", () => ({
 }));
 
 import { subscribeRulesetChanges } from "@/lib/linting/external-ruleset-loader";
-import type { RuleRunnerProxy } from "@/packages/milkdown-plugin-japanese-novel/linting-plugin";
+import type { RuleRunnerProxy } from "@/lib/editor-page/linting-plugin/worker/rule-runner-proxy";
 
 type ChangedCb = (data: { reason: "installed" | "updated" | "uninstalled"; ids: string[] }) => void;
 

@@ -84,17 +84,11 @@ describe("import boundary checker", () => {
     ).toContain("package code");
   });
 
-  it("allows only an exact inherited package exception", () => {
+  it("rejects application imports from packages without legacy exceptions", () => {
     expect(
       validateImportBoundary(
-        "packages/milkdown-plugin-japanese-novel/pos-highlight/decoration-plugin.ts",
+        "packages/example/decoration-plugin.ts",
         "@/lib/nlp-client/nlp-client",
-      ),
-    ).toBeNull();
-    expect(
-      validateImportBoundary(
-        "packages/milkdown-plugin-japanese-novel/pos-highlight/decoration-plugin.ts",
-        "@/lib/project/project-service",
       ),
     ).toContain("package code");
   });

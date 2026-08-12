@@ -1,5 +1,5 @@
 import type { EditorView } from "@milkdown/prose/view";
-import { findScrollContainer } from "@/packages/milkdown-plugin-japanese-novel/shared/paragraph-helpers";
+import { findScrollContainer } from "./paragraph-helpers";
 
 export function centerEditorPosition(
   editorView: EditorView,

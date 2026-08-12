@@ -1,154 +1,57 @@
----
-title: Milkdown プラグイン開発
-slug: milkdown-plugin
-type: guide
-status: active
-updated: 2026-05-31
-tags:
-  - guide
-  - milkdown
-  - mdi
----
+# Milkdown エディター統合
 
-# Milkdown プラグイン開発
+Illusions のエディターは、文書構文、表示レイアウト、アプリ機能を別々の owner に分ける。
 
-このページは、`packages/milkdown-plugin-japanese-novel` の **現在の実装** を追うためのガイドです。  
-以前の文書には、存在しない fixer や簡略化しすぎた構成説明が含まれていました。ここでは現行コードにあるものだけを記します。
+## Ownership
 
-## パッケージの役割
+| 責務                                                        | Owner                                                                            |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| MDI parse / serialize / schema                              | `@illusions-lab/milkdown-plugin-mdi` と `src/lib/document-format` の MDI adapter |
+| Markdown / plain text                                       | `src/lib/document-format` の各 adapter                                           |
+| writing mode / line length / vertical wheel                 | `@illusions-lab/milkdown-plugin-vertical-writing@1.0.1`                          |
+| lint / POS / search / speech / heading / paragraph behavior | `src/lib/editor-page`                                                            |
+| font / line-height / paragraph spacing / theme              | `src/app/editor-typography.css` と editor component                              |
 
-[`packages/milkdown-plugin-japanese-novel`](../../packages/milkdown-plugin-japanese-novel/) は、Milkdown / ProseMirror に日本語小説向けの編集機能を足すパッケージです。
+`milkdown-plugin-mdi` と `milkdown-plugin-vertical-writing` は Milkdown に並列導入する。互いを import
+せず、vertical-writing layer に document format や MDI IR を渡さない。
 
-主な責務は次の 3 系統です。
+## Writing mode
 
-- MDI 由来の inline 構文を remark で解釈する
-- カスタム node / schema を ProseMirror に追加する
-- ProseMirror plugin で editor DOM や編集補助を整える
-
-補助機能として、同じ package 配下に次の 2 つがあります。
-
-- `pos-highlight/`
-- `linting-plugin/`
-
-## エントリーポイント
-
-メインのエントリーポイントは [`index.ts`](../../packages/milkdown-plugin-japanese-novel/index.ts) の `japaneseNovel()` です。
+公開 CSS は `src/app/globals.css` から明示的に読み込む。editor 初期化では一度だけ
+`verticalWriting({ mode, lineLength })` を登録し、その後の変更は action で行う。
 
 ```ts
-import { japaneseNovel } from "@/packages/milkdown-plugin-japanese-novel";
-
-Editor.make()
-  .use(japaneseNovel({ isVertical: true }))
-  .create();
+editor.action(changeWritingMode("vertical-rl"));
+editor.action(changeLineLength(40));
+editor.action(changeLineLength(null));
 ```
 
-`japaneseNovel()` は `MilkdownPlugin[]` を返します。  
-オプション型は [`config.ts`](../../packages/milkdown-plugin-japanese-novel/config.ts) の `JapaneseNovelOptions` です。
+mode や line length を `useEditor` の再構築 dependency に含めてはいけない。切替時も同じ
+EditorView を維持し、document、selection、IME composition、undo/redo history を保持する。
 
-現行オプション:
+`horizontal-tb` と `vertical-rl` が現在の UI の選択肢である。`vertical-lr` は package API として
+利用可能だが、Illusions の UI にはまだ公開しない。
 
-| Option               | Default | 説明                         |
-| -------------------- | ------- | ---------------------------- |
-| `isVertical`         | `false` | 縦書き class を付与する      |
-| `showManuscriptLine` | `false` | 原稿用紙風 class を付与する  |
-| `enableRuby`         | `true`  | ルビ構文を有効化する         |
-| `enableTcy`          | `true`  | 縦中横構文を有効化する       |
-| `enableNoBreak`      | `true`  | 改行禁止 span を有効化する   |
-| `enableKern`         | `true`  | カーニング span を有効化する |
+plugin が付与する `.milkdown-vertical-writing`、`data-writing-mode`、`data-line-length` と公開 CSS が
+layout と scroll container を所有する。アプリ側で wheel event、logical scroll progress、writing-mode、
+line-length sizing を再実装しない。
 
-## 構文とノード
+## Application features
 
-現行のカスタム schema / node は次のとおりです。
+旧 internal Japanese-novel package は廃止した。残すべき機能は次の場所へ移した。
 
-| ノード           | ファイル                   | 役割                                       |
-| ---------------- | -------------------------- | ------------------------------------------ |
-| `ruby`           | `nodes/ruby.ts`            | `{親文字\|ルビ}`                           |
-| `tcy`            | `nodes/tcy.ts`             | `^12^` のような縦中横                      |
-| `nobreak`        | `nodes/nobreak.ts`         | `[[no-break:...]]`                         |
-| `kern`           | `nodes/kern.ts`            | `[[kern:0.2em:...]]`                       |
-| `heading-anchor` | `nodes/heading-anchor.ts`  | 見出しアンカー用ノード                     |
-| `blankParagraph` | `nodes/blank-paragraph.ts` | `[[blank]]`（強制空段落、round-trip 対応） |
+- `src/lib/editor-page/novel-editor-features`: heading anchor、全角 Markdown 互換、会話文／hard break の補助
+- `src/lib/editor-page/linting-plugin`: 校正 decoration と worker 接続
+- `src/lib/editor-page/pos-highlight`: 品詞 highlight
+- `src/lib/editor-page/paragraph-helpers.ts`: editor feature 共通の段落位置計算
+- `src/lib/document-format/remark-plain-text.ts`: plain-text adapter 専用入力処理
 
-### 構文パーサ
+これらは writing mode を所有せず、`.mdi` / `.md` / `.txt` から同じ presentation layer として利用する。
 
-remark 側の構文プラグインは [`syntax.ts`](../../packages/milkdown-plugin-japanese-novel/syntax.ts) にあります。
+## 検証
 
-- `remarkRubyPlugin`
-- `remarkTcyPlugin`
-- `remarkNoBreakPlugin`
-- `remarkKernPlugin`
-- `remarkHeadingAnchorPlugin`
-- `remarkMdiBlankPlugin`（`[[blank]]` のみの段落を `blankParagraph` ノードへ変換）
-
-以前の文書で触れていた `paragraph-id-fixer` は、現在の package 構成には存在しません。
-
-## ProseMirror プラグイン
-
-`japaneseNovel()` が常に組み込む ProseMirror plugin は次の 3 つです。
-
-| プラグイン              | ファイル                      | 役割                                            |
-| ----------------------- | ----------------------------- | ----------------------------------------------- |
-| `stylePlugin`           | `index.ts` 内                 | `.milkdown-japanese-vertical` などの class 付与 |
-| `headingIdFixerPlugin`  | `plugins/heading-id-fixer.ts` | 見出し ID を安定化                              |
-| `hardbreakIndentPlugin` | `plugins/hardbreak-indent.ts` | hard break 周りの字下げ補助                     |
-
-ここでも、旧文書にあった `paragraph-id-fixer` は現行実装にはありません。
-
-## `MilkdownEditor.tsx` との接続
-
-アプリ本体側の接続は [`components/editor/MilkdownEditor.tsx`](../../components/editor/MilkdownEditor.tsx) です。
-
-現在このコンポーネントでは:
-
-- `japaneseNovel({ isVertical, showManuscriptLine: false, enableRuby, enableTcy })`
-- `posHighlight(...)`
-- `linting(...)`
-
-を editor 作成時に組み込み、`editorViewInstance` に対して一部設定を動的更新します。
-
-実装上の特徴:
-
-- `enableRuby` と `enableTcy` は UI 設定に合わせて切り替える
-- `posHighlight` と `linting` は editor を再作成せずに設定更新する
-- editor の縦横レイアウトや measure box は `MilkdownEditor.tsx` 側で制御しており、`japaneseNovel()` 本体は scroll viewport を持ちません
-
-## 品詞ハイライト
-
-品詞ハイライトは [`pos-highlight/`](../../packages/milkdown-plugin-japanese-novel/pos-highlight/) にあります。
-
-現行実装の事実:
-
-- `getNlpClient()` を使って NLP バックエンドに接続する
-- ProseMirror decoration plugin として動作する
-- paragraph 単位で結果をキャッシュする
-- 設定更新は `updatePosHighlightSettings()` で editor 再作成なしに行う
-
-## linting プラグイン
-
-linting は [`linting-plugin/`](../../packages/milkdown-plugin-japanese-novel/linting-plugin/) にあります。
-
-現行実装の事実:
-
-- `RuleRunner` を受け取ってルールを実行する
-- 必要なときだけ `INlpClient` を使って形態素解析する
-- ProseMirror decorations で issue を表示する
-- viewport-aware な段落処理と cache を持つ
-- document-level rule があれば全文脈の処理も走る
-- `updateLintingSettings()` で change reason 付きの動的更新ができる
-- `onNlpError` コールバックで NLP トークナイズ失敗を通知する（失敗エピソードにつき 1 回のみ呼ばれる）
-
-## 開発時の見方
-
-機能を追うときは次の順で見ると早いです。
-
-1. `components/editor/MilkdownEditor.tsx`
-2. `packages/milkdown-plugin-japanese-novel/index.ts`
-3. `packages/milkdown-plugin-japanese-novel/syntax.ts`
-4. `packages/milkdown-plugin-japanese-novel/nodes/*`
-5. `packages/milkdown-plugin-japanese-novel/pos-highlight/*`
-6. `packages/milkdown-plugin-japanese-novel/linting-plugin/*`
-
-## 関連
-
-- [MDI 構文仕様・実装ノート](https://github.com/illusions-lab/MDI)
-- [lint ルール](./linting-rules.md)
+- mode / line length action 後も EditorView identity、document、selection、history が変わらない
+- vertical wheel と nested scroller の優先順位が package 契約どおりである
+- single / split pane の auto line length は pane ごとに独立する
+- `.mdi` / `.md` / `.txt` の adapter が writing-mode plugin に依存しない
+- search、lint、speech の jump / scroll が plugin root を scroll container として利用する

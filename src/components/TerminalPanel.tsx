@@ -459,7 +459,7 @@ export default function TerminalPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Menu item — styled identically to EditorContextMenu for visual consistency
+// Menu item shared by the application's compact context menus.
 // ---------------------------------------------------------------------------
 
 interface TerminalMenuItemProps {

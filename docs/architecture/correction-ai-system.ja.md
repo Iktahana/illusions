@@ -42,7 +42,7 @@ tags:
 
 ### 3. Milkdown linting plugin が表示を更新
 
-[`packages/milkdown-plugin-japanese-novel/linting-plugin`](../../packages/milkdown-plugin-japanese-novel/linting-plugin/) の decoration plugin が:
+[`src/lib/editor-page/linting-plugin`](../../src/lib/editor-page/linting-plugin/) の decoration plugin が:
 
 - visible paragraph を収集
 - 必要なら NLP を呼ぶ
@@ -111,7 +111,7 @@ tags:
 
 ## Milkdown linting plugin の現況
 
-[`linting-plugin/decoration-plugin.ts`](../../packages/milkdown-plugin-japanese-novel/linting-plugin/decoration-plugin.ts) で確認できる現在の特徴:
+[`linting-plugin/decoration-plugin.ts`](../../src/lib/editor-page/linting-plugin/decoration-plugin.ts) で確認できる現在の特徴:
 
 - viewport-aware な段落処理
 - issue cache と token cache
@@ -155,7 +155,7 @@ tags:
 editor への反映まで含めて追う場合は:
 
 1. `lib/editor-page/use-linting.ts`
-2. `packages/milkdown-plugin-japanese-novel/linting-plugin/*`
+2. `src/lib/editor-page/linting-plugin/*`
 
 ## 関連
 

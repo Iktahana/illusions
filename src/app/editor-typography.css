@@ -1,0 +1,60 @@
+/** Application typography only. Layout and scrolling belong to vertical-writing. */
+
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap");
+
+.editor-core > .milkdown {
+  --milkdown-vertical-writing-viewport-size: 100%;
+  width: 100%;
+  height: 100%;
+}
+
+.editor-core > .milkdown > .editor {
+  min-height: 100%;
+  margin-inline: auto;
+  padding-block: 2rem;
+  padding-inline: 4rem;
+  font-family: var(
+    --editor-font-family,
+    "Noto Serif JP",
+    "Hiragino Mincho ProN",
+    "Yu Mincho",
+    serif
+  );
+  font-size: var(--editor-font-scale, 100%);
+  line-height: var(--editor-line-height, 1.8);
+  letter-spacing: 0.05em;
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-break: strict;
+}
+
+.editor-core .milkdown .ProseMirror p {
+  margin-block-end: var(--editor-paragraph-spacing, 0.5em);
+  text-indent: var(--editor-text-indent, 1em);
+}
+
+.editor-core .milkdown .ProseMirror :is(h1, h2, h3, h4, h5, h6, li, blockquote) {
+  text-indent: 0;
+}
+
+.editor-core .mdi-ruby {
+  ruby-align: center;
+}
+
+.editor-core .mdi-ruby rt {
+  font-size: 0.5em;
+  letter-spacing: 0;
+}
+
+.editor-core .mdi-tcy {
+  text-combine-upright: all;
+}
+
+.editor-core .mdi-no-break {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.editor-core .mdi-kern {
+  letter-spacing: var(--mdi-kern, 0);
+}

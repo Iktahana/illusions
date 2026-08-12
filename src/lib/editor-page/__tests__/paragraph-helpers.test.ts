@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { Schema } from "@milkdown/prose/model";
 import type { Node as ProseMirrorNode } from "@milkdown/prose/model";
-import { getAtomOffset, collectParagraphs, type AtomAdjustment } from "../shared/paragraph-helpers";
+import { getAtomOffset, collectParagraphs, type AtomAdjustment } from "../paragraph-helpers";
 
 /**
  * Minimal schema mirroring the editor's relevant shape: a paragraph of inline

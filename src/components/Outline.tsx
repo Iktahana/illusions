@@ -5,20 +5,23 @@ import { RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import type { Chapter } from "@/lib/utils";
 import { useChapters } from "@/lib/editor-page";
+import type { SupportedFileExtension } from "@/lib/project/project-types";
 
 interface OutlineProps {
   className?: string;
   content?: string;
+  fileType: SupportedFileExtension;
   onHeadingClick?: (anchorId: string) => void;
 }
 
 export default function Outline({
   className,
   content = "",
+  fileType,
   onHeadingClick,
 }: OutlineProps): React.ReactElement {
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
-  const { chapters: headings, refresh } = useChapters(content);
+  const { chapters: headings, refresh } = useChapters(content, fileType);
 
   // スクロールイベントで現在のセクションを追跡
   useEffect(() => {

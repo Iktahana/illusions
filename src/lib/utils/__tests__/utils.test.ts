@@ -465,7 +465,7 @@ describe("generateHeadingId", () => {
 // ---------------------------------------------------------------------------
 describe("parseMarkdownChapters", () => {
   it("should parse a single heading", () => {
-    const chapters = parseMarkdownChapters("# 第一章");
+    const chapters = parseMarkdownChapters("# 第一章", ".mdi");
     expect(chapters).toHaveLength(1);
     expect(chapters[0].level).toBe(1);
     expect(chapters[0].title).toBe("第一章");
@@ -475,7 +475,7 @@ describe("parseMarkdownChapters", () => {
 
   it("should parse multiple headings with different levels", () => {
     const md = "# Title\n\n## Section 1\n\nText\n\n### Subsection";
-    const chapters = parseMarkdownChapters(md);
+    const chapters = parseMarkdownChapters(md, ".mdi");
     expect(chapters).toHaveLength(3);
     expect(chapters[0].level).toBe(1);
     expect(chapters[1].level).toBe(2);
@@ -484,14 +484,14 @@ describe("parseMarkdownChapters", () => {
 
   it("should track line numbers correctly", () => {
     const md = "# First\nsome text\n## Second";
-    const chapters = parseMarkdownChapters(md);
+    const chapters = parseMarkdownChapters(md, ".mdi");
     expect(chapters[0].lineNumber).toBe(0);
     expect(chapters[1].lineNumber).toBe(2);
   });
 
   it("should track charOffset correctly", () => {
     const md = "# A\nBC\n## D";
-    const chapters = parseMarkdownChapters(md);
+    const chapters = parseMarkdownChapters(md, ".mdi");
     // Line 0: "# A" = 3 chars + 1 newline = offset 4
     // Line 1: "BC" = 2 chars + 1 newline = offset 7
     expect(chapters[0].charOffset).toBe(0);
@@ -499,45 +499,54 @@ describe("parseMarkdownChapters", () => {
   });
 
   it("should generate anchorId for each heading", () => {
-    const chapters = parseMarkdownChapters("# 物語の始まり");
+    const chapters = parseMarkdownChapters("# 物語の始まり", ".mdi");
     expect(chapters[0].anchorId).toBe(encodeURIComponent("物語の始まり"));
   });
 
   it("should return empty array for text without headings", () => {
-    expect(parseMarkdownChapters("Just plain text.")).toEqual([]);
+    expect(parseMarkdownChapters("Just plain text.", ".mdi")).toEqual([]);
   });
 
   it("should return empty array for empty string", () => {
-    expect(parseMarkdownChapters("")).toEqual([]);
+    expect(parseMarkdownChapters("", ".mdi")).toEqual([]);
   });
 
   it("should ignore lines that look like headings but are not (no space after #)", () => {
-    expect(parseMarkdownChapters("#NoSpace")).toEqual([]);
+    expect(parseMarkdownChapters("#NoSpace", ".mdi")).toEqual([]);
   });
 
   it("should handle h6 headings", () => {
-    const chapters = parseMarkdownChapters("###### Deep");
+    const chapters = parseMarkdownChapters("###### Deep", ".mdi");
     expect(chapters[0].level).toBe(6);
   });
 
   it("should strip MDI ruby syntax from the title (keep base only)", () => {
-    const chapters = parseMarkdownChapters("# {花|か}{様|よう}{年|ねん}{華|か}");
+    const chapters = parseMarkdownChapters("# {花|か}{様|よう}{年|ねん}{華|か}", ".mdi");
     expect(chapters).toHaveLength(1);
     expect(chapters[0].title).toBe("花様年華");
     expect(chapters[0].anchorId).toBe(encodeURIComponent("花様年華"));
   });
 
   it("should strip ruby mixed with plain text in the title", () => {
-    const chapters = parseMarkdownChapters("# 第一章 {序|じょ}");
+    const chapters = parseMarkdownChapters("# 第一章 {序|じょ}", ".mdi");
     expect(chapters[0].title).toBe("第一章 序");
   });
 
   it("should normalize [[br]] in a heading to a single-line title and anchorId", () => {
-    const chapters = parseMarkdownChapters("# 前編[[br]]後編");
+    const chapters = parseMarkdownChapters("# 前編[[br]]後編", ".mdi");
     expect(chapters[0].title).toBe("前編 後編");
     // anchorId must not contain an encoded newline (%0A)
     expect(chapters[0].anchorId).not.toContain("%0A");
     expect(chapters[0].anchorId).toBe(encodeURIComponent("前編 後編"));
+  });
+
+  it("keeps MDI-like ruby literal in Markdown headings", () => {
+    const chapters = parseMarkdownChapters("# {東京|とうきょう}", ".md");
+    expect(chapters[0].title).toBe("{東京|とうきょう}");
+  });
+
+  it("does not interpret hash-prefixed plain text as chapters", () => {
+    expect(parseMarkdownChapters("# literal heading", ".txt")).toEqual([]);
   });
 });
 
