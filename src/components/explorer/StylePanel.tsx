@@ -147,9 +147,10 @@ export function StylePanel() {
 
       <div>
         <label className="flex items-center justify-between text-sm font-medium text-foreground-secondary mb-2">
-          <span>段落番号</span>
+          <span>区画位置（準備中）</span>
           <button
             onClick={() => onShowParagraphNumbersChange(!showParagraphNumbers)}
+            disabled
             className={clsx(
               "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2",
               showParagraphNumbers ? "bg-accent" : "bg-border-secondary",
@@ -165,7 +166,9 @@ export function StylePanel() {
             />
           </button>
         </label>
-        <p className="text-xs text-foreground-tertiary mt-1">段落の先頭に番号を表示します</p>
+        <p className="text-xs text-foreground-tertiary mt-1">
+          Rust IR の区画位置を編集画面へ結び付けるまで無効です
+        </p>
       </div>
     </div>
   );

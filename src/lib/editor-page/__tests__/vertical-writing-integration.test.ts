@@ -161,4 +161,30 @@ describe("vertical-writing app integration", () => {
       expect(encoded).toBe(source);
     },
   );
+
+  it.each([
+    ["blank paragraph", "前\n\n[[blank]]\n\n後\n", "\\", "前\n\n\\\n\n後\n"],
+    ["page break", "前\n\n[[pagebreak]]\n\n後\n", "[[pagebreak]]", "前\n\n[[pagebreak]]\n\n後\n"],
+    [
+      "right page break",
+      "前\n\n[[pagebreak:right]]\n\n後\n",
+      "[[pagebreak:right]]",
+      "前\n\n[[pagebreak:right]]\n\n後\n",
+    ],
+    ["indent", "[[indent:2]]\n本文\n", "[[indent:2]]", "[[indent:2]]\n本文\n"],
+    ["bottom alignment", "[[bottom]]\n本文\n", "[[bottom]]", "[[bottom]]\n本文\n"],
+  ] as const)(
+    "keeps unsupported published-plugin block %s visible and lossless until upstream #9 ships",
+    async (_name, source, literal, canonical) => {
+      const editor = await createFormatEditor("mdi", source);
+      const view = editor.ctx.get(editorViewCtx);
+      expect(view.state.doc.textContent).toContain(literal);
+
+      let encoded = "";
+      editor.action((ctx) => {
+        encoded = getDocumentAdapter("mdi").encodeEditor(ctx, ctx.get(editorViewCtx).state.doc);
+      });
+      expect(encoded).toBe(canonical);
+    },
+  );
 });

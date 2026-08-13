@@ -126,8 +126,8 @@ export default function TypographySettingsTab(): React.ReactElement {
 
       <SettingsSection title="その他">
         <SettingsField
-          label="段落番号を表示"
-          description="各段落に番号を表示します"
+          label="区画位置を表示（準備中）"
+          description="Rust IR の区画位置を編集画面へ結び付けるまで無効です"
           htmlFor="typography-paragraph-numbers"
           inline
         >
@@ -135,6 +135,7 @@ export default function TypographySettingsTab(): React.ReactElement {
             id="typography-paragraph-numbers"
             checked={showParagraphNumbers}
             onChange={onShowParagraphNumbersChange}
+            disabled
           />
         </SettingsField>
 

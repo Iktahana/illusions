@@ -19,12 +19,12 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov", "html"],
       thresholds: {
-        lines: 15,
-        functions: 10,
-        branches: 10,
-        statements: 15,
+        lines: 60,
+        functions: 60,
+        branches: 50,
+        statements: 60,
       },
-      include: ["src/lib/**/*.ts"],
+      include: ["src/lib/**/*.ts", "src/components/editor/MilkdownEditor.tsx"],
       exclude: [
         "**/__tests__/**",
         "**/node_modules/**",

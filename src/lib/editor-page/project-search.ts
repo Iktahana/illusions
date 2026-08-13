@@ -566,7 +566,6 @@ function addRawMatchMetadata(content: string, match: SearchMatch): RawDocumentSe
     rawFrom,
     rawTo,
     lineNumber,
-    paragraphNumber: lineNumber,
     heading,
   };
 }

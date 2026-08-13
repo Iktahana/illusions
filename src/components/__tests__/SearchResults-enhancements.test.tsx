@@ -103,13 +103,12 @@ describe("SearchResults enhanced options", () => {
           text: "東京",
           source: "ruby-base",
           replaceable: false,
-          paragraphNumber: 1,
         },
       ],
     });
 
     expect(container.textContent).toContain("構造を含むため置換できません");
-    expect(container.textContent).toContain("段落 1");
+    expect(container.textContent).not.toContain("段落 1");
   });
 
   it("navigates to the previous and next match from the always-visible controls", () => {

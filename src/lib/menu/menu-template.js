@@ -375,8 +375,9 @@ const MENU_TEMPLATE = [
       SEPARATOR,
       {
         id: "format-paragraph-numbers-toggle",
-        label: "段落番号を表示",
+        label: "区画位置を表示（準備中）",
         type: "checkbox",
+        enabled: false,
         checkedState: { key: "showParagraphNumbers" },
         electronChannel: "menu-format",
         electronArgs: ["paragraphNumbers", "toggle"],

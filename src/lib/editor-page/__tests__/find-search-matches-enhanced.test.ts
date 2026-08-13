@@ -170,18 +170,17 @@ describe("findSearchMatches enhanced search", () => {
     expect(findSearchMatches(source, "blank", {})).toEqual([]);
   });
 
-  it("does not count mdiBlank in paragraphNumber to match UI counter (#1823)", () => {
+  it("does not invent paragraph positions from the ProseMirror tree", () => {
     const source = doc(
       paragraph(schema.text("段落A")),
       schema.node("mdiBlank"),
       paragraph(schema.text("段落B")),
     );
 
-    // 「段落」は両段落にヒットするが、mdiBlank は段落番号を消費しない。
     const matches = findSearchMatches(source, "段落", {});
     expect(matches).toHaveLength(2);
-    expect(matches[0]).toMatchObject({ paragraphNumber: 1 });
-    expect(matches[1]).toMatchObject({ paragraphNumber: 2 });
+    expect(matches[0]).not.toHaveProperty("paragraphNumber");
+    expect(matches[1]).not.toHaveProperty("paragraphNumber");
 
     const source2 = doc(
       paragraph(schema.text("前")),
@@ -189,7 +188,7 @@ describe("findSearchMatches enhanced search", () => {
       paragraph(schema.text("後")),
     );
     const matches2 = findSearchMatches(source2, "後", {});
-    expect(matches2[0]).toMatchObject({ paragraphNumber: 2 });
+    expect(matches2[0]).not.toHaveProperty("paragraphNumber");
   });
 
   it("includes html comment node content when excludeComments is false (#1822)", () => {
@@ -253,8 +252,8 @@ describe("findSearchMatches enhanced search", () => {
     );
 
     expect(findSearchMatches(source, "対象", {})).toMatchObject([
-      { heading: "第一章", paragraphNumber: 1 },
-      { heading: "第一章", paragraphNumber: 2 },
+      { heading: "第一章" },
+      { heading: "第一章" },
     ]);
   });
 });

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const readSource = (relativePath: string): string =>
   readFileSync(path.join(root, relativePath), "utf8");
+const readJson = <T>(relativePath: string): T => JSON.parse(readSource(relativePath)) as T;
 
 describe("new editor core boundary", () => {
   it("composes the editor from the MDI and vertical-writing packages", () => {
@@ -52,5 +53,61 @@ describe("new editor core boundary", () => {
     for (const relativePath of removedPaths) {
       expect(existsSync(path.join(root, relativePath)), relativePath).toBe(false);
     }
+  });
+
+  it("keeps the official editor packages independent and on one Milkdown runtime", () => {
+    const mdiPackage = readJson<{
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    }>("node_modules/@illusions-lab/milkdown-plugin-mdi/package.json");
+    const verticalPackage = readJson<{
+      dependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+    }>("node_modules/@illusions-lab/milkdown-plugin-vertical-writing/package.json");
+    const lock = readJson<{
+      packages: Record<string, { version?: string; dependencies?: Record<string, string> }>;
+    }>("package-lock.json");
+
+    expect({ ...mdiPackage.dependencies, ...mdiPackage.peerDependencies }).not.toHaveProperty(
+      "@illusions-lab/milkdown-plugin-vertical-writing",
+    );
+    expect({
+      ...verticalPackage.dependencies,
+      ...verticalPackage.peerDependencies,
+    }).not.toHaveProperty("@illusions-lab/milkdown-plugin-mdi");
+
+    for (const packageName of ["core", "ctx", "prose"]) {
+      const suffix = `node_modules/@milkdown/${packageName}`;
+      const installations = Object.entries(lock.packages).filter(([location]) =>
+        location.endsWith(suffix),
+      );
+      expect(installations, packageName).toHaveLength(1);
+      expect(installations[0]?.[1].version, packageName).toBe("7.21.3");
+    }
+  });
+
+  it("keeps private MDI core and the removed editor package out of application dependencies", () => {
+    const packageJson = readJson<{ dependencies?: Record<string, string> }>("package.json");
+    const activeSources = [
+      readSource("src/components/editor/MilkdownEditor.tsx"),
+      readSource("src/lib/document-format/index.ts"),
+      readSource("package.json"),
+    ].join("\n");
+
+    expect(packageJson.dependencies).not.toHaveProperty("@illusions-lab/mdi-core");
+    expect(packageJson.dependencies).not.toHaveProperty("milkdown-plugin-japanese-novel");
+    expect(activeSources).not.toContain('from "@illusions-lab/mdi-core"');
+    expect(activeSources).not.toContain('from "milkdown-plugin-japanese-novel"');
+  });
+
+  it("does not invent machine-addressable block numbers outside the Rust projection", () => {
+    const editor = readSource("src/components/editor/MilkdownEditor.tsx");
+    const typography = readSource("src/app/editor-typography.css");
+    const search = readSource("src/lib/editor-page/find-search-matches.ts");
+
+    expect(editor).not.toContain("editor-core--paragraph-numbers");
+    expect(typography).not.toContain("counter-increment");
+    expect(typography).not.toContain("counter-reset");
+    expect(search).not.toContain("paragraphNumber");
   });
 });
