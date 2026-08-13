@@ -39,7 +39,6 @@ export interface SearchMatch {
   replaceable?: boolean;
   captures?: string[];
   heading?: string;
-  paragraphNumber?: number;
 }
 
 export interface ReplacementStep {
@@ -107,21 +106,14 @@ export function findSearchMatches(
 
   const matches: SearchMatch[] = [];
   let currentHeading: string | undefined;
-  let paragraphNumber = 0;
 
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return;
 
     const isHeading = node.type.name === "heading";
-    // mdiBlank is excluded from the visible paragraph counter.
-    // されているため、UI 側の段落番号と一致させるためここでも数えない。
-    const isBlankParagraph = node.type.name === "mdiBlank";
-    if (!isHeading && !isBlankParagraph) paragraphNumber += 1;
-
     const bodyProjection = createBodyProjection(node, pos + 1, options.excludeComments);
     const metadata = {
       heading: isHeading ? bodyProjection.text || currentHeading : currentHeading,
-      paragraphNumber: isHeading ? undefined : paragraphNumber,
     };
 
     if (options.searchTarget !== "ruby") {
@@ -155,7 +147,7 @@ export function findSearchMatchesInProjection(
   projection: SearchTextProjection,
   searchTerm: string,
   caseSensitiveOrOptions: boolean | SearchOptions,
-  metadata: Pick<SearchMatch, "heading" | "paragraphNumber"> = {},
+  metadata: Pick<SearchMatch, "heading"> = {},
 ): SearchMatch[] {
   if (!searchTerm) return [];
   return searchProjection(projection, searchTerm, resolveOptions(caseSensitiveOrOptions), metadata);
@@ -325,7 +317,7 @@ function searchProjection(
   projection: SearchTextProjection,
   searchTerm: string,
   options: ResolvedSearchOptions,
-  metadata: Pick<SearchMatch, "heading" | "paragraphNumber">,
+  metadata: Pick<SearchMatch, "heading">,
 ): SearchMatch[] {
   if (!projection.text || projection.segments.length === 0) return [];
 

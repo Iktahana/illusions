@@ -776,9 +776,6 @@ export default function SearchResults({
                     >
                       <button onClick={() => goToMatch(index)} className="w-full text-left">
                         {renderMatchText(match)}
-                        <p className="text-xs text-foreground-tertiary mt-1">
-                          {match.paragraphNumber ? `段落 ${match.paragraphNumber}` : "見出し"}
-                        </p>
                       </button>
                       {showReplace && replaceTouched && isSearchMatchReplaceable(match) && (
                         <button

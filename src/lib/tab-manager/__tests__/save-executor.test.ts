@@ -684,6 +684,59 @@ describe("executeTabSave: failure and unmount handling", () => {
 // ---------------------------------------------------------------------------
 
 describe("executeTabSave: Save As recomputes fileType from new descriptor (#1871)", () => {
+  it.each([
+    [".mdi", ".md"],
+    [".mdi", ".txt"],
+    [".md", ".mdi"],
+    [".md", ".txt"],
+    [".txt", ".mdi"],
+    [".txt", ".md"],
+  ] as const)(
+    "preserves source bytes and updates the adapter route for Save As %s → %s",
+    async (from, to) => {
+      const source = "# {東京|とうきょう}\n\n[[blank]]\n\n^12^\n";
+      const tab = makeTab({
+        file: { path: `/p/source${from}`, handle: null, name: `source${from}` },
+        fileType: from,
+        content: source,
+      });
+      const h = makeHarness([tab]);
+      const descriptor: MdiFileDescriptor = {
+        path: `/p/destination${to}`,
+        handle: null,
+        name: `destination${to}`,
+      };
+      saveMdiFileMock.mockResolvedValue({ descriptor, content: source });
+
+      const outcome = await executeTabSave({
+        tab,
+        isProject: false,
+        tabsRef: h.tabsRef,
+        setTabs: h.setTabs,
+        tryCreateSnapshot: vi.fn(),
+        forceDialog: true,
+        recheckConflict: false,
+      });
+
+      expect(outcome).toMatchObject({
+        status: "saved",
+        savedContent: source,
+        formatTransition: { from, to },
+      });
+      expect(saveMdiFileMock).toHaveBeenCalledWith({
+        descriptor: { path: null, handle: null, name: `source${from}` },
+        content: source,
+        fileType: from,
+      });
+      expect(h.getTab("tab-1")).toMatchObject({
+        content: source,
+        lastSavedContent: source,
+        fileType: to,
+        file: descriptor,
+      });
+    },
+  );
+
   it("changes fileType from .mdi to .txt when Save As targets a .txt file", async () => {
     const source = "# {東京|とうきょう}\n\n[[blank]]\n\n^12^";
     const tab = makeTab({ file: null, fileType: ".mdi", content: source });

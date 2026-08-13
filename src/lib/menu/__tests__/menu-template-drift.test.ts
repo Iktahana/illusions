@@ -268,9 +268,12 @@ describe("shared menu template drift prevention", () => {
     ]);
 
     const formatSection = native.find((s) => s.label === "書式");
-    const paragraphNumbers = formatSection?.submenu?.find((i) => i.label === "段落番号を表示");
+    const paragraphNumbers = formatSection?.submenu?.find(
+      (i) => i.label === "区画位置を表示（準備中）",
+    );
     expect(paragraphNumbers?.type).toBe("checkbox");
     expect(paragraphNumbers?.checked).toBe(false);
+    expect(paragraphNumbers?.enabled).toBe(false);
 
     const charsPerLine = formatSection?.submenu?.find((i) => i.label === "1行あたりの文字数");
     const auto = charsPerLine?.submenu?.find((i) => i.label === "自動");
@@ -485,7 +488,11 @@ describe("WEB_MENU_STRUCTURE", () => {
             ],
           },
           { type: "separator" },
-          { label: "段落番号を表示", type: "checkbox", action: "format-paragraph-numbers-toggle" },
+          {
+            label: "区画位置を表示（準備中）",
+            type: "checkbox",
+            enabled: false,
+          },
         ],
       },
       {

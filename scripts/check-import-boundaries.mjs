@@ -93,6 +93,22 @@ function importsBrowserPlatform(filePath, specifier) {
 export function validateImportBoundary(filePath, specifier) {
   const importsBrowserAdapter = importsBrowserPlatform(filePath, specifier);
   filePath = normalizeSourcePath(filePath);
+  const isApplicationSource =
+    /^(?:app|application|components|contexts|features|lib|packages|platform|shared)\//.test(
+      filePath,
+    );
+
+  if (isApplicationSource && specifier === "@illusions-lab/mdi-core") {
+    return "application code must use the public @illusions-lab/mdi APIs, not private mdi-core";
+  }
+
+  if (
+    isApplicationSource &&
+    (specifier === "milkdown-plugin-japanese-novel" ||
+      specifier.startsWith("milkdown-plugin-japanese-novel/"))
+  ) {
+    return "removed Japanese-novel editor package must not be reintroduced";
+  }
 
   if (filePath.startsWith("packages/") && specifier.startsWith("@/")) {
     const allowed = LEGACY_PACKAGE_IMPORTS.get(filePath);
@@ -101,24 +117,14 @@ export function validateImportBoundary(filePath, specifier) {
     }
   }
 
-  if (
-    /^(?:app|application|components|contexts|features|lib|packages|platform|shared)\//.test(
-      filePath,
-    ) &&
-    importsBrowserAdapter
-  ) {
+  if (isApplicationSource && importsBrowserAdapter) {
     const allowed = LEGACY_BROWSER_PLATFORM_IMPORTS.get(filePath);
     if (!allowed?.has(specifier)) {
       return "renderer/application code must not add browser-platform adapter imports";
     }
   }
 
-  if (
-    /^(?:app|application|components|contexts|features|lib|packages|platform|shared)\//.test(
-      filePath,
-    ) &&
-    (specifier === "@/electron" || specifier.startsWith("@/electron/"))
-  ) {
+  if (isApplicationSource && (specifier === "@/electron" || specifier.startsWith("@/electron/"))) {
     return "renderer/shared code must access Electron through preload adapters, not main modules";
   }
 

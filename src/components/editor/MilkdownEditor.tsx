@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor, defaultValueCtx, editorViewCtx, rootCtx, serializerCtx } from "@milkdown/core";
 import { clipboard } from "@milkdown/plugin-clipboard";
 import { history } from "@milkdown/plugin-history";
@@ -64,14 +64,28 @@ export default function MilkdownEditor({
   const contentRef = useRef(initialContent);
   const onChangeRef = useRef(onChange);
   const viewRef = useRef<EditorView | null>(null);
+  const [readyGeneration, setReadyGeneration] = useState<number | null>(null);
   const modeRef = useRef(isVertical);
   const lineLengthRef = useRef(lineLength);
+  const editorGenerationRef = useRef({ adapter, documentFormat, value: 0 });
+
+  if (
+    editorGenerationRef.current.adapter !== adapter ||
+    editorGenerationRef.current.documentFormat !== documentFormat
+  ) {
+    editorGenerationRef.current = {
+      adapter,
+      documentFormat,
+      value: editorGenerationRef.current.value + 1,
+    };
+  }
+  const editorGeneration = editorGenerationRef.current.value;
 
   onChangeRef.current = onChange;
   modeRef.current = isVertical;
   lineLengthRef.current = lineLength;
 
-  const { get } = useEditor(
+  const editorHandle = useEditor(
     (root) => {
       let editor = Editor.make()
         .config(nord)
@@ -110,8 +124,17 @@ export default function MilkdownEditor({
     },
     [adapter, documentFormat],
   );
+  const isEditorReady = readyGeneration === editorGeneration && !editorHandle.loading;
+  const getRef = useRef(editorHandle.get);
+  getRef.current = editorHandle.get;
+  const get = useCallback(() => getRef.current(), []);
 
   useEffect(() => {
+    if (editorHandle.loading) {
+      setReadyGeneration(null);
+      return;
+    }
+
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let attempts = 0;
@@ -122,6 +145,7 @@ export default function MilkdownEditor({
         const view = get()?.ctx.get(editorViewCtx);
         if (view) {
           viewRef.current = view;
+          setReadyGeneration(editorGeneration);
           onEditorViewReady?.(view);
           return;
         }
@@ -135,26 +159,29 @@ export default function MilkdownEditor({
     return () => {
       cancelled = true;
       viewRef.current = null;
+      setReadyGeneration(null);
       if (timer) clearTimeout(timer);
     };
-  }, [get, onEditorViewReady]);
+  }, [editorGeneration, editorHandle.loading, get, onEditorViewReady]);
 
   useEffect(() => {
+    if (!isEditorReady) return;
     get()?.action(changeWritingMode(isVertical ? "vertical-rl" : "horizontal-tb"));
-  }, [get, isVertical]);
+  }, [get, isEditorReady, isVertical]);
 
   useEffect(() => {
+    if (!isEditorReady) return;
     get()?.action(changeLineLength(lineLength));
-  }, [get, lineLength]);
+  }, [get, isEditorReady, lineLength]);
 
   useEffect(() => {
-    if (externalContent == null) return;
+    if (!isEditorReady || externalContent == null) return;
     const editor = get();
     if (!editor) return;
     editor.action(replaceAll(externalContent));
     contentRef.current = externalContent;
     onExternalContentApplied?.();
-  }, [externalContent, get, onExternalContentApplied]);
+  }, [externalContent, get, isEditorReady, onExternalContentApplied]);
 
   useEffect(() => {
     if (!registerFlush) return;
