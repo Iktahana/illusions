@@ -10,12 +10,14 @@ const readJson = <T>(relativePath: string): T => JSON.parse(readSource(relativeP
 describe("new editor core boundary", () => {
   it("composes the editor from the MDI and vertical-writing packages", () => {
     const source = readSource("src/components/editor/MilkdownEditor.tsx");
+    const globalStyles = readSource("src/app/globals.css");
 
     expect(source).toContain("getDocumentAdapter");
     expect(source).toContain("@illusions-lab/milkdown-plugin-vertical-writing");
     expect(readSource("src/lib/document-format/index.ts")).toContain(
       "@illusions-lab/milkdown-plugin-mdi",
     );
+    expect(globalStyles).toContain('@import "@illusions-lab/milkdown-plugin-mdi/style.css"');
   });
 
   it("does not load removed application feature plugins into the core", () => {
@@ -57,6 +59,7 @@ describe("new editor core boundary", () => {
 
   it("keeps the official editor packages independent and on one Milkdown runtime", () => {
     const mdiPackage = readJson<{
+      version: string;
       dependencies?: Record<string, string>;
       peerDependencies?: Record<string, string>;
     }>("node_modules/@illusions-lab/milkdown-plugin-mdi/package.json");
@@ -71,6 +74,7 @@ describe("new editor core boundary", () => {
     expect({ ...mdiPackage.dependencies, ...mdiPackage.peerDependencies }).not.toHaveProperty(
       "@illusions-lab/milkdown-plugin-vertical-writing",
     );
+    expect(mdiPackage.version).toBe("0.2.0");
     expect({
       ...verticalPackage.dependencies,
       ...verticalPackage.peerDependencies,

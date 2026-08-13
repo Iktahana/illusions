@@ -32,24 +32,23 @@ context menu、Bubble menu、選択文字数は UI shell が残っていても e
 
 ### 形式分離 matrix
 
-| source               | `.mdi`                      | `.md`                         | `.txt`  |
-| -------------------- | --------------------------- | ----------------------------- | ------- |
-| `# heading`          | heading                     | heading                       | literal |
-| `{東京\|とうきょう}` | Ruby atom                   | literal                       | literal |
-| `^12^`               | TCY mark                    | literal                       | literal |
-| `[[blank]]`          | upstream block support 待ち | escaped literal serialization | literal |
-| `*強調*`             | emphasis                    | emphasis                      | literal |
+| source               | `.mdi`                   | `.md`                         | `.txt`  |
+| -------------------- | ------------------------ | ----------------------------- | ------- |
+| `# heading`          | heading                  | heading                       | literal |
+| `{東京\|とうきょう}` | Ruby atom                | literal                       | literal |
+| `^12^`               | TCY mark                 | literal                       | literal |
+| `[[blank]]`          | semantic `mdiBlank` node | escaped literal serialization | literal |
+| `*強調*`             | emphasis                 | emphasis                      | literal |
 
 Save As は source を変換する操作ではない。`.mdi` / `.md` / `.txt` の六方向すべてで現在の source bytes を
 そのまま書き、保存成功後に destination extension から次回 editor adapter を決める。
 
 ### upstream MDI block support
 
-公開中の `@illusions-lab/milkdown-plugin-mdi@0.1.0` は front matter と inline MDI を提供する。空白段落、
-改頁／改丁、字下げ／地付き等の block authoring は
-[upstream #9](https://github.com/illusions-lab/milkdown-plugin-mdi/issues/9) で追跡する。Illusions 側へ
-fallback parser / schema / serializer を追加しない。公開 release を更新するときに block の
-parse → edit → canonical serialize conformance test を同時に有効化する。
+`@illusions-lab/milkdown-plugin-mdi@0.2.0` から空白段落、改頁／改丁、字下げ／地付きが semantic
+Milkdown block node または paragraph attribute として提供される。Illusions は package の schema と
+logical CSS をそのまま使用し、fallback parser / schema / serializer を追加しない。blank、三種の
+pagebreak、indent、bottom は実 package の parse → DOM → canonical serialize conformance test で固定する。
 
 ### Rust-owned block positions
 

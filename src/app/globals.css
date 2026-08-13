@@ -2,6 +2,7 @@
 /* If local font files don't exist, Google Fonts will be used as fallback */
 
 /* Editor layout plugin and application-owned typography */
+@import "@illusions-lab/milkdown-plugin-mdi/style.css";
 @import "@illusions-lab/milkdown-plugin-vertical-writing/style.css";
 @import "./editor-typography.css";
 

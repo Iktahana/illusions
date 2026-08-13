@@ -178,6 +178,63 @@ describe("MilkdownEditor real runtime", () => {
     expect(views[1].state.doc.textContent).toContain("^12^");
   });
 
+  it("keeps MDI 0.2 block nodes semantic across writing mode and external replacement", async () => {
+    await getDocumentAdapter("mdi").initialize();
+    const views: EditorView[] = [];
+    let flush: (() => string | null) | null = null;
+    const initial = [
+      "[[indent:2]]",
+      "字下げ本文",
+      "",
+      "[[blank]]",
+      "",
+      "[[pagebreak:right]]",
+      "",
+      "次頁",
+      "",
+    ].join("\n");
+    const baseProps: RuntimeProps = {
+      documentFormat: "mdi",
+      initialContent: initial,
+      isVertical: false,
+      lineLength: 40,
+      onEditorViewReady: (view) => views.push(view),
+      registerFlush: (next) => {
+        flush = next;
+      },
+    };
+
+    await render(baseProps);
+    await waitFor(() => expect(views).toHaveLength(1));
+    expect(container.querySelector('p.mdi-indent[data-mdi-indent="2"]')).not.toBeNull();
+    expect(container.querySelector("div.mdi-blank[data-mdi-blank]")).not.toBeNull();
+    expect(container.querySelector('hr.mdi-pagebreak[data-mdi-variant="right"]')).not.toBeNull();
+    expect(runFlush(flush)).toContain("[[indent:2]]");
+    expect(runFlush(flush)).toContain("[[pagebreak:right]]");
+
+    await render({ ...baseProps, isVertical: true, lineLength: 30 });
+    await waitFor(() => {
+      const pluginRoot = container.querySelector(".milkdown-vertical-writing") as HTMLElement;
+      expect(pluginRoot.dataset.writingMode).toBe("vertical-rl");
+    });
+    expect(views).toHaveLength(1);
+    expect(container.querySelector('p.mdi-indent[data-mdi-indent="2"]')).not.toBeNull();
+
+    const replacement = "[[bottom:3]]\n地付き本文\n\n[[pagebreak:left]]\n";
+    const onExternalContentApplied = vi.fn();
+    await render({
+      ...baseProps,
+      externalContent: replacement,
+      isVertical: true,
+      lineLength: 30,
+      onExternalContentApplied,
+    });
+    await waitFor(() => expect(onExternalContentApplied).toHaveBeenCalledTimes(1));
+    expect(container.querySelector('p.mdi-bottom[data-mdi-bottom="3"]')).not.toBeNull();
+    expect(container.querySelector('hr.mdi-pagebreak[data-mdi-variant="left"]')).not.toBeNull();
+    expect(runFlush(flush)).toBe(replacement);
+  });
+
   it("destroys and remounts a fresh real editor view", async () => {
     const views: EditorView[] = [];
     const props: RuntimeProps = {
