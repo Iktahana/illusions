@@ -46,7 +46,7 @@
     "@illusions-lab/mdi": "^2.0.19",
     "@illusions-lab/mdi-export-profile": "^2.0.18",
     "@illusions-lab/mdi-to-pdf": "^2.0.29",
-    "@illusions-lab/milkdown-plugin-mdi": "^0.1.0",
+    "@illusions-lab/milkdown-plugin-mdi": "^0.2.0",
     "@illusions-lab/milkdown-plugin-vertical-writing": "1.0.1",
     "@radix-ui/react-context-menu": "^2.3.4",
     "@sentry/electron": "^7.15.0",
