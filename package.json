@@ -15,7 +15,7 @@
     "type-check": "tsc --noEmit",
     "dev": "npm run electron:dev",
     "build": "npm run type-check && npm run generate:credits && npm run build:electron-renderer",
-    "build:electron-renderer": "cross-env ELECTRON_BUILD=1 next build",
+    "build:electron-renderer": "cross-env ELECTRON_BUILD=1 next build && npm run check:electron-artifacts",
     "lint": "eslint .",
     "check:boundaries": "node scripts/check-import-boundaries.mjs",
     "check:electron-artifacts": "node scripts/check-electron-artifacts.mjs",

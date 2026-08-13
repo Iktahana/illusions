@@ -19,7 +19,13 @@ describe("retired Web distribution contract", () => {
       "src/app/sw.ts",
       "src/app/~offline",
       "src/app/auth/callback",
+      "src/app/api/auth",
+      "src/app/api/nlp",
       "src/components/AnalyticsLoader.tsx",
+      "src/lib/auth/auth-cookies.ts",
+      "src/lib/auth/web-auth.ts",
+      "src/lib/auth/web-session.ts",
+      "src/platform/browser/nlp-client.ts",
       "public/robots.txt",
       "public/site.webmanifest",
       "public/icon/illusions-180.png",
@@ -60,6 +66,7 @@ describe("retired Web distribution contract", () => {
     expect(packageJson.scripts).not.toHaveProperty("dev:web");
     expect(packageJson.scripts?.postinstall).not.toContain("VERCEL");
     expect(packageJson.scripts?.["build:electron-renderer"]).toContain("ELECTRON_BUILD=1");
+    expect(packageJson.scripts?.["build:electron-renderer"]).toContain("check:electron-artifacts");
     expect(packageJson.scripts?.build).toContain("build:electron-renderer");
   });
 
@@ -84,5 +91,21 @@ describe("retired Web distribution contract", () => {
 
     expect(gitignore).not.toMatch(/^\.vercel\/?$/m);
     expect(gitignore).not.toMatch(/^public\/(?:sw|swe-worker)/m);
+  });
+
+  it("keeps renderer service factories on Electron IPC without browser fallback", () => {
+    for (const factoryPath of [
+      "src/lib/nlp-client/nlp-client.ts",
+      "src/lib/storage/storage-service.ts",
+      "src/lib/vfs/index.ts",
+    ]) {
+      const source = readProjectFile(factoryPath);
+      expect(source, factoryPath).toMatch(/platform\/electron-renderer/);
+      expect(source, factoryPath).not.toMatch(/platform\/browser/);
+    }
+
+    expect(readProjectFile("src/lib/auth/use-auth-session.ts")).not.toMatch(
+      /web-session|web-auth|fetchMe|webLogout/,
+    );
   });
 });

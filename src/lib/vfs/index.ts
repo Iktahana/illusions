@@ -1,10 +1,7 @@
 /**
  * Virtual File System (VFS) Factory
  *
- * Automatically detects the runtime environment and returns the appropriate
- * VFS implementation:
- * - Electron renderer: Uses ElectronVFS (IPC communication with main process)
- * - Browser: Uses WebVFS (File System Access API)
+ * Provides the Electron renderer VFS backed by IPC.
  *
  * Follows the same singleton factory pattern as StorageService and NlpClient.
  *
@@ -12,8 +9,6 @@
  * getVFS() is kept for backward compatibility until Phase 9 caller rename.
  */
 
-import { isElectronRenderer } from "../utils/runtime-env";
-import { WebVFS } from "@/platform/browser/vfs";
 import { ElectronVFS } from "@/platform/electron-renderer/vfs";
 
 import type { VirtualFileSystem } from "./types";
@@ -22,17 +17,11 @@ let instance: VirtualFileSystem | null = null;
 
 /**
  * Get or create the global VFS instance.
- * Selects the appropriate implementation based on the runtime environment.
- *
  * @returns Singleton VirtualFileSystem instance
  */
 export function getVFS(): VirtualFileSystem {
   if (!instance) {
-    if (isElectronRenderer()) {
-      instance = new ElectronVFS();
-    } else {
-      instance = new WebVFS();
-    }
+    instance = new ElectronVFS();
   }
   return instance;
 }

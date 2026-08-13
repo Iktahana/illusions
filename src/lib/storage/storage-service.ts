@@ -1,27 +1,19 @@
 /**
  * Storage Service Factory.
- * Automatically detects environment and returns the appropriate storage provider.
+ * Provides the Electron renderer storage provider.
  * Provides a singleton instance for application-wide use.
  */
 
 import type { IStorageService } from "./storage-types";
-import { isElectronEnvironment } from "./storage-types";
-import WebStorageProvider from "@/platform/browser/storage";
 import ElectronStorageProvider from "@/platform/electron-renderer/storage";
 
 let instance: IStorageService | null = null;
 
 /**
- * Create a storage service provider based on the current environment.
- * - Electron renderer: Uses IPC-based storage (communicates with main process SQLite)
- * - Browser: Uses IndexedDB-based storage
+ * Create the IPC-based storage provider backed by main-process SQLite.
  */
 export function createStorageService(): IStorageService {
-  if (isElectronEnvironment()) {
-    return new ElectronStorageProvider();
-  } else {
-    return new WebStorageProvider();
-  }
+  return new ElectronStorageProvider();
 }
 
 /**

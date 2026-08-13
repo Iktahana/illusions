@@ -3,7 +3,7 @@ title: 文書化ギャップマップ
 slug: documentation-gap-map
 type: architecture
 status: active
-updated: 2026-04-06
+updated: 2026-08-13
 tags:
   - architecture
   - docs
@@ -42,11 +42,11 @@ tags:
 
 ### Account / auth
 
-Web OAuth と account settings はありますが、製品契約面やクラウド同期の範囲がまだ十分に文書化できるほど固まっていない可能性があります。
+Electron OAuth と account settings はありますが、製品契約面やクラウド同期の範囲がまだ十分に文書化できるほど固まっていない可能性があります。
 
 既存の主な入口:
 
-- `lib/auth/web-auth.ts`
+- `lib/auth/electron-session.ts`
 - `components/settings/AccountSettingsTab.tsx`
 - `contexts/AuthContext`
 
