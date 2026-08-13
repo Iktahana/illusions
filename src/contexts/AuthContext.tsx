@@ -6,7 +6,6 @@
  * All session logic lives in `lib/auth/`:
  * - `use-auth-session.ts` — session state controller (restore / refresh / login / logout)
  * - `electron-session.ts` — Electron adapter (safeStorage tokens + auth IPC)
- * - `web-session.ts` — Web adapter (httpOnly cookies via API routes)
  * - `refresh-scheduler.ts` — refresh timer with guaranteed cleanup
  */
 

@@ -4,8 +4,8 @@
  * Auth session controller hook.
  *
  * Orchestrates startup restore, refresh scheduling, the Electron OAuth
- * callback, and the login/logout entry points on top of the platform
- * adapters (`electron-session.ts` for Electron, `web-session.ts` for Web).
+ * callback, and the login/logout entry points on top of the Electron session
+ * adapter (`electron-session.ts`).
  * `AuthProvider` is a thin wrapper around this hook.
  *
  * Lifecycle guarantees (#1567):
@@ -19,12 +19,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isElectronDevelopment, isElectronRenderer } from "@/lib/utils/runtime-env";
+import { isElectronDevelopment } from "@/lib/utils/runtime-env";
 import { classifyTelemetryError, trackUsageEvent } from "@/lib/analytics/usage-events";
 import {
   completeElectronOAuthCallback,
   getElectronAuthApi,
   refreshElectronSession,
+  requireElectronAuthApi,
   restoreElectronSession,
 } from "./electron-session";
 import { isElectronAuthErrorPermanent, resetRefreshState } from "./refresh-single-flight";
@@ -35,7 +36,6 @@ import {
   isSessionInvalidatedError,
 } from "./session-epoch";
 import { clearTokens } from "./token-storage";
-import { fetchMe, webLogout } from "./web-session";
 import type { AuthUser } from "./auth-user";
 import type { RefreshScheduler } from "./refresh-scheduler";
 
@@ -51,7 +51,6 @@ export function useAuthSession(): AuthSessionState {
   const [isLoading, setIsLoading] = useState(true);
   /** Per-mount scheduler; null before mount and after unmount (disposed). */
   const schedulerRef = useRef<RefreshScheduler | null>(null);
-  const isElectron = useRef(false);
 
   // --- Electron refresh cycle ---
   const scheduleElectronRefresh = useCallback((expiresAt: number, refreshToken: string): void => {
@@ -86,68 +85,28 @@ export function useAuthSession(): AuthSessionState {
     });
   }, []);
 
-  // --- Web refresh cycle ---
-  const scheduleWebRefresh = useCallback((expiresAt: number): void => {
-    schedulerRef.current?.schedule(expiresAt, async () => {
-      const epochAtStart = getSessionEpoch();
-      const me = await fetchMe();
-      // Unmounted or logged out while probing — discard the result.
-      if (!schedulerRef.current || getSessionEpoch() !== epochAtStart) return;
-      if (me.authenticated && me.user) {
-        setUser(me.user);
-        trackUsageEvent("auth_refresh_completed", { surface: "startup" });
-        if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
-      } else if (me.permanent) {
-        // Permanent failure (401/403): token is invalid — log out
-        setUser(null);
-      } else {
-        // Transient failure (5xx / network): keep session, retry after the floor delay
-        scheduleWebRefresh(expiresAt);
-      }
-    });
-  }, []);
-
   // --- Initialize auth state on mount ---
   useEffect(() => {
     const scheduler = createRefreshScheduler();
     schedulerRef.current = scheduler;
     let cancelled = false;
 
-    const electron = isElectronRenderer();
-    isElectron.current = electron;
-
     async function restore(): Promise<void> {
       const epochAtStart = getSessionEpoch();
       try {
-        if (electron) {
-          // The unsigned development host can block Electron's main thread in
-          // macOS Keychain while safeStorage decrypts a persisted production
-          // token. Skip only the automatic dev restore; explicit login still
-          // works, and packaged beta/stable builds keep persistent sessions.
-          const session = isElectronDevelopment()
-            ? null
-            : await restoreElectronSession(epochAtStart);
-          if (cancelled || getSessionEpoch() !== epochAtStart) return;
-          if (session) {
-            setUser(session.user);
-            trackUsageEvent("auth_session_restored", {
-              surface: "startup",
-              strategy: "electron_tokens",
-            });
-            scheduleElectronRefresh(session.expiresAt, session.refreshToken);
-          }
-        } else {
-          // Web: check session via httpOnly cookies
-          const me = await fetchMe();
-          if (cancelled || getSessionEpoch() !== epochAtStart) return;
-          if (me.authenticated && me.user) {
-            setUser(me.user);
-            trackUsageEvent("auth_session_restored", {
-              surface: "startup",
-              strategy: "web_cookie",
-            });
-            if (me.expiresAt) scheduleWebRefresh(me.expiresAt);
-          }
+        // The unsigned development host can block Electron's main thread in
+        // macOS Keychain while safeStorage decrypts a persisted production
+        // token. Skip only the automatic dev restore; explicit login still
+        // works, and packaged beta/stable builds keep persistent sessions.
+        const session = isElectronDevelopment() ? null : await restoreElectronSession(epochAtStart);
+        if (cancelled || getSessionEpoch() !== epochAtStart) return;
+        if (session) {
+          setUser(session.user);
+          trackUsageEvent("auth_session_restored", {
+            surface: "startup",
+            strategy: "electron_tokens",
+          });
+          scheduleElectronRefresh(session.expiresAt, session.refreshToken);
         }
       } catch (err) {
         // Silently fail — startup restore must never crash the provider
@@ -173,12 +132,10 @@ export function useAuthSession(): AuthSessionState {
         schedulerRef.current = null;
       }
     };
-  }, [scheduleElectronRefresh, scheduleWebRefresh]);
+  }, [scheduleElectronRefresh]);
 
   // --- Listen for Electron OAuth callback (Electron only) ---
   useEffect(() => {
-    if (!isElectron.current) return;
-
     const authApi = getElectronAuthApi();
     if (!authApi) return;
 
@@ -224,32 +181,15 @@ export function useAuthSession(): AuthSessionState {
   // --- Login ---
   const login = useCallback(async (): Promise<void> => {
     trackUsageEvent("auth_login_started", { surface: "settings" });
-    if (isElectron.current) {
-      const authApi = getElectronAuthApi();
-      if (!authApi) return;
-      try {
-        await authApi.startLogin();
-      } catch (err) {
-        trackUsageEvent("auth_login_failed", {
-          surface: "settings",
-          stage: "start",
-          reason: classifyTelemetryError(err),
-        });
-        throw err;
-      }
-    } else {
-      // Dynamic import to avoid bundling web-auth in Electron builds
-      const { startWebLogin } = await import("./web-auth");
-      try {
-        await startWebLogin();
-      } catch (err) {
-        trackUsageEvent("auth_login_failed", {
-          surface: "settings",
-          stage: "start",
-          reason: classifyTelemetryError(err),
-        });
-        throw err;
-      }
+    try {
+      await requireElectronAuthApi().startLogin();
+    } catch (err) {
+      trackUsageEvent("auth_login_failed", {
+        surface: "settings",
+        stage: "start",
+        reason: classifyTelemetryError(err),
+      });
+      throw err;
     }
   }, []);
 
@@ -265,14 +205,8 @@ export function useAuthSession(): AuthSessionState {
     resetRefreshState();
 
     try {
-      if (isElectron.current) {
-        const authApi = getElectronAuthApi();
-        if (!authApi) return;
-        await authApi.logout();
-        await clearTokens();
-      } else {
-        await webLogout();
-      }
+      await requireElectronAuthApi().logout();
+      await clearTokens();
     } catch (err) {
       trackUsageEvent("auth_logout_failed", {
         surface: "settings",

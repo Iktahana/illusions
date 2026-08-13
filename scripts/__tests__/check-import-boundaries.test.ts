@@ -68,10 +68,10 @@ describe("import boundary checker", () => {
       ).toBeNull();
     });
 
-    it("normalizes src paths before matching exact browser-platform exceptions", () => {
+    it("normalizes src paths before enforcing browser-platform boundaries", () => {
       expect(
         validateImportBoundary("src/lib/storage/storage-service.ts", "@/platform/browser/storage"),
-      ).toBeNull();
+      ).toContain("browser-platform");
       expect(
         validateImportBoundary("src/lib/storage/another-service.ts", "@/platform/browser/storage"),
       ).toContain("browser-platform");

@@ -1,19 +1,16 @@
 /**
  * NLP Client Factory
  *
- * Automatically selects the appropriate NLP client based on environment:
- * - Electron: Uses ElectronNlpClient (IPC communication)
- * - Web: Uses WebNlpClient (HTTP API calls)
+ * Provides the Electron renderer NLP client backed by IPC.
  */
 
 import type { INlpClient } from "./types";
-import { WebNlpClient } from "@/platform/browser/nlp-client";
 import { ElectronNlpClient } from "@/platform/electron-renderer/nlp-client";
 
 let cachedClient: INlpClient | null = null;
 
 /**
- * Get the appropriate NLP client for current environment
+ * Get the Electron NLP client.
  *
  * @returns Singleton NLP client instance
  */
@@ -22,19 +19,8 @@ export function getNlpClient(): INlpClient {
     return cachedClient;
   }
 
-  // Detect environment
-  const isElectron = typeof window !== "undefined" && window.electronAPI?.isElectron === true;
-
-  let client: INlpClient;
-
-  if (isElectron) {
-    client = new ElectronNlpClient();
-  } else {
-    client = new WebNlpClient();
-  }
-
-  cachedClient = client;
-  return client;
+  cachedClient = new ElectronNlpClient();
+  return cachedClient;
 }
 
 /**

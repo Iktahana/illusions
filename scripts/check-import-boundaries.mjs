@@ -32,11 +32,7 @@ export const LEGACY_BROWSER_PLATFORM_IMPORTS = new Map([
     "lib/editor-page/__tests__/project-search-vfs-integration.test.ts",
     new Set(["@/platform/browser/vfs"]),
   ],
-  ["lib/nlp-client/nlp-client.ts", new Set(["@/platform/browser/nlp-client"])],
   ["lib/project/project-manager.ts", new Set(["@/platform/browser/storage"])],
-  ["lib/storage/__tests__/storage-service.test.ts", new Set(["@/platform/browser/storage"])],
-  ["lib/storage/storage-service.ts", new Set(["@/platform/browser/storage"])],
-  ["lib/vfs/index.ts", new Set(["@/platform/browser/vfs"])],
   ["platform/browser/__tests__/storage.test.ts", new Set(["@/platform/browser/storage"])],
   ["platform/browser/__tests__/vfs-exists.test.ts", new Set(["@/platform/browser/vfs"])],
 ]);

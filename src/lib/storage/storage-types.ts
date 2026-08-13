@@ -405,11 +405,3 @@ export interface IStorageService {
    */
   clearAll(): Promise<void>;
 }
-
-/**
- * Electron環境かどうかを判定する型ガード。
- */
-export function isElectronEnvironment(): boolean {
-  if (typeof window === "undefined") return false;
-  return typeof (window as Window & { electronAPI?: unknown }).electronAPI !== "undefined";
-}
