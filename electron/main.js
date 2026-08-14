@@ -59,7 +59,8 @@ const { DICT_CHANNELS, POWER_CHANNELS, RULESETS_CHANNELS } = require("./lib/ipc-
 // initialize() は app.whenReady() より前に呼ぶ必要がある（内部でカスタムプロトコルを
 // privileged scheme として登録するため）。App Key はビルド時に esbuild の define で
 // 埋め込まれる（scripts/bundle-electron.mjs）。未設定（OSSビルド等）の場合は計測を無効化する。
-const APTABASE_APP_KEY = process.env.APTABASE_APP_KEY || "";
+const IS_E2E = process.env.ILLUSIONS_E2E === "1";
+const APTABASE_APP_KEY = IS_E2E ? "" : process.env.APTABASE_APP_KEY || "";
 const APTABASE_HOST = process.env.APTABASE_HOST || "";
 if (APTABASE_APP_KEY) {
   const { initialize: initializeAnalytics } = require("@aptabase/electron/main");
@@ -82,11 +83,12 @@ function bucketSessionDuration(ms) {
   return "gte_60m";
 }
 
-initializeErrorReporting({
-  dsn: process.env.ERROR_REPORT_DSN || "",
-  getStorageManager,
-  getRelease: () => app.getVersion(),
-});
+if (!IS_E2E)
+  initializeErrorReporting({
+    dsn: process.env.ERROR_REPORT_DSN || "",
+    getStorageManager,
+    getRelease: () => app.getVersion(),
+  });
 
 process.on("uncaughtException", (err) => {
   console.error("[FATAL] Uncaught exception:", err);
@@ -214,7 +216,7 @@ app.whenReady().then(async () => {
             // ために必要（dynamic import は worker-src ではなく script-src で評価される）。
             // blob は同一オリジンのスクリプトからしか生成できず、ルールセットは
             // sha256 検証済みコードのみを Blob 化するため XSS 面は限定的。
-            `script-src 'self' 'unsafe-inline' blob:${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
+            `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:${isDev && !app.isPackaged ? " 'unsafe-eval'" : ""}`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
@@ -313,11 +315,11 @@ app.whenReady().then(async () => {
   powerMonitor.on("lock-screen", () => broadcastPowerEvent(POWER_CHANNELS.event.lockScreen));
 
   // ウィンドウ作成後に auto-updater を初期化
-  setupAutoUpdater();
+  if (!IS_E2E) setupAutoUpdater();
 
   // 起動時に自動でアップデート確認（少し遅らせる）
   setTimeout(() => {
-    checkForUpdates(false);
+    if (!IS_E2E) checkForUpdates(false);
   }, 3000);
 
   // 辞典データ更新確認（AppState の dictAutoCheckUpdates が true の場合のみ）
