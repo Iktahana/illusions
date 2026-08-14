@@ -168,6 +168,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       openExternal: "open-external",
       openDictionaryPopup: "open-dictionary-popup",
       showContextMenu: "show-context-menu",
+      showEditorContextMenu: "show-editor-context-menu",
     });
     expect(SHELL_CHANNELS.event).toEqual({});
   });
