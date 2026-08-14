@@ -45,7 +45,7 @@ Save As は source を変換する操作ではない。`.mdi` / `.md` / `.txt` �
 
 ### upstream MDI block support
 
-`@illusions-lab/milkdown-plugin-mdi@0.2.0` から空白段落、改頁／改丁、字下げ／地付きが semantic
+`@illusions-lab/milkdown-plugin-mdi@0.4.0` では空白段落、改頁／改丁、字下げ／地付きが semantic
 Milkdown block node または paragraph attribute として提供される。Illusions は package の schema と
 logical CSS をそのまま使用し、fallback parser / schema / serializer を追加しない。blank、三種の
 pagebreak、indent、bottom は実 package の parse → DOM → canonical serialize conformance test で固定する。
@@ -57,11 +57,11 @@ Unicode grapheme 座標 `block:grapheme` だけを使う。heading、paragraph�
 table、footnote、HTML、other は同じ列に属する。React、ProseMirror traversal、CSS counter で別の
 「段落番号」を算出してはいけない。
 
-公開中の plugin は Rust block metadata と editable Milkdown node / decoration の対応をまだ提供しない。
-この bridge は [upstream #10](https://github.com/illusions-lab/milkdown-plugin-mdi/issues/10) で追跡する。
-対応するまでは番号表示を無効化し、検索結果にも DOM 由来の paragraph number や line number を
-block position として表示しない。bridge は `@illusions-lab/mdi` の index、kind、range、span、source
-map、version metadata を原樣に運ぶだけとし、新しい座標、ID、block model を定義しない。
+`@illusions-lab/milkdown-plugin-mdi@0.4.0` の provenance bridge は、Rust の source span をそれを生成した
+Milkdown node の範囲へ対応付ける。Illusions の番号 decoration は `getMdiTextBlocks()` の index と span を
+batch mapping API に渡して表示するだけであり、DOM traversal、文字列一致、substring、source-order
+heuristic、CSS counter を使わない。検索や機械編集も同じ bridge を利用し、新しい座標、ID、block model
+を定義してはならない。
 
 ## Writing mode
 

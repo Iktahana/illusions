@@ -7,13 +7,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
 
+let showParagraphNumbers = false;
+
 vi.mock("@/contexts/EditorSettingsContext", () => ({
   useTypographySettings: () => ({
     fontFamily: "Noto Serif JP",
     fontScale: 100,
     lineHeight: 1.8,
     paragraphSpacing: 0.5,
-    showParagraphNumbers: false,
+    showParagraphNumbers,
     textIndent: 1,
   }),
 }));
@@ -72,6 +74,7 @@ describe("MilkdownEditor real runtime", () => {
   };
 
   beforeEach(() => {
+    showParagraphNumbers = false;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -178,7 +181,7 @@ describe("MilkdownEditor real runtime", () => {
     expect(views[1].state.doc.textContent).toContain("^12^");
   });
 
-  it("keeps MDI 0.2 block nodes semantic across writing mode and external replacement", async () => {
+  it("keeps MDI 0.4 block nodes semantic across writing mode and external replacement", async () => {
     await getDocumentAdapter("mdi").initialize();
     const views: EditorView[] = [];
     let flush: (() => string | null) | null = null;
@@ -233,6 +236,67 @@ describe("MilkdownEditor real runtime", () => {
     expect(container.querySelector('p.mdi-bottom[data-mdi-bottom="3"]')).not.toBeNull();
     expect(container.querySelector('hr.mdi-pagebreak[data-mdi-variant="left"]')).not.toBeNull();
     expect(runFlush(flush)).toBe(replacement);
+  });
+
+  it("renders every Rust-owned text block index through provenance and refreshes decorations", async () => {
+    await getDocumentAdapter("mdi").initialize();
+    showParagraphNumbers = true;
+    const views: EditorView[] = [];
+    const initial = [
+      "# 重複",
+      "",
+      "重複",
+      "",
+      "- 重複",
+      "",
+      "> 重複",
+      "",
+      "[[pagebreak]]",
+      "",
+    ].join("\n");
+    const props: RuntimeProps = {
+      documentFormat: "mdi",
+      initialContent: initial,
+      isVertical: false,
+      lineLength: 40,
+      onEditorViewReady: (view) => views.push(view),
+    };
+
+    await render(props);
+    await waitFor(() => expect(views).toHaveLength(1));
+    await waitFor(() => {
+      const labels = [...container.querySelectorAll<HTMLElement>(".mdi-block-number")];
+      expect(labels.map((label) => label.dataset.mdiBlockIndex)).toEqual(["1", "2", "3", "4"]);
+      expect(labels.map((label) => label.dataset.mdiBlockKind)).toEqual([
+        "heading",
+        "paragraph",
+        "listItem",
+        "blockquote",
+      ]);
+    });
+
+    const replacement = "# 新見出し\n\n新本文。\n\n[[pagebreak:right]]\n";
+    const onExternalContentApplied = vi.fn();
+    await render({ ...props, externalContent: replacement, onExternalContentApplied });
+    await waitFor(() => expect(onExternalContentApplied).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      const labels = [...container.querySelectorAll<HTMLElement>(".mdi-block-number")];
+      expect(labels.map((label) => label.dataset.mdiBlockIndex)).toEqual(["1", "2"]);
+      expect(labels.map((label) => label.dataset.mdiBlockKind)).toEqual(["heading", "paragraph"]);
+    });
+
+    await render({ ...props, externalContent: null, isVertical: true });
+    await waitFor(() =>
+      expect(
+        [...container.querySelectorAll<HTMLElement>(".mdi-block-number")].map(
+          (label) => label.dataset.mdiBlockIndex,
+        ),
+      ).toEqual(["1", "2"]),
+    );
+
+    showParagraphNumbers = false;
+    await render({ ...props, externalContent: null, isVertical: true });
+    await waitFor(() => expect(container.querySelectorAll(".mdi-block-number")).toHaveLength(0));
   });
 
   it("destroys and remounts a fresh real editor view", async () => {

@@ -74,7 +74,9 @@ Electron 環境で、ファイルやディレクトリをアプリにドラッ�
   適用しません。
 - CSS counter、DOM 順序、ProseMirror traversal、source line number から機械編集用の block position を
   作りません。
-- Rust metadata と editable node の bridge が upstream #10 で提供されるまでは、区画位置 UI は無効です。
+- `@illusions-lab/milkdown-plugin-mdi@0.4.0` の provenance bridge で Rust source span を editable
+  node range に対応付けます。区画位置 UI は `getMdiTextBlocks()` の index と span を batch mapping API に
+  渡すだけとし、DOM traversal、文字列一致、CSS counter、独自 block ID を使用しません。
 
 ## 終了処理 (Termination)
 

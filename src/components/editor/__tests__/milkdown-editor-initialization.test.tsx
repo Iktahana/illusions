@@ -84,6 +84,7 @@ vi.mock("@milkdown/plugin-listener", () => ({
 vi.mock("@milkdown/preset-commonmark", () => ({ commonmark: Symbol("commonmark") }));
 vi.mock("@milkdown/theme-nord", () => ({ nord: Symbol("nord") }));
 vi.mock("@milkdown/utils", () => ({
+  $prose: vi.fn(() => Symbol("prose")),
   replaceAll: (value: string) => ({ kind: "replace-all", value }),
 }));
 vi.mock("@illusions-lab/milkdown-plugin-vertical-writing", () => ({
@@ -140,10 +141,12 @@ describe("MilkdownEditor initialization lifecycle", () => {
     render({ onEditorViewReady });
     act(() => vi.runAllTimers());
 
-    expect(editor.action.mock.calls.map(([command]) => command)).toEqual([
+    const commands = editor.action.mock.calls.map(([command]) => command);
+    expect(commands.slice(0, 2)).toEqual([
       { kind: "writing-mode", value: "horizontal-tb" },
       { kind: "line-length", value: 40 },
     ]);
+    expect(commands[2]).toEqual(expect.any(Function));
     expect(onEditorViewReady).toHaveBeenCalledWith(expect.objectContaining({ id: "first" }));
   });
 
