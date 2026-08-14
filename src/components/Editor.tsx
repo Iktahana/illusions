@@ -14,6 +14,7 @@ import type { DocumentFormat } from "@/lib/document-format";
 import { getDocumentAdapter } from "@/lib/document-format";
 import { EditorInteractionStore, type EditorInteractionHandle } from "@/lib/editor-interaction";
 import { EditorInteractionProvider } from "@/lib/editor-interaction/context";
+import EditorToolbar from "./editor/EditorToolbar";
 
 interface EditorProps {
   initialContent?: string;
@@ -83,8 +84,14 @@ export default function NovelEditor({
   }, [registerWritingModeToggle, toggleWritingMode]);
 
   return (
-    <div className={clsx("h-full min-h-0 overflow-hidden bg-background-secondary", className)}>
+    <div
+      className={clsx(
+        "flex h-full min-h-0 flex-col overflow-hidden bg-background-secondary",
+        className,
+      )}
+    >
       <EditorInteractionProvider value={interaction}>
+        <EditorToolbar isVertical={isVertical} onToggleWritingMode={toggleWritingMode} />
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
             <MilkdownEditor

@@ -36,6 +36,8 @@ export default defineConfig({
         "src/lib/editor-interaction/**/*.tsx",
         "src/components/Editor.tsx",
         "src/components/editor/MilkdownEditor.tsx",
+        "src/components/editor/EditorToolbar.tsx",
+        "src/components/editor/ValuePicker.tsx",
       ],
       exclude: [
         "**/__tests__/**",

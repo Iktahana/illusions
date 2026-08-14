@@ -28,7 +28,6 @@ describe("new editor core boundary", () => {
     const removedFeatures = [
       "BubbleMenu",
       "EditorContextMenu",
-      "EditorToolbar",
       "SelectionCounter",
       "linting-plugin",
       "novel-editor-features",
@@ -45,7 +44,6 @@ describe("new editor core boundary", () => {
     const removedPaths = [
       "src/components/BubbleMenu.tsx",
       "src/components/EditorContextMenu.tsx",
-      "src/components/editor/EditorToolbar.tsx",
       "src/lib/editor-page/linting-plugin/index.ts",
       "src/lib/editor-page/novel-editor-features/index.ts",
       "src/lib/editor-page/pos-highlight/index.ts",
