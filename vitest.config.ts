@@ -17,14 +17,26 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, ".claude/worktrees/**", ".worktrees/**"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "lcov", "html"],
+      reporter: ["text", "lcov", "html", "json-summary"],
+      reportOnFailure: true,
       thresholds: {
         lines: 60,
         functions: 60,
         branches: 50,
         statements: 60,
+        "src/lib/editor-interaction/**/*.{ts,tsx}": {
+          lines: 85,
+          functions: 85,
+          branches: 75,
+          statements: 85,
+        },
       },
-      include: ["src/lib/**/*.ts", "src/components/editor/MilkdownEditor.tsx"],
+      include: [
+        "src/lib/**/*.ts",
+        "src/lib/editor-interaction/**/*.tsx",
+        "src/components/Editor.tsx",
+        "src/components/editor/MilkdownEditor.tsx",
+      ],
       exclude: [
         "**/__tests__/**",
         "**/node_modules/**",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Editor, defaultValueCtx, editorViewCtx, rootCtx, serializerCtx } from "@milkdown/core";
 import { clipboard } from "@milkdown/plugin-clipboard";
 import { history } from "@milkdown/plugin-history";
@@ -10,7 +10,7 @@ import type { Node as ProseNode } from "@milkdown/prose/model";
 import type { EditorView } from "@milkdown/prose/view";
 import { Milkdown, useEditor } from "@milkdown/react";
 import { nord } from "@milkdown/theme-nord";
-import { replaceAll } from "@milkdown/utils";
+import { $prose, replaceAll } from "@milkdown/utils";
 import {
   changeLineLength,
   changeWritingMode,
@@ -21,6 +21,7 @@ import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
 import { commitPendingComposition } from "@/lib/editor-page/commit-pending-composition";
 import { mdiBlockNumbers, setMdiBlockNumbers } from "@/lib/editor-page/mdi-block-numbers";
+import { createSelectionBridgePlugin, EditorInteractionStore } from "@/lib/editor-interaction";
 
 interface MilkdownEditorProps {
   initialContent: string;
@@ -32,6 +33,7 @@ interface MilkdownEditorProps {
   externalContent?: string | null;
   onExternalContentApplied?: () => void;
   registerFlush?: (flush: (() => string | null) | null) => void;
+  interaction?: EditorInteractionStore;
 }
 
 function encodeDocument(
@@ -58,10 +60,17 @@ export default function MilkdownEditor({
   externalContent,
   onExternalContentApplied,
   registerFlush,
+  interaction: providedInteraction,
 }: MilkdownEditorProps): React.ReactElement {
   const { fontScale, lineHeight, paragraphSpacing, showParagraphNumbers, textIndent, fontFamily } =
     useTypographySettings();
   const adapter = useMemo(() => getDocumentAdapter(documentFormat), [documentFormat]);
+  const fallbackEditorId = useId();
+  const fallbackInteraction = useMemo(
+    () => new EditorInteractionStore(fallbackEditorId, documentFormat, adapter),
+    [adapter, documentFormat, fallbackEditorId],
+  );
+  const interaction = providedInteraction ?? fallbackInteraction;
   const contentRef = useRef(initialContent);
   const onChangeRef = useRef(onChange);
   const viewRef = useRef<EditorView | null>(null);
@@ -82,6 +91,10 @@ export default function MilkdownEditor({
     };
   }
   const editorGeneration = editorGenerationRef.current.value;
+  const interactionBridge = useMemo(
+    () => $prose(() => createSelectionBridgePlugin(interaction)),
+    [interaction],
+  );
 
   onChangeRef.current = onChange;
   modeRef.current = isVertical;
@@ -119,7 +132,8 @@ export default function MilkdownEditor({
           }
         })
         .use(commonmark)
-        .use(mdiBlockNumbers);
+        .use(mdiBlockNumbers)
+        .use(interactionBridge);
 
       editor = adapter.configureEditor(editor);
       return editor
@@ -132,7 +146,7 @@ export default function MilkdownEditor({
         .use(history)
         .use(clipboard);
     },
-    [adapter, documentFormat],
+    [adapter, documentFormat, interactionBridge],
   );
   const isEditorReady = readyGeneration === editorGeneration && !editorHandle.loading;
   const getRef = useRef(editorHandle.get);
@@ -155,6 +169,7 @@ export default function MilkdownEditor({
         const view = get()?.ctx.get(editorViewCtx);
         if (view) {
           viewRef.current = view;
+          interaction.attach(view, editorGeneration, documentFormat, adapter);
           setReadyGeneration(editorGeneration);
           onEditorViewReady?.(view);
           return;
@@ -169,10 +184,19 @@ export default function MilkdownEditor({
     return () => {
       cancelled = true;
       viewRef.current = null;
+      interaction.detach();
       setReadyGeneration(null);
       if (timer) clearTimeout(timer);
     };
-  }, [editorGeneration, editorHandle.loading, get, onEditorViewReady]);
+  }, [
+    adapter,
+    documentFormat,
+    editorGeneration,
+    editorHandle.loading,
+    get,
+    interaction,
+    onEditorViewReady,
+  ]);
 
   useEffect(() => {
     if (!isEditorReady) return;
@@ -194,9 +218,25 @@ export default function MilkdownEditor({
     const editor = get();
     if (!editor) return;
     editor.action(replaceAll(externalContent));
+    interaction.detach();
+    interaction.attach(
+      editor.ctx.get(editorViewCtx),
+      editorGeneration + 1,
+      documentFormat,
+      adapter,
+    );
     contentRef.current = externalContent;
     onExternalContentApplied?.();
-  }, [externalContent, get, isEditorReady, onExternalContentApplied]);
+  }, [
+    adapter,
+    documentFormat,
+    editorGeneration,
+    externalContent,
+    get,
+    interaction,
+    isEditorReady,
+    onExternalContentApplied,
+  ]);
 
   useEffect(() => {
     if (!registerFlush) return;

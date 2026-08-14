@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import type { EditorView } from "@milkdown/prose/view";
@@ -11,6 +11,9 @@ import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 import { trackUsageEvent } from "@/lib/analytics/usage-events";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { DocumentFormat } from "@/lib/document-format";
+import { getDocumentAdapter } from "@/lib/document-format";
+import { EditorInteractionStore, type EditorInteractionHandle } from "@/lib/editor-interaction";
+import { EditorInteractionProvider } from "@/lib/editor-interaction/context";
 
 interface EditorProps {
   initialContent?: string;
@@ -22,6 +25,8 @@ interface EditorProps {
   onExternalContentApplied?: () => void;
   registerFlush?: (flush: (() => string | null) | null) => void;
   registerWritingModeToggle?: (toggle: (() => void) | null) => void;
+  active?: boolean;
+  registerInteraction?: (handle: EditorInteractionHandle | null) => void;
 }
 
 /** Minimal application shell around the package-owned Milkdown editor. */
@@ -35,12 +40,27 @@ export default function NovelEditor({
   onExternalContentApplied,
   registerFlush,
   registerWritingModeToggle,
+  active = true,
+  registerInteraction,
 }: EditorProps): React.ReactElement {
   const { charsPerLine } = useTypographySettings();
   const [isVertical, setIsVertical] = useState(() => {
     if (typeof window === "undefined") return false;
     return localPreferences.getWritingMode() === "vertical";
   });
+  const editorId = useId();
+  const interaction = useMemo(
+    () => new EditorInteractionStore(editorId, documentFormat, getDocumentAdapter(documentFormat)),
+    [documentFormat, editorId],
+  );
+  useEffect(() => {
+    interaction.setActive(active);
+  }, [active, interaction]);
+  useEffect(() => {
+    if (!active || !registerInteraction) return;
+    registerInteraction(interaction);
+    return () => registerInteraction(null);
+  }, [active, interaction, registerInteraction]);
 
   const toggleWritingMode = useCallback(() => {
     setIsVertical((current) => {
@@ -64,21 +84,24 @@ export default function NovelEditor({
 
   return (
     <div className={clsx("h-full min-h-0 overflow-hidden bg-background-secondary", className)}>
-      <MilkdownProvider>
-        <ProsemirrorAdapterProvider>
-          <MilkdownEditor
-            initialContent={initialContent}
-            onChange={onChange}
-            onEditorViewReady={onEditorViewReady}
-            documentFormat={documentFormat}
-            isVertical={isVertical}
-            lineLength={charsPerLine > 0 ? charsPerLine : null}
-            externalContent={externalContent}
-            onExternalContentApplied={onExternalContentApplied}
-            registerFlush={registerFlush}
-          />
-        </ProsemirrorAdapterProvider>
-      </MilkdownProvider>
+      <EditorInteractionProvider value={interaction}>
+        <MilkdownProvider>
+          <ProsemirrorAdapterProvider>
+            <MilkdownEditor
+              initialContent={initialContent}
+              onChange={onChange}
+              onEditorViewReady={onEditorViewReady}
+              documentFormat={documentFormat}
+              isVertical={isVertical}
+              lineLength={charsPerLine > 0 ? charsPerLine : null}
+              externalContent={externalContent}
+              onExternalContentApplied={onExternalContentApplied}
+              registerFlush={registerFlush}
+              interaction={interaction}
+            />
+          </ProsemirrorAdapterProvider>
+        </MilkdownProvider>
+      </EditorInteractionProvider>
     </div>
   );
 }
