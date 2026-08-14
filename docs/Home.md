@@ -36,6 +36,7 @@ illusions の実装・設計・仕様を整理したドキュメントです。
 - [[architecture/project-lifecycle|プロジェクトライフサイクル]]
 - [[architecture/readability-scoring|可読性スコアリング]]
 - [[architecture/text-statistics|テキスト統計]]
+- [[architecture/mdi-2-editor-audit|MDI 2.0 エディター統合監査]]
 - [[architecture/documentation-gap-map|文書化ギャップマップ]]
 - [[architecture/repository-structure|リポジトリ構造]]
 

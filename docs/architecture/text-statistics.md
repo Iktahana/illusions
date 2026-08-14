@@ -37,13 +37,13 @@ visibleText (可視本文のみ)
 
 ### モジュール構成
 
-| ファイル                                    | 役割                                                                                                                 |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `lib/editor-page/text-statistics.ts`        | Pure functions（副作用ゼロ）。テスト可能。                                                                           |
-| `lib/editor-page/use-text-statistics.ts`    | React hook。`computeTextStatistics` をメモ化して返す。                                                               |
-| `lib/editor-page/use-previous-day-stats.ts` | 前日スナップショット取得。同じ `computeTextStatistics` を使用。                                                      |
-| `lib/editor-page/use-selection-tracking.ts` | 選択文字数・原稿用紙マス数・枚数。`extractVisibleText` + `countVisibleChars` + `countManuscriptCells/Pages` を使用。 |
-| `components/inspector/StatsPanel.tsx`       | UI 表示のみ。計算は行わない。                                                                                        |
+| ファイル                                    | 役割                                                             |
+| ------------------------------------------- | ---------------------------------------------------------------- |
+| `lib/editor-page/text-statistics.ts`        | Pure functions（副作用ゼロ）。テスト可能。                       |
+| `lib/editor-page/use-text-statistics.ts`    | React hook。`computeTextStatistics` をメモ化して返す。           |
+| `lib/editor-page/use-previous-day-stats.ts` | 前日スナップショット取得。同じ `computeTextStatistics` を使用。  |
+| 選択範囲統計                                | 新 editor extension として再接続待ち。UI shell は 0 を表示する。 |
+| `components/inspector/StatsPanel.tsx`       | UI 表示のみ。計算は行わない。                                    |
 
 ---
 
@@ -161,7 +161,7 @@ Math.ceil(cells / 400)
 
 - `lib/editor-page/use-text-statistics.ts` — `computeTextStatistics` を使用
 - `lib/editor-page/use-previous-day-stats.ts` — `computeTextStatistics` を使用、`manuscriptPages` を保存
-- `lib/editor-page/use-selection-tracking.ts` — `extractVisibleText` + `countVisibleChars` + `countManuscriptCells/Pages` を使用。`onSelectionChange` コールバックのシグネチャが `(charCount, manuscriptCells, manuscriptPages)` に拡張。同じ文字数でも禁則処理でマス数が変わる場合に再発火するよう修正。
+- 選択範囲統計の旧 ProseMirror tracking 実装は削除。新 editor extension として再接続する。
 - `components/inspector/StatsPanel.tsx` — UI 文言修正、`manuscriptCellCount` 追加表示、選択時の原稿用紙枚数ブロック追加、前日比較値に `InfoTooltip` 追加
 - `components/inspector/types.ts` — `manuscriptCellCount`, `visibleTextCharCount`, `selectedManuscriptCells`, `selectedManuscriptPages` 型定義追加
 - `app/page.tsx` — 新統計 props を Inspector へ渡す
@@ -196,10 +196,10 @@ computeTextStatistics（統合）:
   401字 → 2ページ（420マス）
   Markdown 記法入り文章 → 記法を除いた字数
 
-selection tracking:
-  MDI 記法を含む選択範囲 → 可視本文ベースでカウント
-  同じ文字数でも禁則処理でマス数が異なる場合 → onSelectionChange 再発火
-  選択解除時 → onSelectionChange(0, 0, 0) を発火
+selection tracking（再接続時の必須契約）:
+  MDI 記法を含む選択範囲 → adapter projection ベースでカウント
+  `.md` / `.txt` に MDI semantics を適用しない
+  選択解除時 → 0 を通知
 ```
 
 ---
@@ -208,7 +208,8 @@ selection tracking:
 
 - 禁則処理は最大3パスで安定するまで繰り返す。極端な連鎖は未対応。
 - 行末禁則の「追い出し」で行が空になる場合は除去しない（最低1行を保持）。
-- `extractVisibleText` は正規表現ベース。ネストした MDI 記法（例: ルビの中のルビ）は想定外。
+- `.mdi` の `extractVisibleText` は Rust-owned `getMdiTextBlocks()` を使用する。Markdown のみ
+  CommonMark 表示近似の正規表現処理を使用し、TXT は literal source を返す。
 - `countManuscriptCells` の空白文字（スペース等）は「1マス」として扱う（`\n` のみ改行として扱う）。
-- 選択文字数は `state.doc.textBetween` から取得したテキストに `extractVisibleText` を適用する。ProseMirror がどこまでの記法を構造化するかによって精度が変わる可能性がある。
+- 選択文字数は現在未接続で、Inspector には 0 を渡す。
 - `lib/utils/index.ts` の `calculateManuscriptPages` / `countCharacters` は旧来の簡易実装であり、本機能の計算には使用しない。
