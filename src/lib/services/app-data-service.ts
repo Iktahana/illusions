@@ -22,6 +22,7 @@ import type {
   RecentFile,
   EditorBuffer,
   RecentProject,
+  StoredRecentProject,
 } from "@/lib/storage/storage-types";
 
 /**
@@ -32,7 +33,7 @@ import type {
  */
 export interface AppDataServiceInterface {
   /** 最近使ったプロジェクト一覧を取得する */
-  getRecentProjects(): Promise<RecentProject[]>;
+  getRecentProjects(): Promise<StoredRecentProject[]>;
   /** プロジェクトを最近使った一覧に追加/更新する */
   addRecentProject(project: RecentProject): Promise<void>;
   /** プロジェクトを最近使った一覧から削除する */
@@ -62,7 +63,7 @@ export interface AppDataServiceInterface {
  * AppDataService implementation — delegates to StorageService.
  */
 class AppDataServiceImpl implements AppDataServiceInterface {
-  getRecentProjects(): Promise<RecentProject[]> {
+  getRecentProjects(): Promise<StoredRecentProject[]> {
     return getStorageService().getRecentProjects();
   }
 

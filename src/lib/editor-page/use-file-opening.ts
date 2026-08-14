@@ -240,6 +240,18 @@ export function useFileOpening({
               restore_strategy: restored ? "recent" : "fresh",
             });
 
+            // Only a fully opened project advances its real recent-project timestamp.
+            try {
+              await storage.addRecentProject({
+                id: project.id,
+                rootPath: project.rootPath,
+                name: project.name,
+              });
+              void window.electronAPI?.rebuildMenu?.();
+            } catch (recentError) {
+              console.error("Failed to refresh recent project timestamp:", recentError);
+            }
+
             // Signal VFS ready AFTER tab restore — this ensures the standalone
             // mount-time restore sees projectTabsRestoredRef=true and skips.
             signalVfsReady();

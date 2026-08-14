@@ -12,6 +12,7 @@ import type {
   AppState,
   RecentFile,
   RecentProject,
+  StoredRecentProject,
   EditorBuffer,
 } from "@/lib/storage/storage-types";
 
@@ -411,7 +412,7 @@ export class WebStorageProvider implements IStorageService {
   /**
    * Returns empty array for Web. Project handles are managed by ProjectManager.
    */
-  async getRecentProjects(): Promise<RecentProject[]> {
+  async getRecentProjects(): Promise<StoredRecentProject[]> {
     // Web uses ProjectManager for directory handle persistence, not this API.
     return [];
   }
