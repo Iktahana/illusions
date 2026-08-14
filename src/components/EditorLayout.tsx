@@ -200,6 +200,7 @@ interface EditorLayoutProps {
     registerWritingModeToggle: NonNullable<
       React.ComponentProps<typeof NovelEditor>["registerWritingModeToggle"]
     >;
+    registerInteraction?: React.ComponentProps<typeof NovelEditor>["registerInteraction"];
   };
   inspector: {
     isRightPanelCollapsed: boolean;
@@ -588,6 +589,10 @@ export default function EditorLayout({
                                     isActivePanel ? mainArea.registerWritingModeToggle : undefined
                                   }
                                   documentFormat={panelDocumentFormat}
+                                  active={isActivePanel}
+                                  registerInteraction={
+                                    isActivePanel ? mainArea.registerInteraction : undefined
+                                  }
                                   externalContent={panelPendingExternalContent}
                                   onExternalContentApplied={() => {
                                     mainArea.updateTab(panelBufferId, {
