@@ -10,6 +10,8 @@ import type {
 } from "@/lib/linting/correction-config";
 import { DEFAULT_CORRECTION_CONFIG } from "@/lib/linting/correction-config";
 import { CORRECTION_MODES } from "@/lib/linting/correction-modes";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
+import { createDebouncedTelemetry } from "@/lib/analytics/debounced-telemetry";
 
 /**
  * Per-rule proofreading config as persisted in app state and edited from the
@@ -50,7 +52,7 @@ export interface AiSettingsHandlers {
   handleLintingModeConfigVersionChange: (version: number) => void;
   handleCharacterExtractionBatchSizeChange: (value: number) => void;
   handleCharacterExtractionConcurrencyChange: (value: number) => void;
-  handlePowerSaveModeChange: (enabled: boolean) => Promise<void>;
+  handlePowerSaveModeChange: (enabled: boolean, source?: "user" | "system") => Promise<void>;
   /** Lift power-save mode for a few minutes, then restore it (default 5 min). */
   temporarilyDisablePowerSave: (durationMs?: number) => void;
   handleAutoPowerSaveOnBatteryChange: (enabled: boolean) => void;
@@ -75,6 +77,21 @@ export interface UseAiSettingsResult {
  * correction config, and power-save mode (which coordinates linting state).
  */
 export function useAiSettings(): UseAiSettingsResult {
+  const [settingsTelemetry] = useState(() => createDebouncedTelemetry());
+  useEffect(() => () => settingsTelemetry.flush(), [settingsTelemetry]);
+  const reportSetting = useCallback(
+    (
+      category: "linting" | "ai_connection" | "power",
+      setting: "linting" | "ai_connection" | "power",
+      action: "enabled" | "disabled" | "updated",
+      debounce = false,
+    ) => {
+      const props = { category, setting, action } as const;
+      if (debounce) settingsTelemetry.schedule(setting, "settings_change_completed", props);
+      else trackUsageEvent("settings_change_completed", props);
+    },
+    [settingsTelemetry],
+  );
   const [lintingEnabled, setLintingEnabled] = useState(true);
   const [lintingRuleConfigs, setLintingRuleConfigs] = useState<Record<string, PersistedRuleConfig>>(
     {},
@@ -185,12 +202,15 @@ export function useAiSettings(): UseAiSettingsResult {
     }
   }, []);
 
-  const handleLintingEnabledChange = useCallback((value: boolean) => {
-    setLintingEnabled(value);
-    void persistAppState({ lintingEnabled: value }).catch((e) =>
-      console.error("Failed to persist lintingEnabled:", e),
-    );
-  }, []);
+  const handleLintingEnabledChange = useCallback(
+    (value: boolean) => {
+      setLintingEnabled(value);
+      void persistAppState({ lintingEnabled: value })
+        .then(() => reportSetting("linting", "linting", value ? "enabled" : "disabled"))
+        .catch((e) => console.error("Failed to persist lintingEnabled:", e));
+    },
+    [reportSetting],
+  );
 
   const handleCharacterExtractionBatchSizeChange = useCallback((value: number) => {
     const clamped = Math.max(1, Math.min(10, value));
@@ -208,26 +228,35 @@ export function useAiSettings(): UseAiSettingsResult {
     );
   }, []);
 
-  const handleAiApiKeyChange = useCallback((apiKey: string) => {
-    setAiApiKey(apiKey);
-    void persistAppState({ aiApiKey: apiKey }).catch((e) =>
-      console.error("Failed to persist aiApiKey:", e),
-    );
-  }, []);
+  const handleAiApiKeyChange = useCallback(
+    (apiKey: string) => {
+      setAiApiKey(apiKey);
+      void persistAppState({ aiApiKey: apiKey })
+        .then(() => reportSetting("ai_connection", "ai_connection", "updated", true))
+        .catch((e) => console.error("Failed to persist aiApiKey:", e));
+    },
+    [reportSetting],
+  );
 
-  const handleAiBaseUrlChange = useCallback((baseUrl: string) => {
-    setAiBaseUrl(baseUrl);
-    void persistAppState({ aiBaseUrl: baseUrl }).catch((e) =>
-      console.error("Failed to persist aiBaseUrl:", e),
-    );
-  }, []);
+  const handleAiBaseUrlChange = useCallback(
+    (baseUrl: string) => {
+      setAiBaseUrl(baseUrl);
+      void persistAppState({ aiBaseUrl: baseUrl })
+        .then(() => reportSetting("ai_connection", "ai_connection", "updated", true))
+        .catch((e) => console.error("Failed to persist aiBaseUrl:", e));
+    },
+    [reportSetting],
+  );
 
-  const handleAiModelIdChange = useCallback((modelId: string) => {
-    setAiModelId(modelId);
-    void persistAppState({ aiModelId: modelId }).catch((e) =>
-      console.error("Failed to persist aiModelId:", e),
-    );
-  }, []);
+  const handleAiModelIdChange = useCallback(
+    (modelId: string) => {
+      setAiModelId(modelId);
+      void persistAppState({ aiModelId: modelId })
+        .then(() => reportSetting("ai_connection", "ai_connection", "updated", true))
+        .catch((e) => console.error("Failed to persist aiModelId:", e));
+    },
+    [reportSetting],
+  );
 
   // Sync AI client configuration whenever relevant settings change
   useEffect(() => {
@@ -246,13 +275,13 @@ export function useAiSettings(): UseAiSettingsResult {
     (ruleId: string, config: PersistedRuleConfig) => {
       setLintingRuleConfigs((prev) => {
         const next = { ...prev, [ruleId]: config };
-        void persistAppState({ lintingRuleConfigs: next }).catch((e) =>
-          console.error("Failed to persist lintingRuleConfigs:", e),
-        );
+        void persistAppState({ lintingRuleConfigs: next })
+          .then(() => reportSetting("linting", "linting", "updated"))
+          .catch((e) => console.error("Failed to persist lintingRuleConfigs:", e));
         return next;
       });
     },
-    [],
+    [reportSetting],
   );
 
   const handleLintingRuleConfigsBatchChange = useCallback(
@@ -284,7 +313,7 @@ export function useAiSettings(): UseAiSettingsResult {
   }, []);
 
   const handlePowerSaveModeChange = useCallback(
-    async (enabled: boolean) => {
+    async (enabled: boolean, source: "user" | "system" = "user") => {
       // Any explicit power-save change cancels a pending "5-minute" re-enable
       // (e.g. the user plugged into AC, which auto-disables power-save).
       clearTempPowerSaveTimer();
@@ -328,8 +357,11 @@ export function useAiSettings(): UseAiSettingsResult {
         }
         setPowerSaveMode(false);
       }
+      if (source === "user") {
+        reportSetting("power", "power", enabled ? "enabled" : "disabled");
+      }
     },
-    [clearTempPowerSaveTimer],
+    [clearTempPowerSaveTimer, reportSetting],
   );
 
   /**
@@ -344,10 +376,10 @@ export function useAiSettings(): UseAiSettingsResult {
       // scheduling the re-enable, so the OFF state is committed first and the
       // re-enable's clobber guard never sees a stale "still on" ref.
       void (async () => {
-        await handlePowerSaveModeChange(false);
+        await handlePowerSaveModeChange(false, "system");
         tempPowerSaveTimerRef.current = setTimeout(() => {
           tempPowerSaveTimerRef.current = null;
-          void handlePowerSaveModeChange(true);
+          void handlePowerSaveModeChange(true, "system");
         }, durationMs);
       })();
     },
@@ -357,12 +389,15 @@ export function useAiSettings(): UseAiSettingsResult {
   // Clear the pending re-enable timer on unmount.
   useEffect(() => clearTempPowerSaveTimer, [clearTempPowerSaveTimer]);
 
-  const handleAutoPowerSaveOnBatteryChange = useCallback((enabled: boolean) => {
-    setAutoPowerSaveOnBattery(enabled);
-    void persistAppState({ autoPowerSaveOnBattery: enabled }).catch((e) =>
-      console.error("Failed to persist autoPowerSaveOnBattery:", e),
-    );
-  }, []);
+  const handleAutoPowerSaveOnBatteryChange = useCallback(
+    (enabled: boolean) => {
+      setAutoPowerSaveOnBattery(enabled);
+      void persistAppState({ autoPowerSaveOnBattery: enabled })
+        .then(() => reportSetting("power", "power", enabled ? "enabled" : "disabled"))
+        .catch((e) => console.error("Failed to persist autoPowerSaveOnBattery:", e));
+    },
+    [reportSetting],
+  );
 
   const handleCorrectionConfigChange = useCallback(
     (partial: Partial<CorrectionConfig>) => {
@@ -371,9 +406,11 @@ export function useAiSettings(): UseAiSettingsResult {
       void persistAppState({
         correctionMode: partial.mode ?? correctionMode,
         correctionGuidelines: partial.guidelines ?? correctionGuidelines,
-      }).catch((e) => console.error("Failed to persist correctionConfig:", e));
+      })
+        .then(() => reportSetting("linting", "linting", "updated"))
+        .catch((e) => console.error("Failed to persist correctionConfig:", e));
     },
-    [correctionMode, correctionGuidelines],
+    [correctionMode, correctionGuidelines, reportSetting],
   );
 
   return {

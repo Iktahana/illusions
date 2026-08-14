@@ -34,7 +34,11 @@ import {
   trackDocumentOutputFailure,
   trackDocumentOutputResult,
 } from "@/lib/analytics/document-output-events";
-import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
+import {
+  classifyTelemetryFailure,
+  normalizeTelemetryFileType,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
@@ -262,7 +266,7 @@ function EditorPageContent() {
   usePowerSaving({
     powerSaveMode,
     autoPowerSaveOnBattery,
-    onPowerSaveModeChange: handlePowerSaveModeChange,
+    onPowerSaveModeChange: (enabled) => void handlePowerSaveModeChange(enabled, "system"),
     // Suggest (never force) power-save on battery, so the user stays in
     // control and the mode can always be turned off (#1402 follow-up).
     onSuggestPowerSave: () => {
@@ -734,11 +738,19 @@ function EditorPageContent() {
   }, [tabOpenFile, incrementEditorKey]);
 
   const newFile = useCallback(
-    (fileType?: SupportedFileExtension) => {
+    (
+      fileType?: SupportedFileExtension,
+      surface: "menu" | "shortcut" | "empty_state" | "context_menu" = "menu",
+    ) => {
       tabNewFile(fileType);
       incrementEditorKey();
+      trackUsageEvent("file_new_created", {
+        surface,
+        file_type: normalizeTelemetryFileType(fileType ?? ".mdi"),
+        context: isProjectMode(editorMode) ? "project" : "standalone",
+      });
     },
-    [tabNewFile, incrementEditorKey],
+    [tabNewFile, incrementEditorKey, editorMode],
   );
 
   // --- Tab bar empty area context menu ---
@@ -767,7 +779,7 @@ function EditorPageContent() {
             setTopView("files");
             setNewFileTrigger((prev) => prev + 1);
           } else {
-            newTab();
+            newFile(undefined, "context_menu");
           }
           break;
         case "open-file":
@@ -778,7 +790,7 @@ function EditorPageContent() {
           break;
       }
     },
-    [editorMode, newTab, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger],
+    [editorMode, newFile, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger],
   );
 
   // Electron menu "New" and "Open" bindings (with safety checks)
@@ -1369,7 +1381,10 @@ function EditorPageContent() {
     incrementEditorKey,
     nextTab,
     prevTab,
-    newTab,
+    newTab: useCallback(
+      (fileType?: SupportedFileExtension) => newFile(fileType, "shortcut"),
+      [newFile],
+    ),
     closeTab,
     switchToIndex,
     tabs,
@@ -1566,6 +1581,7 @@ function EditorPageContent() {
                 isOpen={showPermissionPrompt}
                 projectName={permissionPromptData.projectName}
                 handle={permissionPromptData.handle}
+                source={permissionPromptData.source}
                 onGranted={handlePermissionGranted}
                 onDenied={handlePermissionDenied}
               />
@@ -1789,6 +1805,7 @@ function EditorPageContent() {
           tabs,
           editorMode,
           newTab,
+          newEmptyFile: () => newFile(undefined, "empty_state"),
           openFile,
           setNewFileTrigger,
           handleTabBarContextMenu,

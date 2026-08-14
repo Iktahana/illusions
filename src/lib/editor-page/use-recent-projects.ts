@@ -5,6 +5,7 @@ import { getStorageService } from "@/lib/storage/storage-service";
 import { formatLocation } from "@/lib/location/format-location";
 
 import type { RecentProjectEntry } from "./types";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export const RECENT_PROJECTS_LOAD_TIMEOUT_MS = 10_000;
 
@@ -141,7 +142,14 @@ export function useRecentProjects(
           }));
           setRecentProjects(entries);
         }
+        trackUsageEvent("recent_project_removal_completed", {
+          runtime: isElectron ? "desktop" : "web",
+        });
       } catch (error) {
+        trackUsageEvent("recent_project_removal_failed", {
+          runtime: isElectron ? "desktop" : "web",
+          reason: classifyTelemetryFailure(error),
+        });
         console.error("Failed to delete recent project:", error);
       }
     },

@@ -77,7 +77,7 @@ declare global {
     onMenuSave?: (callback: () => void) => (() => void) | void;
     onMenuSaveAs?: (callback: () => void) => (() => void) | void;
     onMenuCloseTab?: (callback: () => void) => (() => void) | void;
-    onMenuNewTab?: (callback: () => void) => (() => void) | void;
+    onMenuNewTab?: (callback: (source: "menu" | "shortcut") => void) => (() => void) | void;
     onMenuOpenSettings?: (callback: () => void) => (() => void) | void;
     onMenuOpenProject?: (callback: () => void) => (() => void) | void;
     onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;

@@ -33,6 +33,8 @@ type Surface =
   | "startup"
   | "shortcut"
   | "callback"
+  | "empty_state"
+  | "context_menu"
   | "unknown";
 type Mode = "project" | "standalone";
 type FileType = "mdi" | "md" | "txt" | "unknown";
@@ -108,6 +110,17 @@ export interface UsageEventPropsMap {
     restore_strategy: "fresh" | "recent" | "stored_handle" | "none";
   };
   project_auto_restore_failed: { reason: TelemetryReason };
+  project_upgrade_prompt_shown: { trigger: "first_save" | "character_threshold" };
+  project_upgrade_started: UsageEventPropsMap["project_upgrade_prompt_shown"];
+  project_upgrade_completed: UsageEventPropsMap["project_upgrade_prompt_shown"];
+  project_upgrade_cancelled: UsageEventPropsMap["project_upgrade_prompt_shown"];
+  project_upgrade_failed: UsageEventPropsMap["project_upgrade_prompt_shown"] & Failure;
+  web_project_permission_requested: { source: "recent" | "auto_restore" };
+  web_project_permission_finished: UsageEventPropsMap["web_project_permission_requested"] & {
+    outcome: "granted" | "denied" | "cancelled" | "failed";
+  };
+  recent_project_removal_completed: { runtime: "desktop" | "web" };
+  recent_project_removal_failed: UsageEventPropsMap["recent_project_removal_completed"] & Failure;
   file_new_created: { surface: Surface; file_type: FileType; context: Mode };
   file_open_started: UsageEventPropsMap["project_open_started"];
   file_open_completed: UsageEventPropsMap["file_open_started"] & { file_type: FileType };
@@ -177,6 +190,8 @@ export interface UsageEventPropsMap {
     setting:
       | "theme"
       | "typography"
+      | "autosave"
+      | "ai_connection"
       | "scroll"
       | "pos_highlight"
       | "linting"
@@ -203,7 +218,7 @@ export interface UsageEventPropsMap {
     mode: "single" | "all" | "undo";
   } & Failure;
   proofreading_run_completed: {
-    trigger: "first_auto" | "manual" | "settings_change";
+    trigger: "first_auto" | "manual" | "settings_change" | "runtime";
     issue_count_bucket: TelemetryCountBucket;
   };
   proofreading_run_failed: {
@@ -212,6 +227,12 @@ export interface UsageEventPropsMap {
   proofreading_issue_action_completed: {
     action: "navigate" | "apply_fix" | "ignore_one" | "ignore_all" | "add_dictionary";
   };
+  proofreading_ignore_memory_completed: {
+    operation: "restore_one" | "clear_all";
+    context: Mode;
+  };
+  proofreading_ignore_memory_failed: UsageEventPropsMap["proofreading_ignore_memory_completed"] &
+    Failure;
   ruleset_sync_completed: {
     trigger: "startup" | "manual" | "redownload";
     change_count_bucket: TelemetryCountBucket;
@@ -250,6 +271,9 @@ export interface UsageEventPropsMap {
   speech_session_started: { voice_kind: "default" | "custom" };
   speech_session_finished: UsageEventPropsMap["speech_session_started"] & {
     outcome: "completed" | "stopped" | "error";
+  };
+  external_file_conflict_resolved: {
+    outcome: "use_disk" | "keep_editor" | "closed_unresolved";
   };
   terminal_session_started: { context: Mode; shell_kind: "default" | "custom" };
   terminal_session_failed: UsageEventPropsMap["terminal_session_started"] & Failure;

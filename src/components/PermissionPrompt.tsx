@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { getPermissionManager } from "@/lib/services/permission-manager";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 import GlassDialog from "@/shared/ui/GlassDialog";
 
 interface PermissionPromptProps {
@@ -11,6 +12,7 @@ interface PermissionPromptProps {
   handle: FileSystemDirectoryHandle;
   onGranted: () => void;
   onDenied: () => void;
+  source: "recent" | "auto_restore";
 }
 
 /**
@@ -23,12 +25,14 @@ export default function PermissionPrompt({
   handle,
   onGranted,
   onDenied,
+  source,
 }: PermissionPromptProps) {
   const [isRequesting, setIsRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /** 権限リクエストを実行する */
   async function handleGrant(): Promise<void> {
+    trackUsageEvent("web_project_permission_requested", { source });
     setIsRequesting(true);
     setError(null);
 
@@ -37,11 +41,14 @@ export default function PermissionPrompt({
       const result = await permissionManager.requestWritePermission(handle);
 
       if (result.canWrite) {
+        trackUsageEvent("web_project_permission_finished", { source, outcome: "granted" });
         onGranted();
       } else {
+        trackUsageEvent("web_project_permission_finished", { source, outcome: "denied" });
         onDenied();
       }
     } catch (err) {
+      trackUsageEvent("web_project_permission_finished", { source, outcome: "failed" });
       const message =
         err instanceof Error ? err.message : "権限の取得中に不明なエラーが発生しました。";
       setError(message);
@@ -50,8 +57,13 @@ export default function PermissionPrompt({
     }
   }
 
+  const handleCancel = (): void => {
+    trackUsageEvent("web_project_permission_finished", { source, outcome: "cancelled" });
+    onDenied();
+  };
+
   return (
-    <GlassDialog isOpen={isOpen} onBackdropClick={isRequesting ? undefined : onDenied}>
+    <GlassDialog isOpen={isOpen} onBackdropClick={isRequesting ? undefined : handleCancel}>
       <h2 className="text-lg font-semibold text-foreground">アクセス許可が必要です</h2>
       <p className="mt-2 text-sm text-foreground-secondary">
         「{projectName}」のファイルにアクセスするには、ブラウザの許可が必要です。
@@ -69,7 +81,7 @@ export default function PermissionPrompt({
       <div className="mt-6 flex justify-end gap-3">
         <button
           type="button"
-          onClick={onDenied}
+          onClick={handleCancel}
           disabled={isRequesting}
           className="rounded-lg px-4 py-2 text-sm font-medium text-foreground-secondary hover:bg-hover transition-colors disabled:opacity-50"
         >

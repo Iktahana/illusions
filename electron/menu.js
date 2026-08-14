@@ -160,7 +160,11 @@ function buildClickHandler(item, sendToFocused) {
   if (item.electronChannel) {
     const channel = item.electronChannel;
     const args = item.electronArgs ?? [];
-    return () => {
+    return (_menuItem, _browserWindow, event) => {
+      if (item.id === "new-tab") {
+        sendToFocused(channel, event?.triggeredByAccelerator ? "shortcut" : "menu");
+        return;
+      }
       sendToFocused(channel, ...args);
     };
   }

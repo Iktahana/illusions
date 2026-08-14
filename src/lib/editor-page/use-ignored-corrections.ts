@@ -12,6 +12,7 @@ import { getIgnoredCorrectionsService } from "@/lib/services/ignored-corrections
 import { isProjectMode, isStandaloneMode } from "@/lib/project/project-types";
 import { hashString } from "@/shared/lib/hash-string";
 import type { EditorMode, IgnoredCorrection } from "@/lib/project/project-types";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export interface UseIgnoredCorrectionsResult {
   ignoredCorrections: IgnoredCorrection[];
@@ -148,15 +149,39 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
       if (editorMode && isProjectMode(editorMode)) {
         service
           .removeIgnoredCorrection(ruleId, text, context)
-          .then(setIgnoredCorrections)
-          .catch((err) => console.error("[useIgnoredCorrections] Failed to remove:", err));
+          .then((next) => {
+            setIgnoredCorrections(next);
+            trackUsageEvent("proofreading_ignore_memory_completed", {
+              operation: "restore_one",
+              context: "project",
+            });
+          })
+          .catch((err) => {
+            trackUsageEvent("proofreading_ignore_memory_failed", {
+              operation: "restore_one",
+              context: "project",
+              reason: classifyTelemetryFailure(err),
+            });
+            console.error("[useIgnoredCorrections] Failed to remove:", err);
+          });
       } else if (editorMode && isStandaloneMode(editorMode)) {
         service
           .removeIgnoredCorrectionStandalone(editorMode.fileName, ruleId, text, context)
-          .then(setIgnoredCorrections)
-          .catch((err) =>
-            console.error("[useIgnoredCorrections] Failed to remove standalone:", err),
-          );
+          .then((next) => {
+            setIgnoredCorrections(next);
+            trackUsageEvent("proofreading_ignore_memory_completed", {
+              operation: "restore_one",
+              context: "standalone",
+            });
+          })
+          .catch((err) => {
+            trackUsageEvent("proofreading_ignore_memory_failed", {
+              operation: "restore_one",
+              context: "standalone",
+              reason: classifyTelemetryFailure(err),
+            });
+            console.error("[useIgnoredCorrections] Failed to remove standalone:", err);
+          });
       }
     },
     [editorMode],
@@ -168,12 +193,38 @@ export function useIgnoredCorrections(editorMode: EditorMode): UseIgnoredCorrect
     mutationVersionRef.current += 1;
 
     if (editorMode && isProjectMode(editorMode)) {
-      await service.clearIgnoredCorrections();
-      setIgnoredCorrections([]);
+      try {
+        await service.clearIgnoredCorrections();
+        setIgnoredCorrections([]);
+        trackUsageEvent("proofreading_ignore_memory_completed", {
+          operation: "clear_all",
+          context: "project",
+        });
+      } catch (error) {
+        trackUsageEvent("proofreading_ignore_memory_failed", {
+          operation: "clear_all",
+          context: "project",
+          reason: classifyTelemetryFailure(error),
+        });
+        throw error;
+      }
     } else if (editorMode && isStandaloneMode(editorMode)) {
       // Standalone clears across ALL files, not just the current one.
-      await service.clearAllIgnoredCorrectionsStandalone();
-      setIgnoredCorrections([]);
+      try {
+        await service.clearAllIgnoredCorrectionsStandalone();
+        setIgnoredCorrections([]);
+        trackUsageEvent("proofreading_ignore_memory_completed", {
+          operation: "clear_all",
+          context: "standalone",
+        });
+      } catch (error) {
+        trackUsageEvent("proofreading_ignore_memory_failed", {
+          operation: "clear_all",
+          context: "standalone",
+          reason: classifyTelemetryFailure(error),
+        });
+        throw error;
+      }
     }
   }, [editorMode]);
 

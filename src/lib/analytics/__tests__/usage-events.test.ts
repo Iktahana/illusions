@@ -66,6 +66,16 @@ describe("usage analytics facade", () => {
     expect(isUsageEventName("document_output_with_private_path")).toBe(false);
   });
 
+  it("recognizes the anonymous result events for the newly instrumented workflows", async () => {
+    const { isUsageEventName } = await import("../usage-events");
+
+    expect(isUsageEventName("project_upgrade_completed")).toBe(true);
+    expect(isUsageEventName("web_project_permission_finished")).toBe(true);
+    expect(isUsageEventName("external_file_conflict_resolved")).toBe(true);
+    expect(isUsageEventName("proofreading_ignore_memory_failed")).toBe(true);
+    expect(isUsageEventName("recent_project_removal_completed")).toBe(true);
+  });
+
   it("maps raw errors to safe reason enums without exposing messages", async () => {
     const { classifyTelemetryError } = await import("../usage-events");
 
