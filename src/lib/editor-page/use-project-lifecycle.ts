@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from "react";
 import { getStorageService } from "@/lib/storage/storage-service";
 import { getProjectUpgradeService } from "@/lib/project/project-upgrade";
 import { isStandaloneMode } from "@/lib/project/project-types";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 import type {
   EditorMode,
@@ -130,11 +131,8 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
   }, []);
 
   // Upgrade banner
-  const { showUpgradeBanner, upgradeBannerDismissed, handleUpgradeDismiss } = useUpgradeBanner(
-    editorMode,
-    content,
-    lastSavedTime,
-  );
+  const { showUpgradeBanner, upgradeBannerDismissed, upgradeTrigger, handleUpgradeDismiss } =
+    useUpgradeBanner(editorMode, content, lastSavedTime);
 
   // Recent projects + auto-restore trigger
   const onNoRestore = useCallback(() => {
@@ -229,7 +227,8 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
   );
 
   const handleUpgrade = useCallback(async () => {
-    if (!isStandaloneMode(editorMode)) return;
+    if (!isStandaloneMode(editorMode) || !upgradeTrigger) return;
+    trackUsageEvent("project_upgrade_started", { trigger: upgradeTrigger });
     try {
       const upgradeService = getProjectUpgradeService();
       const project = await upgradeService.upgradeToProject(editorMode, content);
@@ -245,11 +244,19 @@ export function useProjectLifecycle(params: UseProjectLifecycleParams): UseProje
         });
         void window.electronAPI?.rebuildMenu?.();
       }
+      trackUsageEvent("project_upgrade_completed", { trigger: upgradeTrigger });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof DOMException && error.name === "AbortError") {
+        trackUsageEvent("project_upgrade_cancelled", { trigger: upgradeTrigger });
+        return;
+      }
+      trackUsageEvent("project_upgrade_failed", {
+        trigger: upgradeTrigger,
+        reason: classifyTelemetryFailure(error),
+      });
       console.error("Failed to upgrade to project:", error);
     }
-  }, [editorMode, content, setProjectMode, loadProjectContent, isElectron]);
+  }, [editorMode, content, setProjectMode, loadProjectContent, isElectron, upgradeTrigger]);
 
   return {
     state: {

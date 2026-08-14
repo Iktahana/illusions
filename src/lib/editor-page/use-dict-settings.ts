@@ -4,6 +4,7 @@
  */
 import { useCallback, useState } from "react";
 import { persistAppState } from "@/lib/storage/app-state-manager";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export interface DictSettings {
   dictAutoCheckUpdates: boolean;
@@ -48,16 +49,28 @@ export function useDictSettings(): UseDictSettingsResult {
 
   const handleDictAutoCheckUpdatesChange = useCallback((value: boolean) => {
     setDictAutoCheckUpdates(value);
-    void persistAppState({ dictAutoCheckUpdates: value }).catch((e: unknown) =>
-      console.error("辞書設定の保存に失敗しました", e),
-    );
+    void persistAppState({ dictAutoCheckUpdates: value })
+      .then(() =>
+        trackUsageEvent("settings_change_completed", {
+          category: "dictionary",
+          setting: "dictionary",
+          action: value ? "enabled" : "disabled",
+        }),
+      )
+      .catch((e: unknown) => console.error("辞書設定の保存に失敗しました", e));
   }, []);
 
   const handleDictAutoDownloadChange = useCallback((value: boolean) => {
     setDictAutoDownload(value);
-    void persistAppState({ dictAutoDownload: value }).catch((e: unknown) =>
-      console.error("辞書設定の保存に失敗しました", e),
-    );
+    void persistAppState({ dictAutoDownload: value })
+      .then(() =>
+        trackUsageEvent("settings_change_completed", {
+          category: "dictionary",
+          setting: "dictionary",
+          action: value ? "enabled" : "disabled",
+        }),
+      )
+      .catch((e: unknown) => console.error("辞書設定の保存に失敗しました", e));
   }, []);
 
   const handleDictInstalledVersionChange = useCallback((version: string | undefined) => {

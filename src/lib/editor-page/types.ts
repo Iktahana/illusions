@@ -18,4 +18,5 @@ export interface PermissionPromptState {
   projectName: string;
   handle: FileSystemDirectoryHandle;
   projectId: string;
+  source: "recent" | "auto_restore";
 }

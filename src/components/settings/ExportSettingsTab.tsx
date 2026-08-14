@@ -8,6 +8,7 @@ import {
   type PdfPreviewMaxPagesPreference,
 } from "@/lib/export/pdf-preview-limits";
 import { SelectField, SettingsSection } from "./primitives";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 const PDF_PREVIEW_PAGE_OPTIONS = [
   {
@@ -29,6 +30,11 @@ export default function ExportSettingsTab(): React.ReactElement {
   const handleChange = (value: PdfPreviewMaxPagesPreference) => {
     setMaxPages(value);
     localPreferences.setPdfPreviewMaxPages(value);
+    trackUsageEvent("settings_change_completed", {
+      category: "export",
+      setting: "export",
+      action: "updated",
+    });
   };
 
   return (

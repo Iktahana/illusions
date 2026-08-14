@@ -1,7 +1,11 @@
 import type { EditorView } from "@milkdown/prose/view";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { bucketTelemetryCount, trackUsageEvent } from "@/lib/analytics/usage-events";
+import {
+  bucketTelemetryCount,
+  classifyTelemetryFailure,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
@@ -102,6 +106,10 @@ export function useLinting(
 
   // Handle NLP tokenization errors — show a user-visible notification
   const handleNlpError = useCallback((error: Error) => {
+    trackUsageEvent("proofreading_run_failed", {
+      trigger: "runtime",
+      reason: classifyTelemetryFailure(error),
+    });
     console.error("[useLinting] NLP initialization/tokenization failed:", error);
     notificationManager.warning(
       "形態素解析の初期化に失敗しました。一部の校正ルール（L2）が無効になっています。",

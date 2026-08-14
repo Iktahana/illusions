@@ -1,8 +1,9 @@
 import type { Dispatch, SetStateAction } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { persistAppState } from "@/lib/storage/app-state-manager";
 import { trackUsageEvent } from "@/lib/analytics/usage-events";
+import { createDebouncedTelemetry } from "@/lib/analytics/debounced-telemetry";
 
 export interface DisplaySettings {
   fontScale: number;
@@ -100,6 +101,31 @@ export interface UseDisplaySettingsResult {
  * @param incrementEditorKey - called after settings that require an editor remount
  */
 export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySettingsResult {
+  const [settingsTelemetry] = useState(() => createDebouncedTelemetry());
+  useEffect(() => () => settingsTelemetry.flush(), [settingsTelemetry]);
+
+  const persistSetting = useCallback(
+    (
+      update: Record<string, unknown>,
+      category: "typography" | "scroll" | "pos_highlight" | "speech" | "terminal",
+      setting: "typography" | "scroll" | "pos_highlight" | "speech" | "terminal" | "autosave",
+      action: "enabled" | "disabled" | "updated" | "reset",
+      errorLabel: string,
+      debounce = false,
+    ): void => {
+      void persistAppState(update)
+        .then(() => {
+          const props = { category, setting, action } as const;
+          if (debounce) {
+            settingsTelemetry.schedule(setting, "settings_change_completed", props);
+          } else {
+            trackUsageEvent("settings_change_completed", props);
+          }
+        })
+        .catch((error) => console.error(errorLabel, error));
+    },
+    [settingsTelemetry],
+  );
   const [fontScale, setFontScale] = useState(100);
   const [lineHeight, setLineHeight] = useState(1.8);
   const [paragraphSpacing, setParagraphSpacing] = useState(0.5);
@@ -252,55 +278,79 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
     (value: number) => {
       setFontScale(value);
       incrementEditorKey();
-      void persistAppState({ fontScale: value }).catch((e) =>
-        console.error("Failed to persist fontScale:", e),
+      persistSetting(
+        { fontScale: value },
+        "typography",
+        "typography",
+        "updated",
+        "Failed to persist fontScale:",
+        true,
       );
     },
-    [incrementEditorKey],
+    [incrementEditorKey, persistSetting],
   );
 
   const handleLineHeightChange = useCallback(
     (value: number) => {
       setLineHeight(value);
       incrementEditorKey();
-      void persistAppState({ lineHeight: value }).catch((e) =>
-        console.error("Failed to persist lineHeight:", e),
+      persistSetting(
+        { lineHeight: value },
+        "typography",
+        "typography",
+        "updated",
+        "Failed to persist lineHeight:",
+        true,
       );
     },
-    [incrementEditorKey],
+    [incrementEditorKey, persistSetting],
   );
 
   const handleParagraphSpacingChange = useCallback(
     (value: number) => {
       setParagraphSpacing(value);
       incrementEditorKey();
-      void persistAppState({ paragraphSpacing: value }).catch((e) =>
-        console.error("Failed to persist paragraphSpacing:", e),
+      persistSetting(
+        { paragraphSpacing: value },
+        "typography",
+        "typography",
+        "updated",
+        "Failed to persist paragraphSpacing:",
+        true,
       );
     },
-    [incrementEditorKey],
+    [incrementEditorKey, persistSetting],
   );
 
   const handleTextIndentChange = useCallback(
     (value: number) => {
       setTextIndent(value);
       incrementEditorKey();
-      void persistAppState({ textIndent: value }).catch((e) =>
-        console.error("Failed to persist textIndent:", e),
+      persistSetting(
+        { textIndent: value },
+        "typography",
+        "typography",
+        "updated",
+        "Failed to persist textIndent:",
+        true,
       );
     },
-    [incrementEditorKey],
+    [incrementEditorKey, persistSetting],
   );
 
   const handleFontFamilyChange = useCallback(
     (value: string) => {
       setFontFamily(value);
       incrementEditorKey();
-      void persistAppState({ fontFamily: value }).catch((e) =>
-        console.error("Failed to persist fontFamily:", e),
+      persistSetting(
+        { fontFamily: value },
+        "typography",
+        "typography",
+        "updated",
+        "Failed to persist fontFamily:",
       );
     },
-    [incrementEditorKey],
+    [incrementEditorKey, persistSetting],
   );
 
   const handleCharsPerLineChange = useCallback(
@@ -308,11 +358,16 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
       const clamped = Math.max(1, value);
       setCharsPerLine(clamped);
       incrementEditorKey();
-      void persistAppState({ charsPerLine: clamped }).catch((e) =>
-        console.error("Failed to persist charsPerLine:", e),
+      persistSetting(
+        { charsPerLine: clamped },
+        "typography",
+        "typography",
+        "updated",
+        "Failed to persist charsPerLine:",
+        true,
       );
     },
-    [incrementEditorKey],
+    [incrementEditorKey, persistSetting],
   );
 
   // Lightweight setter for auto-calculation: updates value + persists but does NOT
@@ -326,50 +381,93 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
     );
   }, []);
 
-  const handleAutoCharsPerLineChange = useCallback((value?: boolean) => {
-    setAutoCharsPerLine((prev) => {
-      const next = value !== undefined ? value : !prev;
-      void persistAppState({ autoCharsPerLine: next }).catch((e) =>
-        console.error("Failed to persist autoCharsPerLine:", e),
+  const handleAutoCharsPerLineChange = useCallback(
+    (value?: boolean) => {
+      setAutoCharsPerLine((prev) => {
+        const next = value !== undefined ? value : !prev;
+        persistSetting(
+          { autoCharsPerLine: next },
+          "typography",
+          "typography",
+          next ? "enabled" : "disabled",
+          "Failed to persist autoCharsPerLine:",
+        );
+        return next;
+      });
+    },
+    [persistSetting],
+  );
+
+  const handleShowParagraphNumbersChange = useCallback(
+    (value: boolean) => {
+      setShowParagraphNumbers(value);
+      persistSetting(
+        { showParagraphNumbers: value },
+        "typography",
+        "typography",
+        value ? "enabled" : "disabled",
+        "Failed to persist showParagraphNumbers:",
       );
-      return next;
-    });
-  }, []);
+    },
+    [persistSetting],
+  );
 
-  const handleShowParagraphNumbersChange = useCallback((value: boolean) => {
-    setShowParagraphNumbers(value);
-    void persistAppState({ showParagraphNumbers: value }).catch((e) =>
-      console.error("Failed to persist showParagraphNumbers:", e),
-    );
-  }, []);
+  const handleAutoSaveChange = useCallback(
+    (value: boolean) => {
+      setAutoSave(value);
+      persistSetting(
+        { autoSave: value },
+        "typography",
+        "autosave",
+        value ? "enabled" : "disabled",
+        "Failed to persist autoSave:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleAutoSaveChange = useCallback((value: boolean) => {
-    setAutoSave(value);
-    void persistAppState({ autoSave: value }).catch((e) =>
-      console.error("Failed to persist autoSave:", e),
-    );
-  }, []);
+  const handlePosHighlightEnabledChange = useCallback(
+    (value: boolean) => {
+      setPosHighlightEnabled(value);
+      persistSetting(
+        { posHighlightEnabled: value },
+        "pos_highlight",
+        "pos_highlight",
+        value ? "enabled" : "disabled",
+        "Failed to persist posHighlightEnabled:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handlePosHighlightEnabledChange = useCallback((value: boolean) => {
-    setPosHighlightEnabled(value);
-    void persistAppState({ posHighlightEnabled: value }).catch((e) =>
-      console.error("Failed to persist posHighlightEnabled:", e),
-    );
-  }, []);
+  const handlePosHighlightColorsChange = useCallback(
+    (value: Record<string, string>) => {
+      setPosHighlightColors(value);
+      persistSetting(
+        { posHighlightColors: value },
+        "pos_highlight",
+        "pos_highlight",
+        "updated",
+        "Failed to persist posHighlightColors:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
-  const handlePosHighlightColorsChange = useCallback((value: Record<string, string>) => {
-    setPosHighlightColors(value);
-    void persistAppState({ posHighlightColors: value }).catch((e) =>
-      console.error("Failed to persist posHighlightColors:", e),
-    );
-  }, []);
-
-  const handlePosHighlightDisabledTypesChange = useCallback((value: string[]) => {
-    setPosHighlightDisabledTypes(value);
-    void persistAppState({ posHighlightDisabledTypes: value }).catch((e) =>
-      console.error("Failed to persist posHighlightDisabledTypes:", e),
-    );
-  }, []);
+  const handlePosHighlightDisabledTypesChange = useCallback(
+    (value: string[]) => {
+      setPosHighlightDisabledTypes(value);
+      persistSetting(
+        { posHighlightDisabledTypes: value },
+        "pos_highlight",
+        "pos_highlight",
+        "updated",
+        "Failed to persist posHighlightDisabledTypes:",
+      );
+    },
+    [persistSetting],
+  );
 
   const handleToggleCompactMode = useCallback(() => {
     setCompactMode((prev) => {
@@ -392,125 +490,245 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
     );
   }, []);
 
-  const handleSpeechVoiceURIChange = useCallback((value: string) => {
-    setSpeechVoiceURI(value);
-    void persistAppState({ speechVoiceURI: value }).catch((e) =>
-      console.error("Failed to persist speechVoiceURI:", e),
-    );
-  }, []);
+  const handleSpeechVoiceURIChange = useCallback(
+    (value: string) => {
+      setSpeechVoiceURI(value);
+      persistSetting(
+        { speechVoiceURI: value },
+        "speech",
+        "speech",
+        "updated",
+        "Failed to persist speechVoiceURI:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleSpeechRateChange = useCallback((value: number) => {
-    setSpeechRate(value);
-    void persistAppState({ speechRate: value }).catch((e) =>
-      console.error("Failed to persist speechRate:", e),
-    );
-  }, []);
+  const handleSpeechRateChange = useCallback(
+    (value: number) => {
+      setSpeechRate(value);
+      persistSetting(
+        { speechRate: value },
+        "speech",
+        "speech",
+        "updated",
+        "Failed to persist speechRate:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleSpeechPitchChange = useCallback((value: number) => {
-    setSpeechPitch(value);
-    void persistAppState({ speechPitch: value }).catch((e) =>
-      console.error("Failed to persist speechPitch:", e),
-    );
-  }, []);
+  const handleSpeechPitchChange = useCallback(
+    (value: number) => {
+      setSpeechPitch(value);
+      persistSetting(
+        { speechPitch: value },
+        "speech",
+        "speech",
+        "updated",
+        "Failed to persist speechPitch:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleSpeechVolumeChange = useCallback((value: number) => {
-    setSpeechVolume(value);
-    void persistAppState({ speechVolume: value }).catch((e) =>
-      console.error("Failed to persist speechVolume:", e),
-    );
-  }, []);
+  const handleSpeechVolumeChange = useCallback(
+    (value: number) => {
+      setSpeechVolume(value);
+      persistSetting(
+        { speechVolume: value },
+        "speech",
+        "speech",
+        "updated",
+        "Failed to persist speechVolume:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
   // --- Terminal handlers ---
 
-  const handleTerminalBackgroundChange = useCallback((value: string) => {
-    setTerminalBackground(value);
-    void persistAppState({ terminalBackground: value }).catch((e) =>
-      console.error("Failed to persist terminalBackground:", e),
-    );
-  }, []);
+  const handleTerminalBackgroundChange = useCallback(
+    (value: string) => {
+      setTerminalBackground(value);
+      persistSetting(
+        { terminalBackground: value },
+        "terminal",
+        "terminal",
+        "updated",
+        "Failed to persist terminalBackground:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalForegroundChange = useCallback((value: string) => {
-    setTerminalForeground(value);
-    void persistAppState({ terminalForeground: value }).catch((e) =>
-      console.error("Failed to persist terminalForeground:", e),
-    );
-  }, []);
+  const handleTerminalForegroundChange = useCallback(
+    (value: string) => {
+      setTerminalForeground(value);
+      persistSetting(
+        { terminalForeground: value },
+        "terminal",
+        "terminal",
+        "updated",
+        "Failed to persist terminalForeground:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalFontFamilyChange = useCallback((value: string) => {
-    setTerminalFontFamily(value);
-    void persistAppState({ terminalFontFamily: value }).catch((e) =>
-      console.error("Failed to persist terminalFontFamily:", e),
-    );
-  }, []);
+  const handleTerminalFontFamilyChange = useCallback(
+    (value: string) => {
+      setTerminalFontFamily(value);
+      persistSetting(
+        { terminalFontFamily: value },
+        "terminal",
+        "terminal",
+        "updated",
+        "Failed to persist terminalFontFamily:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalFontSizeChange = useCallback((value: number) => {
-    setTerminalFontSize(value);
-    void persistAppState({ terminalFontSize: value }).catch((e) =>
-      console.error("Failed to persist terminalFontSize:", e),
-    );
-  }, []);
+  const handleTerminalFontSizeChange = useCallback(
+    (value: number) => {
+      setTerminalFontSize(value);
+      persistSetting(
+        { terminalFontSize: value },
+        "terminal",
+        "terminal",
+        "updated",
+        "Failed to persist terminalFontSize:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalLineHeightChange = useCallback((value: number) => {
-    setTerminalLineHeight(value);
-    void persistAppState({ terminalLineHeight: value }).catch((e) =>
-      console.error("Failed to persist terminalLineHeight:", e),
-    );
-  }, []);
+  const handleTerminalLineHeightChange = useCallback(
+    (value: number) => {
+      setTerminalLineHeight(value);
+      persistSetting(
+        { terminalLineHeight: value },
+        "terminal",
+        "terminal",
+        "updated",
+        "Failed to persist terminalLineHeight:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalCursorStyleChange = useCallback((value: "block" | "underline" | "bar") => {
-    setTerminalCursorStyle(value);
-    void persistAppState({ terminalCursorStyle: value }).catch((e) =>
-      console.error("Failed to persist terminalCursorStyle:", e),
-    );
-  }, []);
+  const handleTerminalCursorStyleChange = useCallback(
+    (value: "block" | "underline" | "bar") => {
+      setTerminalCursorStyle(value);
+      persistSetting(
+        { terminalCursorStyle: value },
+        "terminal",
+        "terminal",
+        "updated",
+        "Failed to persist terminalCursorStyle:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalCursorBlinkChange = useCallback((value: boolean) => {
-    setTerminalCursorBlink(value);
-    void persistAppState({ terminalCursorBlink: value }).catch((e) =>
-      console.error("Failed to persist terminalCursorBlink:", e),
-    );
-  }, []);
+  const handleTerminalCursorBlinkChange = useCallback(
+    (value: boolean) => {
+      setTerminalCursorBlink(value);
+      persistSetting(
+        { terminalCursorBlink: value },
+        "terminal",
+        "terminal",
+        value ? "enabled" : "disabled",
+        "Failed to persist terminalCursorBlink:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalScrollbackChange = useCallback((value: number) => {
-    setTerminalScrollback(value);
-    void persistAppState({ terminalScrollback: value }).catch((e) =>
-      console.error("Failed to persist terminalScrollback:", e),
-    );
-  }, []);
+  const handleTerminalScrollbackChange = useCallback(
+    (value: number) => {
+      setTerminalScrollback(value);
+      persistSetting(
+        { terminalScrollback: value },
+        "terminal",
+        "terminal",
+        "updated",
+        "Failed to persist terminalScrollback:",
+        true,
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalCopyOnSelectChange = useCallback((value: boolean) => {
-    setTerminalCopyOnSelect(value);
-    void persistAppState({ terminalCopyOnSelect: value }).catch((e) =>
-      console.error("Failed to persist terminalCopyOnSelect:", e),
-    );
-  }, []);
+  const handleTerminalCopyOnSelectChange = useCallback(
+    (value: boolean) => {
+      setTerminalCopyOnSelect(value);
+      persistSetting(
+        { terminalCopyOnSelect: value },
+        "terminal",
+        "terminal",
+        value ? "enabled" : "disabled",
+        "Failed to persist terminalCopyOnSelect:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalMacOptionIsMetaChange = useCallback((value: boolean) => {
-    setTerminalMacOptionIsMeta(value);
-    void persistAppState({ terminalMacOptionIsMeta: value }).catch((e) =>
-      console.error("Failed to persist terminalMacOptionIsMeta:", e),
-    );
-  }, []);
+  const handleTerminalMacOptionIsMetaChange = useCallback(
+    (value: boolean) => {
+      setTerminalMacOptionIsMeta(value);
+      persistSetting(
+        { terminalMacOptionIsMeta: value },
+        "terminal",
+        "terminal",
+        value ? "enabled" : "disabled",
+        "Failed to persist terminalMacOptionIsMeta:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalDefaultShellChange = useCallback((value: string) => {
-    setTerminalDefaultShell(value);
-    void persistAppState({ terminalDefaultShell: value }).catch((e) =>
-      console.error("Failed to persist terminalDefaultShell:", e),
-    );
-  }, []);
+  const handleTerminalDefaultShellChange = useCallback(
+    (value: string) => {
+      setTerminalDefaultShell(value);
+      persistSetting(
+        { terminalDefaultShell: value },
+        "terminal",
+        "terminal",
+        "updated",
+        "Failed to persist terminalDefaultShell:",
+      );
+    },
+    [persistSetting],
+  );
 
-  const handleTerminalAnsiColorChange = useCallback((key: string, value: string) => {
-    setTerminalAnsiColors((prev) => {
-      const next = { ...prev, [key]: value };
-      // Persist as individual fields: terminalColorBlack, terminalColorRed, etc.
-      const capitalKey = key.charAt(0).toUpperCase() + key.slice(1);
-      void persistAppState({ [`terminalColor${capitalKey}`]: value } as Record<
-        string,
-        string
-      >).catch((e) => console.error(`Failed to persist terminalColor${capitalKey}:`, e));
-      return next;
-    });
-  }, []);
+  const handleTerminalAnsiColorChange = useCallback(
+    (key: string, value: string) => {
+      setTerminalAnsiColors((prev) => {
+        const next = { ...prev, [key]: value };
+        // Persist as individual fields: terminalColorBlack, terminalColorRed, etc.
+        const capitalKey = key.charAt(0).toUpperCase() + key.slice(1);
+        persistSetting(
+          { ["terminalColor" + capitalKey]: value },
+          "terminal",
+          "terminal",
+          "updated",
+          "Failed to persist terminal color:",
+          true,
+        );
+        return next;
+      });
+    },
+    [persistSetting],
+  );
 
   const DEFAULT_ANSI_COLORS: Record<string, string> = {
     black: "#000000",
@@ -539,10 +757,14 @@ export function useDisplaySettings(incrementEditorKey: () => void): UseDisplaySe
       const capitalKey = key.charAt(0).toUpperCase() + key.slice(1);
       batch[`terminalColor${capitalKey}`] = val;
     }
-    void persistAppState(batch as Record<string, string>).catch((e) =>
-      console.error("Failed to persist terminal color reset:", e),
+    persistSetting(
+      batch,
+      "terminal",
+      "terminal",
+      "reset",
+      "Failed to persist terminal color reset:",
     );
-  }, []);
+  }, [persistSetting]);
 
   return {
     displaySettings: {

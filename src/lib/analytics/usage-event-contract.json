@@ -284,6 +284,58 @@
         "unknown"
       ]
     },
+    "project_upgrade_prompt_shown": {
+      "trigger": ["first_save", "character_threshold"]
+    },
+    "project_upgrade_started": {
+      "trigger": ["first_save", "character_threshold"]
+    },
+    "project_upgrade_completed": {
+      "trigger": ["first_save", "character_threshold"]
+    },
+    "project_upgrade_cancelled": {
+      "trigger": ["first_save", "character_threshold"]
+    },
+    "project_upgrade_failed": {
+      "trigger": ["first_save", "character_threshold"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
+    "web_project_permission_requested": {
+      "source": ["recent", "auto_restore"]
+    },
+    "web_project_permission_finished": {
+      "source": ["recent", "auto_restore"],
+      "outcome": ["granted", "denied", "cancelled", "failed"]
+    },
+    "recent_project_removal_completed": {
+      "runtime": ["desktop", "web"]
+    },
+    "recent_project_removal_failed": {
+      "runtime": ["desktop", "web"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
+    },
     "file_new_created": {
       "surface": [
         "wizard",
@@ -295,6 +347,8 @@
         "system",
         "startup",
         "shortcut",
+        "empty_state",
+        "context_menu",
         "unknown"
       ],
       "file_type": ["mdi", "md", "txt", "unknown"],
@@ -592,6 +646,8 @@
       "setting": [
         "theme",
         "typography",
+        "autosave",
+        "ai_connection",
         "scroll",
         "pos_highlight",
         "linting",
@@ -656,11 +712,11 @@
       ]
     },
     "proofreading_run_completed": {
-      "trigger": ["first_auto", "manual", "settings_change"],
+      "trigger": ["first_auto", "manual", "settings_change", "runtime"],
       "issue_count_bucket": ["0", "1", "2_5", "6_10", "11_plus"]
     },
     "proofreading_run_failed": {
-      "trigger": ["first_auto", "manual", "settings_change"],
+      "trigger": ["first_auto", "manual", "settings_change", "runtime"],
       "reason": [
         "invalid_input",
         "unavailable",
@@ -676,6 +732,26 @@
     },
     "proofreading_issue_action_completed": {
       "action": ["navigate", "apply_fix", "ignore_one", "ignore_all", "add_dictionary"]
+    },
+    "proofreading_ignore_memory_completed": {
+      "operation": ["restore_one", "clear_all"],
+      "context": ["project", "standalone"]
+    },
+    "proofreading_ignore_memory_failed": {
+      "operation": ["restore_one", "clear_all"],
+      "context": ["project", "standalone"],
+      "reason": [
+        "invalid_input",
+        "unavailable",
+        "network",
+        "timeout",
+        "permission_denied",
+        "not_found",
+        "conflict",
+        "io_error",
+        "invalid_pattern",
+        "unknown"
+      ]
     },
     "ruleset_sync_completed": {
       "trigger": ["startup", "manual", "redownload"],
@@ -766,6 +842,9 @@
     "speech_session_finished": {
       "voice_kind": ["default", "custom"],
       "outcome": ["completed", "stopped", "error"]
+    },
+    "external_file_conflict_resolved": {
+      "outcome": ["use_disk", "keep_editor", "closed_unresolved"]
     },
     "terminal_session_started": {
       "context": ["project", "standalone"],

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isStandaloneMode } from "@/lib/project/project-types";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 import type { EditorMode } from "@/lib/project/project-types";
 import { chars } from "./types";
@@ -8,6 +9,7 @@ import { chars } from "./types";
 export interface UseUpgradeBannerResult {
   showUpgradeBanner: boolean;
   upgradeBannerDismissed: boolean;
+  upgradeTrigger: "first_save" | "character_threshold" | null;
   handleUpgradeDismiss: () => void;
 }
 
@@ -22,24 +24,33 @@ export function useUpgradeBanner(
 ): UseUpgradeBannerResult {
   const [showUpgradeBanner, setShowUpgradeBanner] = useState(false);
   const [upgradeBannerDismissed, setUpgradeBannerDismissed] = useState(false);
+  const [upgradeTrigger, setUpgradeTrigger] = useState<"first_save" | "character_threshold" | null>(
+    null,
+  );
+  const promptTrackedRef = useRef(false);
   const standaloneSaveCountRef = useRef(0);
-  // Tracks whether we've seen a prior save (so we skip the initial load)
-  const upgradeSaveInitializedRef = useRef(false);
+  // The mount value is hydration, while the first subsequent timestamp is the
+  // user's first save (including the null -> timestamp transition).
+  const saveEffectMountedRef = useRef(false);
 
   // Track save count to trigger UpgradeBanner in standalone mode
   useEffect(() => {
-    if (!lastSavedTime) return;
-    if (!upgradeSaveInitializedRef.current) {
-      // First time seeing lastSavedTime; skip (this is initial load, not a user save)
-      upgradeSaveInitializedRef.current = true;
+    if (!saveEffectMountedRef.current) {
+      saveEffectMountedRef.current = true;
       return;
     }
+    if (!lastSavedTime) return;
     if (!isStandaloneMode(editorMode) || upgradeBannerDismissed) return;
 
     standaloneSaveCountRef.current += 1;
     // Show banner on 1st save or subsequent saves
     if (standaloneSaveCountRef.current >= 1) {
       setShowUpgradeBanner(true);
+      if (!promptTrackedRef.current) {
+        promptTrackedRef.current = true;
+        setUpgradeTrigger("first_save");
+        trackUsageEvent("project_upgrade_prompt_shown", { trigger: "first_save" });
+      }
     }
   }, [lastSavedTime, editorMode, upgradeBannerDismissed]);
 
@@ -48,18 +59,31 @@ export function useUpgradeBanner(
     if (!isStandaloneMode(editorMode) || upgradeBannerDismissed) return;
     if (chars(content) >= 5000) {
       setShowUpgradeBanner(true);
+      if (!promptTrackedRef.current) {
+        promptTrackedRef.current = true;
+        setUpgradeTrigger("character_threshold");
+        trackUsageEvent("project_upgrade_prompt_shown", { trigger: "character_threshold" });
+      }
     }
   }, [content, editorMode, upgradeBannerDismissed]);
 
   // Reset save count tracking when editor mode changes
+  const previousEditorModeRef = useRef(editorMode);
   useEffect(() => {
+    if (previousEditorModeRef.current === editorMode) return;
+    previousEditorModeRef.current = editorMode;
     standaloneSaveCountRef.current = 0;
+    promptTrackedRef.current = false;
+    setUpgradeTrigger(null);
   }, [editorMode]);
 
   const handleUpgradeDismiss = useCallback(() => {
+    if (upgradeTrigger) {
+      trackUsageEvent("project_upgrade_cancelled", { trigger: upgradeTrigger });
+    }
     setShowUpgradeBanner(false);
     setUpgradeBannerDismissed(true);
-  }, []);
+  }, [upgradeTrigger]);
 
-  return { showUpgradeBanner, upgradeBannerDismissed, handleUpgradeDismiss };
+  return { showUpgradeBanner, upgradeBannerDismissed, upgradeTrigger, handleUpgradeDismiss };
 }

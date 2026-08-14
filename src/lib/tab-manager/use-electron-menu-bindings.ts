@@ -11,6 +11,7 @@ import type { SnapshotType } from "../services/history-policy";
 import type { SupportedFileExtension } from "../project/project-types";
 import type { TabId, EditorTabState } from "./tab-types";
 import type { TabManagerCore } from "./types";
+import { trackUsageEvent } from "../analytics/usage-events";
 
 // ---------------------------------------------------------------------------
 // Params
@@ -341,11 +342,16 @@ export function useElectronMenuBindings(params: UseElectronMenuBindingsParams): 
   // Menu: New Tab (Cmd+T from Electron menu)
   useEffect(() => {
     if (!isElectron || !window.electronAPI?.onMenuNewTab) return;
-    const cleanup = window.electronAPI.onMenuNewTab(() => {
+    const cleanup = window.electronAPI.onMenuNewTab((source) => {
       newTabRef.current();
+      trackUsageEvent("file_new_created", {
+        surface: source === "shortcut" ? "shortcut" : "menu",
+        file_type: "mdi",
+        context: isProjectRef.current ? "project" : "standalone",
+      });
     });
     return cleanup;
-  }, [isElectron]);
+  }, [isElectron, isProjectRef]);
 
   // Web: beforeunload warning if any tab is dirty
   useEffect(() => {

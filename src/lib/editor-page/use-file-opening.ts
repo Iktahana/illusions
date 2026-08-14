@@ -291,6 +291,7 @@ export function useFileOpening({
             projectName: projectId,
             handle: restoreResult.handle,
             projectId,
+            source: isAutoRestoringRef.current ? "auto_restore" : "recent",
           });
           setShowPermissionPrompt(true);
           // Permission prompt shown — outcome depends on user action, not a failure

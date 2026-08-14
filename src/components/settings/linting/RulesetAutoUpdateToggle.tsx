@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { getStorageService } from "@/lib/storage/storage-service";
 import { persistAppState } from "@/lib/storage/app-state-manager";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 import SettingsField from "../primitives/SettingsField";
 import SettingsToggle from "../primitives/SettingsToggle";
 
@@ -41,9 +42,15 @@ export default function RulesetAutoUpdateToggle({
 
   const handleChange = (value: boolean): void => {
     setAutoUpdate(value);
-    void persistAppState({ rulesetAutoUpdate: value }).catch((e: unknown) =>
-      console.error("校正ルールセット設定の保存に失敗しました", e),
-    );
+    void persistAppState({ rulesetAutoUpdate: value })
+      .then(() =>
+        trackUsageEvent("settings_change_completed", {
+          category: "linting",
+          setting: "linting",
+          action: value ? "enabled" : "disabled",
+        }),
+      )
+      .catch((e: unknown) => console.error("校正ルールセット設定の保存に失敗しました", e));
   };
 
   return (

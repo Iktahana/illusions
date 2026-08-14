@@ -109,6 +109,7 @@ export function FilesPanel({
   const contextTargetRef = useRef<{ path: string; kind: "file" | "directory" } | null>(null);
   /** Timer for single/double click discrimination on files */
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const newFileSurfaceRef = useRef<"explorer" | "context_menu">("explorer");
 
   // ---- Drag-and-drop state ----
   const [dragSourcePath, setDragSourcePath] = useState<string | null>(null);
@@ -482,6 +483,11 @@ export function FilesPanel({
                 file_type: normalizeTelemetryFileType(finalName.slice(finalName.lastIndexOf("."))),
                 collision: "confirmed",
               });
+              trackUsageEvent("file_new_created", {
+                surface: newFileSurfaceRef.current,
+                file_type: normalizeTelemetryFileType(finalName.slice(finalName.lastIndexOf("."))),
+                context: "project",
+              });
               refresh();
             },
           });
@@ -493,6 +499,11 @@ export function FilesPanel({
           surface: "explorer",
           file_type: normalizeTelemetryFileType(finalName.slice(finalName.lastIndexOf("."))),
           collision: "none",
+        });
+        trackUsageEvent("file_new_created", {
+          surface: newFileSurfaceRef.current,
+          file_type: normalizeTelemetryFileType(finalName.slice(finalName.lastIndexOf("."))),
+          context: "project",
         });
         setEditing(null);
         refresh();
@@ -533,7 +544,12 @@ export function FilesPanel({
   );
 
   const startNewFile = useCallback(
-    (parentPath: string, defaultExtension?: string) => {
+    (
+      parentPath: string,
+      defaultExtension?: string,
+      surface: "explorer" | "context_menu" = "explorer",
+    ) => {
+      newFileSurfaceRef.current = surface;
       // Ensure parent is expanded
       setExpandedDirs((prev) => {
         const next = new Set(prev);
@@ -806,16 +822,16 @@ export function FilesPanel({
           await handleDownload(fullPath);
           break;
         case "new-file":
-          startNewFile(fullPath);
+          startNewFile(fullPath, undefined, "context_menu");
           break;
         case "new-file-mdi":
-          startNewFile(fullPath, ".mdi");
+          startNewFile(fullPath, ".mdi", "context_menu");
           break;
         case "new-file-md":
-          startNewFile(fullPath, ".md");
+          startNewFile(fullPath, ".md", "context_menu");
           break;
         case "new-file-txt":
-          startNewFile(fullPath, ".txt");
+          startNewFile(fullPath, ".txt", "context_menu");
           break;
         case "new-folder":
           startNewFolder(fullPath);
