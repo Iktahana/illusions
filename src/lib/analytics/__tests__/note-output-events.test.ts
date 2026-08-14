@@ -27,13 +27,22 @@ describe("note output analytics", () => {
   });
 
   it.each([
-    ["cancelled", null],
-    ["unavailable", undefined],
-    ["failed", { success: false, error: "clipboard contents: 秘密" }],
-  ] as const)("does not track a %s note output", (_label, result) => {
+    ["cancelled", null, "note_output_cancelled", undefined],
+    ["unavailable", undefined, "note_output_cancelled", undefined],
+    [
+      "failed",
+      { success: false, error: "clipboard contents: 秘密" },
+      "note_output_failed",
+      "unknown",
+    ],
+  ] as const)("tracks a safe %s note outcome", (_label, result, eventName, reason) => {
     trackNoteOutputResult("export", result);
 
-    expect(trackUsageEvent).not.toHaveBeenCalled();
+    expect(trackUsageEvent).toHaveBeenCalledWith(eventName, {
+      operation: "export",
+      format: "note",
+      ...(reason ? { reason } : {}),
+    });
   });
 
   it("never forwards paths, titles, content, clipboard data, or errors", () => {

@@ -24,8 +24,6 @@ illusions のエディタ（メインウィンドウ）が起動し、ユーザ�
 
 - 実行環境（Electron / Web）を特定し、適切な `StorageService` プロバイダーを初期化します。
 - ユーザーのテーマ設定、表示設定（フォント、マージン等）をロードします。
-- `MdiRuntimeProvider` が browser WASM を初期化します。同期 MDI projection を呼ぶ画面は、この
-  startup gate の完了後に render されます。初期化失敗時は rejected promise を固定せず再試行できます。
 
 ### 2. セッションの復元 (Auto-Restore)
 
@@ -51,10 +49,34 @@ Electron 環境で、ファイルやディレクトリをアプリにドラッ�
 
 ### 5. コンテンツのロードとレンダリング
 
-- 最後にアクティブだったタブのバッファをロードし、拡張子から明示的な `DocumentAdapter` を選びます。
-- MDI は公式 MDI plugin、Markdown は CommonMark + GFM、TXT は plain-text adapter で decode します。
-- 最小 editor core は history、clipboard、change notification、flush、external content、vertical-writing
-  plugin のみを構成します。校正 decoration 等の追加機能は現在再接続待ちです。
+- 最後にアクティブだったタブのバッファ（`BufferState`）をロードし、Milkdown エディタに流し込みます。
+- extension から `.mdi` / `.md` / `.txt` adapter を決め、MDI の場合は Rust WASM 初期化完了後に
+  Milkdown を mount します。
+- Milkdown の async create 中は writing mode、line length、外部内容置換を実行しません。作成済み
+  EditorView と現在の format generation が一致してから action を適用します。
+- format 切替では旧 EditorView を破棄し、新しい adapter で作成した view の ready 通知を待ちます。
+- 検索、校正 decoration、品詞 highlight、音声追従、選択範囲統計等は現在 editor core へ未接続です。
+
+### 6. 編集、外部置換、保存
+
+- editor の変更通知は active adapter の canonical serializer で tab buffer を更新します。
+- file watcher 等による外部内容置換は新 EditorView の ready 後に一度適用します。
+- 保存直前は登録済み flush callback が IME composition を確定し、現在の EditorView を同期 serialize
+  します。debounce 済みの tab buffer だけを信用しません。
+- Save As は source bytes を暗黙変換せず、保存成功後に destination extension から次回 adapter を
+  更新します。読取・保存・hot update の将来設計は、この現行データ安全契約とは別に議論します。
+
+### 7. MDI block position ownership
+
+- MDI の block 順序、kind、`block:grapheme` range、UTF-8 span / source map は
+  `@illusions-lab/mdi#getMdiTextBlocks()` の Rust IR projection を唯一の基準とします。
+- source revision が変わると座標も再取得します。旧 revision の block metadata を新しい EditorView へ
+  適用しません。
+- CSS counter、DOM 順序、ProseMirror traversal、source line number から機械編集用の block position を
+  作りません。
+- `@illusions-lab/milkdown-plugin-mdi@0.4.0` の provenance bridge で Rust source span を editable
+  node range に対応付けます。区画位置 UI は `getMdiTextBlocks()` の index と span を batch mapping API に
+  渡すだけとし、DOM traversal、文字列一致、CSS counter、独自 block ID を使用しません。
 
 ## 終了処理 (Termination)
 

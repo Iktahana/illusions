@@ -14,6 +14,7 @@ import { getDictAccess } from "@/lib/dict/dict-access";
 import { getStorageService } from "@/lib/storage/storage-service";
 import { notificationManager } from "../notification-manager";
 import type { NotificationAction } from "@/types/notification";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 interface DictDownloadResult {
   success: boolean;
@@ -76,6 +77,12 @@ export async function isAutoDownloadAllowed(): Promise<boolean> {
 const DEFAULT_DOWNLOAD_KEY = "dict-download";
 const activeDownloadKeys = new Set<string>();
 
+function getDownloadTrigger(key: string): "startup" | "update" | "repair" {
+  if (key.includes("corrupt")) return "repair";
+  if (key.includes("update")) return "update";
+  return "startup";
+}
+
 /**
  * 辞書ダウンロードを進捗トーストつきで実行する（手動ボタン・カウントダウン共通）。
  * 既定 UA の Chromium と同様、進捗 95% 以降は「展開中」に切り替える。
@@ -92,6 +99,10 @@ function runDictDownloadWithProgressInternal(
 
   const dict = getElectronDict();
   if (!dict?.download) {
+    trackUsageEvent("dictionary_download_failed", {
+      trigger: getDownloadTrigger(key),
+      reason: "unavailable",
+    });
     activeDownloadKeys.delete(key);
     return;
   }
@@ -109,6 +120,10 @@ function runDictDownloadWithProgressInternal(
   try {
     downloadPromise = dict.download();
   } catch (e: unknown) {
+    trackUsageEvent("dictionary_download_failed", {
+      trigger: getDownloadTrigger(key),
+      reason: classifyTelemetryFailure(e),
+    });
     console.warn("[dict] auto download failed:", e);
     notificationManager.dismiss(progressId);
     notificationManager.error(
@@ -122,11 +137,16 @@ function runDictDownloadWithProgressInternal(
   downloadPromise
     .then((result) => {
       if (result?.success === false) {
+        trackUsageEvent("dictionary_download_failed", {
+          trigger: getDownloadTrigger(key),
+          reason: "unknown",
+        });
         notificationManager.dismiss(progressId);
         notificationManager.error(
           `辞書のダウンロードに失敗しました：${result.error ?? "不明なエラー"}`,
         );
       } else {
+        trackUsageEvent("dictionary_download_completed", { trigger: getDownloadTrigger(key) });
         // updateProgress(100) は 3 秒後に自動クローズする。最終イベントが
         // 100 未満で coalesce された場合に備えて明示的に 100 にする。
         notificationManager.updateProgress(progressId, 100, "辞書のダウンロードが完了しました");
@@ -135,6 +155,10 @@ function runDictDownloadWithProgressInternal(
       }
     })
     .catch((e: unknown) => {
+      trackUsageEvent("dictionary_download_failed", {
+        trigger: getDownloadTrigger(key),
+        reason: classifyTelemetryFailure(e),
+      });
       console.warn("[dict] auto download failed:", e);
       notificationManager.dismiss(progressId);
       notificationManager.error(

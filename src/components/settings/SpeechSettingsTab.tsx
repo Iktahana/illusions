@@ -1,10 +1,11 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useSpeechSettings } from "@/contexts/EditorSettingsContext";
 import { SettingsField, SettingsSection, SliderField } from "./primitives";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 /**
  * Settings tab for text-to-speech (読み上げ) and speech recognition (音声入力).
@@ -24,6 +25,7 @@ export default function SpeechSettingsTab(): React.ReactElement {
   } = useSpeechSettings();
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const previewFinishedRef = useRef(true);
 
   // Load available Japanese voices (may arrive asynchronously)
   useEffect(() => {
@@ -42,6 +44,13 @@ export default function SpeechSettingsTab(): React.ReactElement {
   const handlePreview = useCallback((): void => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     if (isSpeaking) {
+      if (!previewFinishedRef.current) {
+        previewFinishedRef.current = true;
+        trackUsageEvent("speech_session_finished", {
+          voice_kind: speechVoiceURI ? "custom" : "default",
+          outcome: "stopped",
+        });
+      }
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
       return;
@@ -58,9 +67,28 @@ export default function SpeechSettingsTab(): React.ReactElement {
     utterance.pitch = speechPitch;
     utterance.volume = speechVolume;
     utterance.lang = "ja-JP";
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    const voiceKind = selectedVoice ? "custom" : "default";
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      if (previewFinishedRef.current) return;
+      previewFinishedRef.current = true;
+      trackUsageEvent("speech_session_finished", {
+        voice_kind: voiceKind,
+        outcome: "completed",
+      });
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      if (previewFinishedRef.current) return;
+      previewFinishedRef.current = true;
+      trackUsageEvent("speech_session_finished", {
+        voice_kind: voiceKind,
+        outcome: "error",
+      });
+    };
     setIsSpeaking(true);
+    previewFinishedRef.current = false;
+    trackUsageEvent("speech_session_started", { voice_kind: voiceKind });
     // resume() is a workaround for the Chromium bug where speechSynthesis enters a paused state
     window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);

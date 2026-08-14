@@ -137,9 +137,7 @@ export interface TokenizeProgress {
 /**
  * Abstract NLP Client Interface
  *
- * Implementations:
- * - ElectronNlpClient: Uses IPC to communicate with Electron main process
- * - WebNlpClient: Uses fetch to call Next.js API routes
+ * Implementation: ElectronNlpClient uses IPC to communicate with the Electron main process.
  */
 export interface INlpClient {
   /**

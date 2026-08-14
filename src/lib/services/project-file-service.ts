@@ -30,7 +30,7 @@ export type {
 
 /**
  * Get the global ProjectFileService instance.
- * Delegates to getVFS() — selects ElectronVFS or WebVFS at runtime.
+ * Delegates to getVFS(), which provides the Electron IPC-backed VFS.
  *
  * @returns Singleton VirtualFileSystem instance
  */

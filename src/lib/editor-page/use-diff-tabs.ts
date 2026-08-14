@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import type { DiffTabContextValue } from "@/contexts/DiffTabContext";
 import type { EditorTabState } from "@/lib/tab-manager/tab-types";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 import {
   isDiffTab,
   isEditorTab,
@@ -93,6 +94,7 @@ export function useDiffTabs({
       }
 
       forceCloseTab(diffTabId);
+      trackUsageEvent("external_file_conflict_resolved", { outcome: "use_disk" });
     },
     [updateTab, forceCloseTab],
   );
@@ -118,13 +120,19 @@ export function useDiffTabs({
       }
 
       forceCloseTab(diffTabId);
+      trackUsageEvent("external_file_conflict_resolved", { outcome: "keep_editor" });
     },
     [updateTab, forceCloseTab],
   );
 
   const closeDiffTab = useCallback(
     (diffTabId: string) => {
+      const diffTab = tabsRef.current.find(
+        (tab): tab is DiffTabState => isDiffTab(tab) && tab.id === diffTabId,
+      );
+      if (!diffTab) return;
       forceCloseTab(diffTabId);
+      trackUsageEvent("external_file_conflict_resolved", { outcome: "closed_unresolved" });
     },
     [forceCloseTab],
   );

@@ -5,6 +5,7 @@ const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const { isDev, isMicrosoftStoreApp, isMasBuild } = require("./app-constants");
 const { resolveUpdaterFlags, isUnpublishedChannelVersion } = require("./lib/update-policy");
+const { classifyMainTelemetryFailure, sendUsageEvent } = require("./analytics");
 
 // dev/alpha ブランチのビルドは GitHub Release を持たない CI 専用成果物のため、
 // auto-updater を走らせると安定版/beta への誤ダウングレードを招く。バージョン文字列で
@@ -49,6 +50,14 @@ async function applyBetaOptIn() {
 }
 
 let isManualUpdateCheck = false;
+let updateDownloadActive = false;
+
+function updateTelemetryProps() {
+  return {
+    trigger: isManualUpdateCheck ? "manual" : "automatic",
+    channel: autoUpdater.allowPrerelease ? "beta" : "stable",
+  };
+}
 
 // auto-updater のイベントハンドラ設定
 function setupAutoUpdater() {
@@ -82,6 +91,8 @@ function setupAutoUpdater() {
   // イベント: アップデートあり
   autoUpdater.on("update-available", (info) => {
     log.info("アップデートが見つかりました:", info);
+    updateDownloadActive = true;
+    void sendUsageEvent("app_update_available", updateTelemetryProps());
     // Defer require to avoid circular dependency with window-manager.js
     const { getMainWindow } = require("./window-manager");
     const mainWindow = getMainWindow();
@@ -104,6 +115,8 @@ function setupAutoUpdater() {
   // イベント: ダウンロード完了
   autoUpdater.on("update-downloaded", (info) => {
     log.info("アップデートのダウンロードが完了しました:", info);
+    void sendUsageEvent("app_update_download_completed", updateTelemetryProps());
+    updateDownloadActive = false;
     const { getMainWindow } = require("./window-manager");
     const mainWindow = getMainWindow();
     if (mainWindow) {
@@ -126,7 +139,13 @@ function setupAutoUpdater() {
             const { saveAllBeforeQuitAndInstall } = require("./window-manager");
             const shouldQuit = await saveAllBeforeQuitAndInstall();
             if (shouldQuit) {
+              void sendUsageEvent("app_update_install_started", updateTelemetryProps());
               autoUpdater.quitAndInstall();
+            } else {
+              void sendUsageEvent("app_update_install_blocked", {
+                ...updateTelemetryProps(),
+                reason: "conflict",
+              });
             }
           }
         });
@@ -136,6 +155,13 @@ function setupAutoUpdater() {
   // イベント: エラー
   autoUpdater.on("error", (error) => {
     log.error("アップデートでエラーが発生しました:", error);
+    if (updateDownloadActive) {
+      void sendUsageEvent("app_update_download_failed", {
+        ...updateTelemetryProps(),
+        reason: classifyMainTelemetryFailure(error),
+      });
+      updateDownloadActive = false;
+    }
     const { getMainWindow } = require("./window-manager");
     const mainWindow = getMainWindow();
     if (isManualUpdateCheck && mainWindow) {

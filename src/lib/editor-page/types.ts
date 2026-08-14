@@ -10,7 +10,8 @@ export interface RecentProjectEntry {
   projectId: string;
   name: string;
   lastAccessedAt: number;
-  rootDirName?: string;
+  displayPath: string;
+  rootPath?: string;
 }
 
 /** Permission prompt state for re-opening a stored project */
@@ -18,4 +19,5 @@ export interface PermissionPromptState {
   projectName: string;
   handle: FileSystemDirectoryHandle;
   projectId: string;
+  source: "recent" | "auto_restore";
 }

@@ -1,6 +1,11 @@
 import type { EditorView } from "@milkdown/prose/view";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  bucketTelemetryCount,
+  classifyTelemetryFailure,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 import type { LintIssue, Severity } from "@/lib/linting/types";
 import { RULE_GUIDELINE_MAP } from "@/lib/linting/lint-presets";
 import type { CorrectionModeId, GuidelineId } from "@/lib/linting/correction-config";
@@ -48,6 +53,7 @@ export function useLinting(
 ): UseLintingResult {
   const [ruleRunner, setRuleRunner] = useState<RuleRunnerLike | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
+  const pendingTelemetryTriggerRef = useRef<"first_auto" | null>("first_auto");
   const [isLinting, setIsLinting] = useState(false);
 
   // Build the proxy in an effect so the Worker constructor is never invoked
@@ -87,12 +93,23 @@ export function useLinting(
       if (!lintingEnabled) return;
       setLintIssues(issues);
       setIsLinting(false);
+      if (pendingTelemetryTriggerRef.current) {
+        trackUsageEvent("proofreading_run_completed", {
+          trigger: pendingTelemetryTriggerRef.current,
+          issue_count_bucket: bucketTelemetryCount(issues.length),
+        });
+        pendingTelemetryTriggerRef.current = null;
+      }
     },
     [lintingEnabled],
   );
 
   // Handle NLP tokenization errors — show a user-visible notification
   const handleNlpError = useCallback((error: Error) => {
+    trackUsageEvent("proofreading_run_failed", {
+      trigger: "runtime",
+      reason: classifyTelemetryFailure(error),
+    });
     console.error("[useLinting] NLP initialization/tokenization failed:", error);
     notificationManager.warning(
       "形態素解析の初期化に失敗しました。一部の校正ルール（L2）が無効になっています。",
@@ -128,20 +145,11 @@ export function useLinting(
 
   // Sync rule configs from settings to the runner, then re-run linting so the
   // displayed issues reflect the new enabled/severity immediately.
-  //
-  // `setConfig()` mutates the runner in place (its reference is stable), so the
-  // editor's decoration effect — keyed only on the runner reference — never
-  // re-fires on a config change. Without the explicit `refreshLinting()` here,
-  // disabling a rule or a whole guideline group (the inspector's EyeOff button)
-  // would update the config but leave the now-stale issues on screen until the
-  // next document edit, making the toggle look broken.
   useEffect(() => {
     if (!ruleRunner) return;
 
     // Apply user overrides from settings. `options` must be forwarded so
-    // rule-specific overrides (e.g. genji-out-of-dict's
-    // includeVerbsAdjectives, #2048) actually reach the rule at lint time;
-    // when omitted (undefined) the runner preserves the manifest defaults.
+    // rule-specific overrides actually reach the rule at lint time.
     for (const [ruleId, config] of Object.entries(lintingRuleConfigs)) {
       ruleRunner.setConfig(ruleId, {
         enabled: config.enabled,
@@ -151,9 +159,6 @@ export function useLinting(
       });
     }
 
-    // SET_CONFIG messages are dispatched synchronously above; refreshLinting's
-    // re-lint request is posted after a dynamic import (a microtask later), so
-    // the worker always sees the new config before it re-lints.
     refreshLinting();
   }, [ruleRunner, lintingRuleConfigs, refreshLinting]);
 

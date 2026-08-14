@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openFile: invokeChannel(FILE_CHANNELS.invoke.openFile, { arity: 0 }),
   saveFile: invokeChannel(FILE_CHANNELS.invoke.saveFile, { arity: 3 }),
   getChromeVersion: invokeChannel(SYSTEM_CHANNELS.invoke.getChromeVersion, { arity: 0 }),
+  getLocationContext: invokeChannel(SYSTEM_CHANNELS.invoke.getLocationContext, { arity: 0 }),
   setDirty: invokeChannel(SYSTEM_CHANNELS.invoke.setDirty, { arity: 1 }),
   // 歴史的命名: flush 完了後にウィンドウを実際に閉じるためのシグナル。
   // Phase 2 で save 経路は消滅したが、close handshake の終端トリガとして引き続き利用する。
@@ -73,7 +74,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMenuSave: eventChannel(MENU_CHANNELS.event.saveTriggered, { arity: 0 }),
   onMenuSaveAs: eventChannel(MENU_CHANNELS.event.saveAsTriggered, { arity: 0 }),
   onMenuCloseTab: eventChannel(MENU_CHANNELS.event.closeTab, { arity: 0 }),
-  onMenuNewTab: eventChannel(MENU_CHANNELS.event.newTab, { arity: 0 }),
+  onMenuNewTab: eventChannel(MENU_CHANNELS.event.newTab, { arity: 1 }),
   onMenuOpenSettings: eventChannel(MENU_CHANNELS.event.openSettings, { arity: 0 }),
   onSaveBeforeClose: eventChannel(SYSTEM_CHANNELS.event.requestSaveBeforeClose, { arity: 0 }),
   onFlushStateBeforeClose: eventChannel(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose, {

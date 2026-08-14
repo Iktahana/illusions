@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { commandsCtx, defaultValueCtx, Editor, editorViewCtx, rootCtx } from "@milkdown/core";
+import {
+  commandsCtx,
+  defaultValueCtx,
+  Editor,
+  editorStateCtx,
+  editorViewCtx,
+  rootCtx,
+} from "@milkdown/core";
 import { history, undoCommand } from "@milkdown/plugin-history";
 import { commonmark } from "@milkdown/preset-commonmark";
 import { TextSelection } from "@milkdown/prose/state";
@@ -161,4 +168,68 @@ describe("vertical-writing app integration", () => {
       expect(encoded).toBe(source);
     },
   );
+
+  it.each([
+    ["plain", "[[pagebreak]]", null],
+    ["right", "[[pagebreak:right]]", "right"],
+    ["left", "[[pagebreak:left]]", "left"],
+  ] as const)("round-trips semantic %s pagebreaks from MDI 0.2", async (_name, source, variant) => {
+    const editor = await createFormatEditor("mdi", source);
+    const state = editor.ctx.get(editorStateCtx);
+
+    expect(state.doc.toJSON()).toEqual({
+      type: "doc",
+      content: [{ type: "mdiPagebreak", attrs: { variant } }],
+    });
+    expect(editor.ctx.get(editorViewCtx).dom.querySelector("hr.mdi-pagebreak")).not.toBeNull();
+
+    let encoded = "";
+    editor.action((ctx) => {
+      encoded = getDocumentAdapter("mdi").encodeEditor(ctx, ctx.get(editorViewCtx).state.doc);
+    });
+    expect(encoded.trim()).toBe(source);
+  });
+
+  it("maps both blank spellings to the canonical semantic blank node", async () => {
+    for (const source of ["[[blank]]", "\\"]) {
+      const editor = await createFormatEditor("mdi", source);
+      const state = editor.ctx.get(editorStateCtx);
+
+      expect(state.doc.toJSON()).toEqual({
+        type: "doc",
+        content: [{ type: "mdiBlank" }],
+      });
+      expect(editor.ctx.get(editorViewCtx).dom.querySelector("div.mdi-blank")).not.toBeNull();
+
+      let encoded = "";
+      editor.action((ctx) => {
+        encoded = getDocumentAdapter("mdi").encodeEditor(ctx, ctx.get(editorViewCtx).state.doc);
+      });
+      expect(encoded).toBe("\\\n");
+    }
+  });
+
+  it.each([
+    ["indent", "[[indent:2]]\n本文", { mdiIndent: 2, mdiBottom: null }],
+    ["bottom", "[[bottom]]\n本文", { mdiIndent: null, mdiBottom: 0 }],
+    ["bottom with offset", "[[bottom:3]]\n本文", { mdiIndent: null, mdiBottom: 3 }],
+  ] as const)("round-trips semantic paragraph layout: %s", async (_name, source, attrs) => {
+    const editor = await createFormatEditor("mdi", source);
+    const state = editor.ctx.get(editorStateCtx);
+    const paragraph = state.doc.firstChild;
+
+    expect(paragraph?.type.name).toBe("paragraph");
+    expect(paragraph?.attrs).toMatchObject(attrs);
+    expect(
+      editor.ctx
+        .get(editorViewCtx)
+        .dom.querySelector(`[data-mdi-${_name.startsWith("indent") ? "indent" : "bottom"}]`),
+    ).not.toBeNull();
+
+    let encoded = "";
+    editor.action((ctx) => {
+      encoded = getDocumentAdapter("mdi").encodeEditor(ctx, ctx.get(editorViewCtx).state.doc);
+    });
+    expect(encoded.trim()).toBe(source);
+  });
 });

@@ -26,6 +26,10 @@ declare global {
       fileType?: string,
     ) => Promise<string | null | { success: false; error?: string; code?: string }>;
     getChromeVersion: () => Promise<number>;
+    getLocationContext?: () => Promise<{
+      platform: NodeJS.Platform;
+      homePath: string;
+    }>;
     setDirty: (dirty: boolean) => Promise<void>;
     /**
      * Close-handshake terminator. Name is historical (originally tied to save).
@@ -73,7 +77,7 @@ declare global {
     onMenuSave?: (callback: () => void) => (() => void) | void;
     onMenuSaveAs?: (callback: () => void) => (() => void) | void;
     onMenuCloseTab?: (callback: () => void) => (() => void) | void;
-    onMenuNewTab?: (callback: () => void) => (() => void) | void;
+    onMenuNewTab?: (callback: (source: "menu" | "shortcut") => void) => (() => void) | void;
     onMenuOpenSettings?: (callback: () => void) => (() => void) | void;
     onMenuOpenProject?: (callback: () => void) => (() => void) | void;
     onMenuOpenRecentProject?: (callback: (projectId: string) => void) => (() => void) | void;
@@ -256,7 +260,9 @@ declare global {
       clearEditorBuffer: () => Promise<void>;
       clearAll: () => Promise<void>;
       addRecentProject: (project: { id: string; rootPath: string; name: string }) => Promise<void>;
-      getRecentProjects: () => Promise<Array<{ id: string; rootPath: string; name: string }>>;
+      getRecentProjects: () => Promise<
+        Array<{ id: string; rootPath: string; name: string; lastAccessedAt: number }>
+      >;
       removeRecentProject: (projectId: string) => Promise<void>;
       setItem: (key: string, value: string) => Promise<void>;
       getItem: (key: string) => Promise<string | null>;

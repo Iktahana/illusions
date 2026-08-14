@@ -1,13 +1,20 @@
 "use client";
 
 import type { ExportFormat } from "@/lib/export/types";
-import { trackUsageEvent } from "./usage-events";
+import { classifyTelemetryFailure, trackUsageEvent } from "./usage-events";
 
 export type OutputOperation = "export" | "copy";
 export type DocumentOutputOperation = OutputOperation;
 export type DocumentOutputFormat = Exclude<ExportFormat, "note">;
 
 export type OutputResult = string | { success: boolean } | null | undefined;
+
+export function trackDocumentOutputAttempt(
+  operation: DocumentOutputOperation,
+  format: DocumentOutputFormat,
+): void {
+  trackUsageEvent("document_output_attempted", { operation, format });
+}
 
 /**
  * Reduce IPC output to its success state before analytics sees it. IPC return
@@ -32,7 +39,23 @@ export function trackDocumentOutputResult(
   format: DocumentOutputFormat,
   result: OutputResult,
 ): void {
-  if (!isOutputCompleted(result)) return;
+  if (isOutputCompleted(result)) {
+    trackUsageEvent("document_output_completed", { operation, format });
+  } else if (result === null || result === undefined) {
+    trackUsageEvent("document_output_cancelled", { operation, format });
+  } else {
+    trackUsageEvent("document_output_failed", { operation, format, reason: "unknown" });
+  }
+}
 
-  trackUsageEvent("document_output_completed", { operation, format });
+export function trackDocumentOutputFailure(
+  operation: DocumentOutputOperation,
+  format: DocumentOutputFormat,
+  error: unknown,
+): void {
+  trackUsageEvent("document_output_failed", {
+    operation,
+    format,
+    reason: classifyTelemetryFailure(error),
+  });
 }

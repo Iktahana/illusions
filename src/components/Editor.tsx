@@ -8,6 +8,7 @@ import clsx from "clsx";
 
 import MilkdownEditor from "./editor/MilkdownEditor";
 import { useTypographySettings } from "@/contexts/EditorSettingsContext";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { DocumentFormat } from "@/lib/document-format";
 
@@ -42,7 +43,14 @@ export default function NovelEditor({
   });
 
   const toggleWritingMode = useCallback(() => {
-    setIsVertical((current) => !current);
+    setIsVertical((current) => {
+      const next = !current;
+      trackUsageEvent("editor_layout_changed", {
+        action: "writing_mode",
+        value: next ? "vertical" : "horizontal",
+      });
+      return next;
+    });
   }, []);
 
   useEffect(() => {

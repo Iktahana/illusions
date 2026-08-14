@@ -1,55 +1,72 @@
----
-title: Milkdown エディター統合
-slug: milkdown-plugin
-type: guide
-status: active
-updated: 2026-08-13
----
-
 # Milkdown エディター統合
 
 Illusions のエディターは、文書構文、表示レイアウト、アプリ機能を別々の owner に分ける。
 
-## 現在の最小コア
+## Ownership
 
-| 責務                                              | Owner                                                             |
-| ------------------------------------------------- | ----------------------------------------------------------------- |
-| MDI editor parse / schema / canonical serialize   | `@illusions-lab/milkdown-plugin-mdi`                              |
-| MDI diagnostics / text projection                 | `@illusions-lab/mdi`                                              |
-| Markdown                                          | `src/lib/document-format` の Markdown adapter（CommonMark + GFM） |
-| plain text                                        | `src/lib/document-format` の plain-text adapter                   |
-| writing mode / line length / vertical wheel       | `@illusions-lab/milkdown-plugin-vertical-writing@1.0.1`           |
-| history / clipboard / change notification / flush | `src/components/editor/MilkdownEditor.tsx`                        |
-| font / line-height / paragraph spacing            | `src/app/editor-typography.css`                                   |
+| 責務                                           | Owner                                                                            |
+| ---------------------------------------------- | -------------------------------------------------------------------------------- |
+| MDI parse / serialize / schema                 | `@illusions-lab/milkdown-plugin-mdi` と `src/lib/document-format` の MDI adapter |
+| Markdown / plain text                          | `src/lib/document-format` の各 adapter                                           |
+| writing mode / line length / vertical wheel    | `@illusions-lab/milkdown-plugin-vertical-writing@1.0.1`                          |
+| lint / POS / search / speech UI                | `src/lib/editor-page`                                                            |
+| MDI block order / kind / position / source map | `@illusions-lab/mdi`                                                             |
+| font / line-height / paragraph spacing / theme | `src/app/editor-typography.css` と editor component                              |
 
-`src/components/Editor.tsx` は writing-mode preference と provider を接続する薄い shell、
-`MilkdownEditor.tsx` は上記 package を compose する最小 lifecycle である。MDI delimiter や
-vertical scroll の規則をアプリ側で実装してはいけない。
+`milkdown-plugin-mdi` と `milkdown-plugin-vertical-writing` は Milkdown に並列導入する。互いを import
+せず、vertical-writing layer に document format や MDI IR を渡さない。
 
-## Document adapter
+## 現在の editor core 完了境界
 
-`.mdi`、`.md`、`.txt` は `DocumentFormat` と `DocumentAdapter` で明示的に分離する。
+最小 core が直接担当するのは次だけである。
 
-| 拡張子 | Adapter    | MDI semantics | Markdown semantics                |
-| ------ | ---------- | ------------- | --------------------------------- |
-| `.mdi` | MDI        | 有効          | CommonMark / GFM を基礎として有効 |
-| `.md`  | Markdown   | 無効          | 有効                              |
-| `.txt` | plain text | 無効          | 無効                              |
+- `.mdi` / `.md` / `.txt` ごとの adapter 選択
+- 初期値、変更通知、外部内容置換、同期 flush
+- history / clipboard
+- MDI package（`.mdi` のみ）
+- vertical-writing package（全形式共通）
 
-editor core は拡張子や delimiter を判定せず、選択済み adapter のみを参照する。`.md` / `.txt`
-の text projection と diagnostics に MDI parser を流してはいけない。Save As で拡張子が変わると
-editor key と adapter が同時に切り替わり、保存済み source 自体は暗黙変換しない。
+検索、選択範囲、校正 decoration、品詞 highlight、音声追従、Ruby / 縦中横編集 command、toolbar、
+context menu、Bubble menu、選択文字数は UI shell が残っていても editor core には未接続である。これらは
+設計確定後に個別 extension と integration test を伴って再接続する。
 
-## MDI runtime
+### 形式分離 matrix
 
-Browser 版 WASM は editor より先に初期化する必要がある。`app/layout.tsx` の
-`MdiRuntimeProvider` が唯一の renderer bootstrap であり、失敗した promise は cache せず再試行可能に
-する。project-search worker は別 realm なので worker 内で独立して初期化する。
+| source               | `.mdi`                   | `.md`                         | `.txt`  |
+| -------------------- | ------------------------ | ----------------------------- | ------- |
+| `# heading`          | heading                  | heading                       | literal |
+| `{東京\|とうきょう}` | Ruby atom                | literal                       | literal |
+| `^12^`               | TCY mark                 | literal                       | literal |
+| `[[blank]]`          | semantic `mdiBlank` node | escaped literal serialization | literal |
+| `*強調*`             | emphasis                 | emphasis                      | literal |
+
+Save As は source を変換する操作ではない。`.mdi` / `.md` / `.txt` の六方向すべてで現在の source bytes を
+そのまま書き、保存成功後に destination extension から次回 editor adapter を決める。
+
+### upstream MDI block support
+
+`@illusions-lab/milkdown-plugin-mdi@0.4.0` では空白段落、改頁／改丁、字下げ／地付きが semantic
+Milkdown block node または paragraph attribute として提供される。Illusions は package の schema と
+logical CSS をそのまま使用し、fallback parser / schema / serializer を追加しない。blank、三種の
+pagebreak、indent、bottom は実 package の parse → DOM → canonical serialize conformance test で固定する。
+
+### Rust-owned block positions
+
+MDI の機械編集位置は `getMdiTextBlocks()` が返す source-order `MdiTextBlock.index` と、一基準の
+Unicode grapheme 座標 `block:grapheme` だけを使う。heading、paragraph、list item、blockquote、code、
+table、footnote、HTML、other は同じ列に属する。React、ProseMirror traversal、CSS counter で別の
+「段落番号」を算出してはいけない。
+
+`@illusions-lab/milkdown-plugin-mdi@0.4.0` の provenance bridge は、Rust の source span をそれを生成した
+Milkdown node の範囲へ対応付ける。Illusions の番号 decoration は `getMdiTextBlocks()` の index と span を
+batch mapping API に渡して表示するだけであり、DOM traversal、文字列一致、substring、source-order
+heuristic、CSS counter を使わない。検索や機械編集も同じ bridge を利用し、新しい座標、ID、block model
+を定義してはならない。
 
 ## Writing mode
 
-公開 CSS は `src/app/globals.css` から一度だけ import する。初期化後の変更は action で行い、
-Milkdown instance を再構築しない。
+公開 CSS は `src/app/globals.css` から明示的に読み込む。editor 初期化では一度だけ
+`verticalWriting({ mode, lineLength })` を登録し、その後の変更は action で行う。
 
 ```ts
 editor.action(changeWritingMode("vertical-rl"));
@@ -57,41 +74,33 @@ editor.action(changeLineLength(40));
 editor.action(changeLineLength(null));
 ```
 
-`.milkdown-vertical-writing`、`data-writing-mode`、`data-line-length`、reading-axis wheel と scroll
-position は package が所有する。アプリ CSS や event listener で同じ責務を再実装しない。
+mode や line length を `useEditor` の再構築 dependency に含めてはいけない。切替時も同じ
+EditorView を維持し、document、selection、IME composition、undo/redo history を保持する。
 
-## 意図的に切り離している機能
+`horizontal-tb` と `vertical-rl` が現在の UI の選択肢である。`vertical-lr` は package API として
+利用可能だが、Illusions の UI にはまだ公開しない。
 
-2026-08-13 の再構築では旧 editor feature implementation を削除し、UI shell を残した。次の機能は
-「移設済み」ではなく、新コア用 extension として一つずつ再接続する対象である。
+plugin が付与する `.milkdown-vertical-writing`、`data-writing-mode`、`data-line-length` と公開 CSS が
+layout と scroll container を所有する。アプリ側で wheel event、logical scroll progress、writing-mode、
+line-length sizing を再実装しない。
 
-- lint decoration と editor 内 correction action
-- POS highlight
-- search / speech highlight と auto-scroll
-- selection tracking と選択範囲統計
-- bubble menu、context menu、toolbar
-- 旧 novel-specific paragraph / heading behavior
+## 延期中の application features
 
-設定、Inspector、Dialog 等の UI が存在することは editor extension が接続済みである証拠ではない。
-再接続するときは MDI 文法や writing-mode を feature 側へ複製せず、core boundary gate を更新する。
+旧 internal Japanese-novel package は廃止した。application service や UI 設定が残っていても、それを
+Milkdown decoration / command として接続済みとは扱わない。再導入時も writing mode を所有させず、
+`.mdi` / `.md` / `.txt` の意味論を混在させない。
 
-## Upstream MDI plugin の範囲
+## 検証
 
-`milkdown-plugin-mdi@0.1.0` は front matter と inline MDI（ruby、TCY、boten、no-break、warichu、
-kern、explicit break、nesting）を提供する。block syntax、commands、input rules、popover、paste、
-custom clipboard serializer は未提供である。不足構文を Illusions に Regex / Remark / ProseMirror
-fallback として実装せず、公開 upstream release を待って dependency を更新する。
+- mode / line length action 後も EditorView identity、document、selection、history が変わらない
+- vertical wheel と nested scroller の優先順位が package 契約どおりである
+- single / split pane の auto line length は pane ごとに独立する
+- `.mdi` / `.md` / `.txt` の adapter が writing-mode plugin に依存しない
+- editor view ready 前に writing-mode / line-length / external replacement action を実行しない
+- format 切替時に旧 EditorView の ready 状態を新 editor へ流用しない
+- 実 package mount で edit / external replacement / synchronous flush が canonical source を返す
+- Save As 六方向で source bytes を変えず destination adapter route だけを更新する
+- package graph に plugin 間依存、複数 Milkdown runtime、renderer からの private `mdi-core` import がない
 
-## Release gate
-
-`npm run check:boundaries` は通常の import boundary に加えて次を検査する。
-
-- 旧 editor package / implementation が復活していない
-- editor core が延期中 feature を import していない
-- renderer が private `@illusions-lab/mdi-core` を直接 import していない
-- MDI plugin と vertical-writing plugin が相互依存していない
-- MDI / Milkdown runtime が複数 version に分裂していない
-- vertical-writing の公式 CSS が読み込まれている
-
-統合監査の結果と機能 matrix は
-[MDI 2.0 エディター統合監査](../architecture/mdi-2-editor-audit.md) を参照する。
+品質閘は `format:check`、`lint`、`type-check`、`check:boundaries`、`test:coverage`、
+`build:electron-renderer`、`bundle:electron`、`check:electron-artifacts` をすべて通す。

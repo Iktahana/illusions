@@ -9,6 +9,11 @@ import {
   notifyRulesetSyncError,
 } from "@/lib/services/ruleset-sync-feedback";
 import { notificationManager } from "@/lib/services/notification-manager";
+import {
+  bucketTelemetryCount,
+  classifyTelemetryFailure,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 
 /** Matches RulesetManifest from the SDK — only the fields the UI needs. */
 export interface RulesetRuleMeta {
@@ -160,8 +165,18 @@ export function useRulesetStatus(): UseRulesetStatusReturn {
     const progressId = showRulesetSyncProgress();
     try {
       const summary = await api.sync();
+      trackUsageEvent("ruleset_sync_completed", {
+        trigger: "redownload",
+        change_count_bucket: bucketTelemetryCount(
+          summary.filter((result) => result.status === "installed").length,
+        ),
+      });
       notifyRulesetSyncSummary(summary);
     } catch (err) {
+      trackUsageEvent("ruleset_sync_failed", {
+        trigger: "redownload",
+        reason: classifyTelemetryFailure(err),
+      });
       console.error("[useRulesetStatus] sync failed", err);
       notifyRulesetSyncError(err);
     } finally {

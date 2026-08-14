@@ -12,13 +12,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // -----------------------------------------------------------------------
-// Mock the runtime-env detection so we always get a predictable backend
-// -----------------------------------------------------------------------
-vi.mock("@/lib/utils/runtime-env", () => ({
-  isElectronRenderer: () => false, // Force WebVFS path (no IPC needed)
-}));
-
-// -----------------------------------------------------------------------
 // Reset singleton state before each test
 // -----------------------------------------------------------------------
 let resetProjectFileService: () => void;

@@ -458,16 +458,19 @@ export class ElectronStorageManager {
     id: string;
     rootPath: string;
     name: string;
+    lastAccessedAt: number;
   }> {
     const db = this.ensureInitialized();
     const stmt = db.prepare(
-      "SELECT id, data FROM recent_projects ORDER BY updated_at DESC LIMIT 10",
+      "SELECT id, data, updated_at FROM recent_projects ORDER BY updated_at DESC LIMIT 10",
     );
-    const rows = stmt.all() as { id: string; data: string }[];
-    const results: Array<{ id: string; rootPath: string; name: string }> = [];
+    const rows = stmt.all() as { id: string; data: string; updated_at: number }[];
+    const results: Array<{ id: string; rootPath: string; name: string; lastAccessedAt: number }> =
+      [];
     for (const row of rows) {
       try {
-        results.push(JSON.parse(row.data) as { id: string; rootPath: string; name: string });
+        const project = JSON.parse(row.data) as { id: string; rootPath: string; name: string };
+        results.push({ ...project, lastAccessedAt: row.updated_at });
       } catch (err) {
         // Corrupt recent_projects row: quarantine then remove (Codex F-06).
         // 破損した recent_projects 行を隔離してから削除しセルフヒールする。

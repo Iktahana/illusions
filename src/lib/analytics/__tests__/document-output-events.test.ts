@@ -33,12 +33,21 @@ describe("document output analytics", () => {
   });
 
   it.each([
-    ["cancelled", null],
-    ["unavailable", undefined],
-    ["failed", { success: false, error: "/Users/alice/private/novel.mdi" }],
-  ] as const)("does not track a %s output", (_label, result) => {
+    ["cancelled", null, "document_output_cancelled", undefined],
+    ["unavailable", undefined, "document_output_cancelled", undefined],
+    [
+      "failed",
+      { success: false, error: "/Users/alice/private/novel.mdi" },
+      "document_output_failed",
+      "unknown",
+    ],
+  ] as const)("tracks a safe %s outcome", (_label, result, eventName, reason) => {
     trackDocumentOutputResult("export", "pdf", result);
 
-    expect(trackUsageEvent).not.toHaveBeenCalled();
+    expect(trackUsageEvent).toHaveBeenCalledWith(eventName, {
+      operation: "export",
+      format: "pdf",
+      ...(reason ? { reason } : {}),
+    });
   });
 });

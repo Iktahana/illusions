@@ -4,6 +4,7 @@ import type { EditorView } from "@milkdown/prose/view";
 import type { LintIssue } from "@/lib/linting/types";
 import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
 import { dispatchIfEditorViewAlive, isEditorViewAlive } from "@/shared/lib/editor-view-safety";
+import { trackUsageEvent } from "@/lib/analytics/usage-events";
 
 /**
  * Get the exact text a lint issue flagged.
@@ -97,6 +98,7 @@ export function useLintHandlers({
         centerEditorPosition(editorViewInstance, clampedFrom);
 
         editorViewInstance.focus();
+        trackUsageEvent("proofreading_issue_action_completed", { action: "navigate" });
       });
     },
     [editorViewInstance],
@@ -121,6 +123,7 @@ export function useLintHandlers({
       if (ignoreAll) {
         // Ignore all occurrences: no context hash
         ignoreCorrection(issue.ruleId, issueText);
+        trackUsageEvent("proofreading_issue_action_completed", { action: "ignore_all" });
       } else {
         // Ignore single occurrence: compute context hash from paragraph text
         // Find the paragraph containing this issue
@@ -137,6 +140,7 @@ export function useLintHandlers({
           return true;
         });
         ignoreCorrection(issue.ruleId, issueText, paragraphText);
+        trackUsageEvent("proofreading_issue_action_completed", { action: "ignore_one" });
       }
     },
     [editorViewInstance, ignoreCorrection],
@@ -148,7 +152,11 @@ export function useLintHandlers({
       if (!editorViewInstance) return;
       const issueText = getIssueText(issue, editorViewInstance);
       if (!issueText) return;
-      void addWordToUserDictionary(issueText);
+      void addWordToUserDictionary(issueText)
+        .then(() => {
+          trackUsageEvent("proofreading_issue_action_completed", { action: "add_dictionary" });
+        })
+        .catch(() => undefined);
     },
     [editorViewInstance, addWordToUserDictionary],
   );
@@ -167,9 +175,12 @@ export function useLintHandlers({
         notificationManager.warning("テキストが変更されたため修正を適用できません");
         return;
       }
-      dispatchIfEditorViewAlive(editorViewInstance, (view) =>
+      const applied = dispatchIfEditorViewAlive(editorViewInstance, (view) =>
         view.state.tr.insertText(issue.fix!.replacement, issue.from, issue.to),
       );
+      if (applied) {
+        trackUsageEvent("proofreading_issue_action_completed", { action: "apply_fix" });
+      }
     },
     [editorViewInstance],
   );

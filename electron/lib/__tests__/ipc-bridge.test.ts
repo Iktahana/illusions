@@ -174,6 +174,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
 
   it("system invoke/event channels keep their historical string values", () => {
     expect(SYSTEM_CHANNELS.invoke).toEqual({
+      getLocationContext: "system:get-location-context",
       getChromeVersion: "get-chrome-version",
       setDirty: "set-dirty",
       saveBeforeCloseDone: "save-before-close-done",

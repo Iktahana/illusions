@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 
 import { getProjectManager } from "@/lib/project/project-manager";
 import { getStorageService } from "@/lib/storage/storage-service";
+import { formatLocation } from "@/lib/location/format-location";
 
 import type { RecentProjectEntry } from "./types";
+import { classifyTelemetryFailure, trackUsageEvent } from "@/lib/analytics/usage-events";
 
 export const RECENT_PROJECTS_LOAD_TIMEOUT_MS = 10_000;
 
@@ -50,15 +52,21 @@ export function useRecentProjects(
       try {
         if (isElectron) {
           const storage = getStorageService();
-          const projects = await loadWithStartupTimeout(storage.getRecentProjects());
+          const [projects, locationContext] = await loadWithStartupTimeout(
+            Promise.all([
+              storage.getRecentProjects(),
+              window.electronAPI?.getLocationContext?.() ??
+                Promise.resolve({ platform: "linux", homePath: null }),
+            ]),
+          );
           if (!mounted) return;
 
           const entries: RecentProjectEntry[] = projects.map((p) => ({
             projectId: p.id,
             name: p.name,
-            lastAccessedAt: Date.now(),
-            rootDirName:
-              p.rootPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? p.rootPath,
+            lastAccessedAt: p.lastAccessedAt ?? 0,
+            displayPath: formatLocation({ rootPath: p.rootPath, ...locationContext }),
+            rootPath: p.rootPath,
           }));
           setRecentProjects(entries);
 
@@ -76,7 +84,7 @@ export function useRecentProjects(
             projectId: h.projectId,
             name: h.name ?? h.rootDirName ?? h.projectId,
             lastAccessedAt: h.lastAccessedAt,
-            rootDirName: h.rootDirName,
+            displayPath: h.rootDirName ?? h.name ?? h.projectId,
           }));
           setRecentProjects(entries);
 
@@ -107,13 +115,17 @@ export function useRecentProjects(
           const storage = getStorageService();
           await storage.removeRecentProject(projectId);
 
-          const updatedProjects = await storage.getRecentProjects();
+          const [updatedProjects, locationContext] = await Promise.all([
+            storage.getRecentProjects(),
+            window.electronAPI?.getLocationContext?.() ??
+              Promise.resolve({ platform: "linux", homePath: null }),
+          ]);
           const entries: RecentProjectEntry[] = updatedProjects.map((p) => ({
             projectId: p.id,
             name: p.name,
-            lastAccessedAt: Date.now(),
-            rootDirName:
-              p.rootPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? p.rootPath,
+            lastAccessedAt: p.lastAccessedAt ?? 0,
+            displayPath: formatLocation({ rootPath: p.rootPath, ...locationContext }),
+            rootPath: p.rootPath,
           }));
           setRecentProjects(entries);
           void window.electronAPI?.rebuildMenu?.();
@@ -126,11 +138,18 @@ export function useRecentProjects(
             projectId: h.projectId,
             name: h.name ?? h.rootDirName ?? h.projectId,
             lastAccessedAt: h.lastAccessedAt,
-            rootDirName: h.rootDirName,
+            displayPath: h.rootDirName ?? h.name ?? h.projectId,
           }));
           setRecentProjects(entries);
         }
+        trackUsageEvent("recent_project_removal_completed", {
+          runtime: isElectron ? "desktop" : "web",
+        });
       } catch (error) {
+        trackUsageEvent("recent_project_removal_failed", {
+          runtime: isElectron ? "desktop" : "web",
+          reason: classifyTelemetryFailure(error),
+        });
         console.error("Failed to delete recent project:", error);
       }
     },

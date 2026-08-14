@@ -162,6 +162,7 @@ interface EditorLayoutProps {
     tabs: TabState[];
     editorMode: EditorMode;
     newTab: (fileType?: SupportedFileExtension) => void;
+    newEmptyFile: () => void;
     openFile: () => Promise<void>;
     setNewFileTrigger: Dispatch<SetStateAction<number>>;
     handleTabBarContextMenu: (e: React.MouseEvent<HTMLDivElement>) => void;
@@ -467,7 +468,7 @@ export default function EditorLayout({
                             activityBar.setTopView("files");
                             mainArea.setNewFileTrigger((prev) => prev + 1);
                           } else {
-                            mainArea.newTab();
+                            mainArea.newEmptyFile();
                           }
                         }}
                         onOpenFile={() => void mainArea.openFile()}

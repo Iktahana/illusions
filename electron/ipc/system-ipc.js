@@ -1,6 +1,6 @@
 // System, window, and safe-storage IPC handlers
 
-const { ipcMain, BrowserWindow, safeStorage, powerMonitor } = require("electron");
+const { ipcMain, BrowserWindow, safeStorage, powerMonitor, app } = require("electron");
 const {
   SYSTEM_CHANNELS,
   MENU_CHANNELS,
@@ -10,6 +10,10 @@ const {
 } = require("../lib/ipc-channels");
 
 function registerSystemHandlers() {
+  ipcMain.handle(SYSTEM_CHANNELS.invoke.getLocationContext, () => ({
+    platform: process.platform,
+    homePath: app.getPath("home"),
+  }));
   ipcMain.handle(SYSTEM_CHANNELS.invoke.getChromeVersion, () => {
     const v = process.versions.chrome || "0";
     const major = Number.parseInt(String(v).split(".")[0] || "0", 10);

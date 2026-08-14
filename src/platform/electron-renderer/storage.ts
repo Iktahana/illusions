@@ -9,6 +9,7 @@ import type {
   AppState,
   RecentFile,
   RecentProject,
+  StoredRecentProject,
   EditorBuffer,
 } from "@/lib/storage/storage-types";
 import { getElectronAPI } from "@/platform/electron-renderer/electron-api";
@@ -160,7 +161,7 @@ export class ElectronStorageProvider implements IStorageService {
     return api.addRecentProject(project);
   }
 
-  async getRecentProjects(): Promise<RecentProject[]> {
+  async getRecentProjects(): Promise<StoredRecentProject[]> {
     await this.initialize();
     const api = this.getElectronAPI();
     return api.getRecentProjects();

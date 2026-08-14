@@ -271,6 +271,11 @@ export interface RecentProject {
   name: string;
 }
 
+/** Recent project returned from storage with its durable access timestamp. */
+export interface StoredRecentProject extends RecentProject {
+  lastAccessedAt: number;
+}
+
 /**
  * プラットフォーム差分を吸収するストレージサービスの中核インターフェース。
  * 実装は Web（IndexedDB）/ Electron（SQLite）双方を扱う。
@@ -365,7 +370,7 @@ export interface IStorageService {
    * Get all recent projects.
    * Electron: reads from SQLite. Web: returns empty array (uses ProjectManager instead).
    */
-  getRecentProjects(): Promise<RecentProject[]>;
+  getRecentProjects(): Promise<StoredRecentProject[]>;
 
   /**
    * Remove a project from the recent projects list by its ID.
@@ -404,12 +409,4 @@ export interface IStorageService {
    * すべてのデータを削除する。取り扱い注意。
    */
   clearAll(): Promise<void>;
-}
-
-/**
- * Electron環境かどうかを判定する型ガード。
- */
-export function isElectronEnvironment(): boolean {
-  if (typeof window === "undefined") return false;
-  return typeof (window as Window & { electronAPI?: unknown }).electronAPI !== "undefined";
 }

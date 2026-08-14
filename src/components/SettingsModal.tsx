@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
 import { SettingsNav } from "./settings/primitives";
 import { buildSettingsNavConfig } from "./settings/nav-config";
+import { trackUsageEvent, type UsageEventPropsMap } from "@/lib/analytics/usage-events";
 import { buildSettingsTabRegistry } from "./settings/tab-registry";
 import {
   isCategoryInScope,
@@ -70,9 +71,20 @@ export default function SettingsModal({
   const modalRef = useRef<HTMLDivElement>(null);
   /** Element that had focus before the modal opened — restored on close. */
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
   const headingId = "settings-modal-heading";
 
   useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      const category = resolveCategory(initialCategory);
+      trackUsageEvent("settings_category_opened", {
+        category: category.replaceAll(
+          "-",
+          "_",
+        ) as UsageEventPropsMap["settings_category_opened"]["category"],
+      });
+    }
+    wasOpenRef.current = isOpen;
     if (isOpen && initialCategory) {
       setActiveCategory(resolveCategory(initialCategory));
     }
@@ -236,7 +248,26 @@ export default function SettingsModal({
           <SettingsNav
             groups={navGroups}
             active={activeCategory}
-            onSelect={setActiveCategory}
+            onSelect={(category) => {
+              setActiveCategory(category);
+              trackUsageEvent("settings_category_opened", {
+                category: category.replaceAll("-", "_") as
+                  | "account"
+                  | "ai_connection"
+                  | "typography"
+                  | "scroll"
+                  | "pos_highlight"
+                  | "linting"
+                  | "speech"
+                  | "export"
+                  | "keymap"
+                  | "terminal"
+                  | "power"
+                  | "dictionary"
+                  | "privacy"
+                  | "about",
+              });
+            }}
             aria-label="設定カテゴリ"
           />
 

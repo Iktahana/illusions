@@ -29,7 +29,16 @@ import { useDockviewPersistence } from "@/lib/dockview/use-dockview-persistence"
 import "@/lib/dockview/dockview-theme.css";
 import { useElectronMenuHandlers } from "@/lib/menu/use-electron-menu-handlers";
 import { useExport } from "@/lib/export/use-export";
-import { trackDocumentOutputResult } from "@/lib/analytics/document-output-events";
+import {
+  trackDocumentOutputAttempt,
+  trackDocumentOutputFailure,
+  trackDocumentOutputResult,
+} from "@/lib/analytics/document-output-events";
+import {
+  classifyTelemetryFailure,
+  normalizeTelemetryFileType,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 import TxtExportDialog from "@/components/TxtExportDialog";
 import BugReportDialog from "@/components/BugReportDialog";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
@@ -257,7 +266,7 @@ function EditorPageContent() {
   usePowerSaving({
     powerSaveMode,
     autoPowerSaveOnBattery,
-    onPowerSaveModeChange: handlePowerSaveModeChange,
+    onPowerSaveModeChange: (enabled) => void handlePowerSaveModeChange(enabled, "system"),
     // Suggest (never force) power-save on battery, so the user stays in
     // control and the mode can always be turned off (#1402 follow-up).
     onSuggestPowerSave: () => {
@@ -727,11 +736,19 @@ function EditorPageContent() {
   }, [tabOpenFile, incrementEditorKey]);
 
   const newFile = useCallback(
-    (fileType?: SupportedFileExtension) => {
+    (
+      fileType?: SupportedFileExtension,
+      surface: "menu" | "shortcut" | "empty_state" | "context_menu" = "menu",
+    ) => {
       tabNewFile(fileType);
       incrementEditorKey();
+      trackUsageEvent("file_new_created", {
+        surface,
+        file_type: normalizeTelemetryFileType(fileType ?? ".mdi"),
+        context: isProjectMode(editorMode) ? "project" : "standalone",
+      });
     },
-    [tabNewFile, incrementEditorKey],
+    [tabNewFile, incrementEditorKey, editorMode],
   );
 
   // --- Tab bar empty area context menu ---
@@ -760,7 +777,7 @@ function EditorPageContent() {
             setTopView("files");
             setNewFileTrigger((prev) => prev + 1);
           } else {
-            newTab();
+            newFile(undefined, "context_menu");
           }
           break;
         case "open-file":
@@ -771,7 +788,7 @@ function EditorPageContent() {
           break;
       }
     },
-    [editorMode, newTab, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger],
+    [editorMode, newFile, openFile, handleNewTerminalTab, setTopView, setNewFileTrigger],
   );
 
   // Electron menu "New" and "Open" bindings (with safety checks)
@@ -835,20 +852,25 @@ function EditorPageContent() {
   const executeSystemPrint = useCallback(
     async (state: PrintDialogState, settings: PdfExportSettings): Promise<boolean> => {
       if (!window.electronAPI?.printDocument) {
+        trackUsageEvent("print_failed", { reason: "unavailable" });
         notificationManager.error("印刷機能を利用できません。アプリを再起動してください");
         return false;
       }
       try {
+        trackUsageEvent("print_attempted");
         const result = await window.electronAPI.printDocument(
           state.content,
           toPdfGenerationOptions(settings, state.metadata, state.fileType),
         );
         if (result && !result.success) {
+          trackUsageEvent("print_failed", { reason: "unknown" });
           notificationManager.error(`印刷に失敗しました: ${result.error}`);
           return false;
         }
+        trackUsageEvent("print_completed");
         return true;
       } catch (error) {
+        trackUsageEvent("print_failed", { reason: classifyTelemetryFailure(error) });
         const message = error instanceof Error ? error.message : "不明なエラー";
         notificationManager.error(`印刷に失敗しました: ${message}`);
         return false;
@@ -870,6 +892,7 @@ function EditorPageContent() {
           .then((result) => {
             const options = result?.options as PdfExportSettings | undefined;
             if (options) void executeSystemPrint(state, options);
+            else trackUsageEvent("print_cancelled");
           })
           .catch((error: unknown) => {
             const message = error instanceof Error ? error.message : "不明なエラー";
@@ -924,33 +947,42 @@ function EditorPageContent() {
       };
       exportDialogStateRef.current = state;
       if (window.electronAPI?.openExportDialog) {
-        void window.electronAPI.openExportDialog({ kind: "document", ...state }).then((result) => {
-          const options = result?.options;
-          if (!options) return;
-          if (format === "html")
-            void window.electronAPI?.exportHTML?.(
-              content,
-              state.fileType,
-              metadata.title,
-              options as HtmlExportOptions,
-            );
-          if (format === "pdf")
-            void window.electronAPI?.exportPDF?.(
-              content,
-              toPdfGenerationOptions(options as PdfExportSettings, metadata, state.fileType),
-            );
-          if (format === "docx")
-            void window.electronAPI?.exportDOCX?.(content, {
-              metadata,
-              settings: options as UnifiedExportSettings,
-              fileType: state.fileType,
-            });
-          if (format === "epub")
-            void window.electronAPI?.exportEPUB?.(content, {
-              ...(options as EpubExportOptions),
-              fileType: state.fileType,
-            });
-        });
+        void window.electronAPI
+          .openExportDialog({ kind: "document", ...state })
+          .then(async (result) => {
+            const options = result?.options;
+            if (!options) {
+              trackDocumentOutputResult("export", format, null);
+              return;
+            }
+            trackDocumentOutputAttempt("export", format);
+            let outputResult;
+            if (format === "html")
+              outputResult = await window.electronAPI?.exportHTML?.(
+                content,
+                state.fileType,
+                metadata.title,
+                options as HtmlExportOptions,
+              );
+            if (format === "pdf")
+              outputResult = await window.electronAPI?.exportPDF?.(
+                content,
+                toPdfGenerationOptions(options as PdfExportSettings, metadata, state.fileType),
+              );
+            if (format === "docx")
+              outputResult = await window.electronAPI?.exportDOCX?.(content, {
+                metadata,
+                settings: options as UnifiedExportSettings,
+                fileType: state.fileType,
+              });
+            if (format === "epub")
+              outputResult = await window.electronAPI?.exportEPUB?.(content, {
+                ...(options as EpubExportOptions),
+                fileType: state.fileType,
+              });
+            trackDocumentOutputResult("export", format, outputResult);
+          })
+          .catch((error: unknown) => trackDocumentOutputFailure("export", format, error));
         return;
       }
       setExportDialogState(state);
@@ -970,6 +1002,7 @@ function EditorPageContent() {
       });
 
       try {
+        trackDocumentOutputAttempt("export", "html");
         const result = await window.electronAPI.exportHTML(
           dialogState.content,
           dialogState.fileType,
@@ -986,6 +1019,7 @@ function EditorPageContent() {
         }
         notificationManager.success("HTMLをエクスポートしました");
       } catch (error) {
+        trackDocumentOutputFailure("export", "html", error);
         notificationManager.dismiss(progressId);
         const message = error instanceof Error ? error.message : "不明なエラー";
         notificationManager.error(`HTMLのエクスポートに失敗しました: ${message}`);
@@ -1009,6 +1043,7 @@ function EditorPageContent() {
       });
 
       try {
+        trackDocumentOutputAttempt("export", "pdf");
         const result = await window.electronAPI.exportPDF(
           dialogState.content,
           toPdfGenerationOptions(settings, dialogState.metadata, dialogState.fileType),
@@ -1028,6 +1063,7 @@ function EditorPageContent() {
 
         notificationManager.success("PDFをエクスポートしました");
       } catch (error) {
+        trackDocumentOutputFailure("export", "pdf", error);
         notificationManager.dismiss(progressId);
         const message = error instanceof Error ? error.message : "不明なエラー";
         notificationManager.error(`PDFのエクスポートに失敗しました: ${message}`);
@@ -1059,6 +1095,7 @@ function EditorPageContent() {
       });
 
       try {
+        trackDocumentOutputAttempt("export", "docx");
         const result = await window.electronAPI.exportDOCX(dialogState.content, {
           metadata: dialogState.metadata,
           settings,
@@ -1083,6 +1120,7 @@ function EditorPageContent() {
 
         notificationManager.success("DOCXをエクスポートしました");
       } catch (error) {
+        trackDocumentOutputFailure("export", "docx", error);
         notificationManager.dismiss(progressId);
         const message = error instanceof Error ? error.message : "不明なエラー";
         notificationManager.error(`DOCXのエクスポートに失敗しました: ${message}`);
@@ -1111,6 +1149,7 @@ function EditorPageContent() {
       });
 
       try {
+        trackDocumentOutputAttempt("export", "epub");
         // Electron IPC serializes Uint8Array automatically
         const result = await window.electronAPI.exportEPUB(dialogState.content, epubOptions);
 
@@ -1128,6 +1167,7 @@ function EditorPageContent() {
 
         notificationManager.success("EPUBをエクスポートしました");
       } catch (error) {
+        trackDocumentOutputFailure("export", "epub", error);
         notificationManager.dismiss(progressId);
         const message = error instanceof Error ? error.message : "不明なエラー";
         notificationManager.error(`EPUBのエクスポートに失敗しました: ${message}`);
@@ -1331,7 +1371,10 @@ function EditorPageContent() {
     incrementEditorKey,
     nextTab,
     prevTab,
-    newTab,
+    newTab: useCallback(
+      (fileType?: SupportedFileExtension) => newFile(fileType, "shortcut"),
+      [newFile],
+    ),
     closeTab,
     switchToIndex,
     tabs,
@@ -1339,26 +1382,34 @@ function EditorPageContent() {
     isEditorTabActive: !!activeEditorTab,
     splitEditorRight: useCallback(() => splitEditor("right"), [splitEditor]),
     splitEditorDown: useCallback(() => splitEditor("down"), [splitEditor]),
-    toggleFiles: useCallback(
-      () => setTopView(topView === "files" ? "none" : "files"),
-      [setTopView, topView],
-    ),
-    toggleExplorer: useCallback(
-      () => setTopView(topView === "explorer" ? "none" : "explorer"),
-      [setTopView, topView],
-    ),
-    toggleSearch: useCallback(
-      () => setTopView(topView === "search" ? "none" : "search"),
-      [setTopView, topView],
-    ),
-    toggleDictionary: useCallback(
-      () => setBottomView(bottomView === "dictionary" ? "none" : "dictionary"),
-      [bottomView, setBottomView],
-    ),
-    toggleWordfreq: useCallback(
-      () => setBottomView(bottomView === "wordfreq" ? "none" : "wordfreq"),
-      [bottomView, setBottomView],
-    ),
+    toggleFiles: useCallback(() => {
+      if (topView !== "files")
+        trackUsageEvent("feature_view_opened", { view: "files", surface: "shortcut" });
+      setTopView(topView === "files" ? "none" : "files");
+    }, [setTopView, topView]),
+    toggleExplorer: useCallback(() => {
+      if (topView !== "explorer")
+        trackUsageEvent("feature_view_opened", { view: "explorer", surface: "shortcut" });
+      setTopView(topView === "explorer" ? "none" : "explorer");
+    }, [setTopView, topView]),
+    toggleSearch: useCallback(() => {
+      if (topView !== "search")
+        trackUsageEvent("feature_view_opened", { view: "search", surface: "shortcut" });
+      setTopView(topView === "search" ? "none" : "search");
+    }, [setTopView, topView]),
+    toggleDictionary: useCallback(() => {
+      if (bottomView !== "dictionary")
+        trackUsageEvent("feature_view_opened", { view: "dictionary", surface: "shortcut" });
+      setBottomView(bottomView === "dictionary" ? "none" : "dictionary");
+    }, [bottomView, setBottomView]),
+    toggleWordfreq: useCallback(() => {
+      if (bottomView !== "wordfreq")
+        trackUsageEvent("feature_view_opened", {
+          view: "word_frequency",
+          surface: "shortcut",
+        });
+      setBottomView(bottomView === "wordfreq" ? "none" : "wordfreq");
+    }, [bottomView, setBottomView]),
     newTerminal: isTerminalAvailable ? handleNewTerminalTab : undefined,
     toggleOutline: useCallback(
       () => setTopView(topView === "outline" ? "none" : "outline"),
@@ -1520,6 +1571,7 @@ function EditorPageContent() {
                 isOpen={showPermissionPrompt}
                 projectName={permissionPromptData.projectName}
                 handle={permissionPromptData.handle}
+                source={permissionPromptData.source}
                 onGranted={handlePermissionGranted}
                 onDenied={handlePermissionDenied}
               />
@@ -1688,7 +1740,12 @@ function EditorPageContent() {
           handleApplyRuby,
           exportDialog: {
             state: exportDialogState,
-            onClose: () => setExportDialogState(null),
+            onClose: () => {
+              if (exportDialogState) {
+                trackDocumentOutputResult("export", exportDialogState.format, null);
+              }
+              setExportDialogState(null);
+            },
             onHtmlExport: handleHtmlExportConfirm,
             onPdfExport: handlePdfExportConfirm,
             onDocxExport: handleDocxExportConfirm,
@@ -1699,7 +1756,10 @@ function EditorPageContent() {
           },
           printDialog: {
             state: printDialogState,
-            onClose: () => setPrintDialogState(null),
+            onClose: () => {
+              trackUsageEvent("print_cancelled");
+              setPrintDialogState(null);
+            },
             onPrint: handlePrintConfirm,
             content: printDialogState?.content ?? "",
             metadata: printDialogState?.metadata ?? { title: "" },
@@ -1735,6 +1795,7 @@ function EditorPageContent() {
           tabs,
           editorMode,
           newTab,
+          newEmptyFile: () => newFile(undefined, "empty_state"),
           openFile,
           setNewFileTrigger,
           handleTabBarContextMenu,

@@ -4,22 +4,7 @@
 
 const { ipcMain } = require("electron");
 const { ANALYTICS_CHANNELS } = require("../lib/ipc-channels");
-const usageEventContract = require("../../src/lib/analytics/usage-event-contract.json");
-
-function isWhitelistedProps(eventName, props) {
-  const eventContract = usageEventContract.events[eventName];
-  if (!eventContract) return false;
-  if (props === undefined) return true;
-  if (typeof props !== "object" || props === null) return false;
-  return Object.entries(props).every(([key, value]) => {
-    const allowedValues = eventContract[key];
-    if (!Array.isArray(allowedValues)) return false;
-    if (typeof value === "number")
-      return Number.isFinite(value) && allowedValues.includes("__number");
-    if (typeof value !== "string") return false;
-    return allowedValues.includes(value);
-  });
-}
+const { isWhitelistedProps, sendUsageEvent } = require("../analytics");
 
 /**
  * @typedef {Object} AnalyticsHandlerDependencies
@@ -41,17 +26,7 @@ function createAnalyticsTrackEventHandler(
 ) {
   return async (_event, eventName, props) => {
     if (typeof eventName !== "string" || !eventName) return;
-    if (!isWhitelistedProps(eventName, props)) return;
-    if (!hasAppKey()) return;
-
-    try {
-      const appState = await getStorageManager().loadAppState();
-      if (appState?.usageAnalyticsConsent === false) return;
-
-      await trackEvent(eventName, props);
-    } catch (error) {
-      console.warn("[Analytics IPC] trackEvent failed:", error);
-    }
+    await sendUsageEvent(eventName, props, { getStorageManager, trackEvent, hasAppKey });
   };
 }
 

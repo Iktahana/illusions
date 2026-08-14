@@ -23,6 +23,11 @@ import DictionaryEntryDialog from "./Dictionary/DictionaryEntryDialog";
 import { getDictService } from "@/lib/dict/dict-service";
 import type { DictEntry, DictExample, DictDownloadStatus } from "@/lib/dict/dict-types";
 import { isElectronRenderer } from "@/lib/utils/runtime-env";
+import {
+  bucketTelemetryCount,
+  classifyTelemetryFailure,
+  trackUsageEvent,
+} from "@/lib/analytics/usage-events";
 
 // Web dictionary sources
 interface WebDictionarySource {
@@ -83,6 +88,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
 
   // #1932: generation counter to discard stale async query responses
   const searchGenerationRef = useRef(0);
+  const searchSourceRef = useRef<"panel" | "selection">("panel");
 
   // Persistence
   const dictService = getUserDictionaryService();
@@ -136,6 +142,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
   // Update search when initialSearchTerm changes
   useEffect(() => {
     if (initialSearchTerm && searchTriggerId) {
+      searchSourceRef.current = "selection";
       setGlobalSearchQuery(initialSearchTerm);
       setActiveSearchQuery(initialSearchTerm);
     }
@@ -158,6 +165,11 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
       .then((result) => {
         if (generation !== searchGenerationRef.current) return; // stale — discard
         setMasterResults(result.entries);
+        trackUsageEvent("dictionary_search_completed", {
+          source: searchSourceRef.current,
+          result_count_bucket: bucketTelemetryCount(result.entries.length),
+        });
+        searchSourceRef.current = "panel";
       })
       .catch(() => {
         if (generation !== searchGenerationRef.current) return; // stale — discard
@@ -236,6 +248,9 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
 
     try {
       await persistEntries(updated);
+      trackUsageEvent("dictionary_entry_changed", {
+        operation: editingEntry ? "update" : "add",
+      });
     } catch {
       // #1934: Rollback optimistic update and keep dialog open for retry
       setUserEntries(previousEntries);
@@ -260,6 +275,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
 
       try {
         await persistEntries(updated);
+        trackUsageEvent("dictionary_entry_changed", { operation: "remove" });
       } catch {
         // #1934: Rollback — the entry wasn't actually removed from disk
         setUserEntries(previousEntries);
@@ -301,7 +317,10 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
         };
       }
     ).electronAPI?.dict;
-    if (!api) return;
+    if (!api) {
+      trackUsageEvent("dictionary_download_failed", { trigger: "manual", reason: "unavailable" });
+      return;
+    }
 
     setLocalInstallStatus("downloading");
     setDownloadProgress(0);
@@ -314,9 +333,16 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
       .download()
       .then((result) => {
         setLocalInstallStatus(result.success ? "installed" : "error");
+        if (result.success) trackUsageEvent("dictionary_download_completed", { trigger: "manual" });
+        else
+          trackUsageEvent("dictionary_download_failed", { trigger: "manual", reason: "unknown" });
       })
-      .catch(() => {
+      .catch((error) => {
         setLocalInstallStatus("error");
+        trackUsageEvent("dictionary_download_failed", {
+          trigger: "manual",
+          reason: classifyTelemetryFailure(error),
+        });
       })
       .finally(() => {
         cleanup?.();
@@ -361,6 +387,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            searchSourceRef.current = "panel";
             setActiveSearchQuery(globalSearchQuery.trim());
           }}
           className="flex gap-2"
@@ -570,6 +597,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                         </div>
                         <button
                           onClick={() => {
+                            trackUsageEvent("dictionary_lookup_opened", { provider: "genji" });
                             const url = `https://dict.illusions.app/results?q=${encodeURIComponent(activeSearchQuery)}`;
                             if (isElectronRenderer() && window.electronAPI?.openDictionaryPopup) {
                               window.electronAPI.openDictionaryPopup(
@@ -621,6 +649,7 @@ function Dictionary({ content, initialSearchTerm, searchTriggerId, editorMode }:
                         encodeURIComponent(activeSearchQuery),
                       );
                       const handleOpenDictionary = () => {
+                        trackUsageEvent("dictionary_lookup_opened", { provider: "unknown" });
                         if (isElectronRenderer() && window.electronAPI?.openDictionaryPopup) {
                           window.electronAPI.openDictionaryPopup(
                             searchUrl,

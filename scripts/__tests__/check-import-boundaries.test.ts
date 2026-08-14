@@ -68,10 +68,10 @@ describe("import boundary checker", () => {
       ).toBeNull();
     });
 
-    it("normalizes src paths before matching exact browser-platform exceptions", () => {
+    it("normalizes src paths before enforcing browser-platform boundaries", () => {
       expect(
         validateImportBoundary("src/lib/storage/storage-service.ts", "@/platform/browser/storage"),
-      ).toBeNull();
+      ).toContain("browser-platform");
       expect(
         validateImportBoundary("src/lib/storage/another-service.ts", "@/platform/browser/storage"),
       ).toContain("browser-platform");
@@ -97,6 +97,18 @@ describe("import boundary checker", () => {
     expect(
       validateImportBoundary("features/editor/model/use-editor.ts", "@/electron/main"),
     ).toContain("preload");
+  });
+
+  it("rejects renderer imports of the private MDI core", () => {
+    expect(
+      validateImportBoundary("src/lib/document-format/index.ts", "@illusions-lab/mdi-core"),
+    ).toContain("public @illusions-lab/mdi APIs");
+  });
+
+  it("rejects reintroducing the removed Japanese-novel package", () => {
+    expect(
+      validateImportBoundary("src/components/editor/Editor.tsx", "milkdown-plugin-japanese-novel"),
+    ).toContain("must not be reintroduced");
   });
 
   it("rejects shared-to-feature imports", () => {
