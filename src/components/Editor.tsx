@@ -15,6 +15,7 @@ import { getDocumentAdapter } from "@/lib/document-format";
 import { EditorInteractionStore, type EditorInteractionHandle } from "@/lib/editor-interaction";
 import { EditorInteractionProvider } from "@/lib/editor-interaction/context";
 import EditorToolbar from "./editor/EditorToolbar";
+import BubbleMenu from "./editor/BubbleMenu";
 
 interface EditorProps {
   initialContent?: string;
@@ -108,6 +109,7 @@ export default function NovelEditor({
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
+        <BubbleMenu isVertical={isVertical} />
       </EditorInteractionProvider>
     </div>
   );

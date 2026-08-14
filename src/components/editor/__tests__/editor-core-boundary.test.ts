@@ -26,7 +26,6 @@ describe("new editor core boundary", () => {
       readSource("src/components/editor/MilkdownEditor.tsx"),
     ].join("\n");
     const removedFeatures = [
-      "BubbleMenu",
       "EditorContextMenu",
       "SelectionCounter",
       "linting-plugin",
@@ -42,7 +41,6 @@ describe("new editor core boundary", () => {
 
   it("keeps deleted legacy implementation entry points absent", () => {
     const removedPaths = [
-      "src/components/BubbleMenu.tsx",
       "src/components/EditorContextMenu.tsx",
       "src/lib/editor-page/linting-plugin/index.ts",
       "src/lib/editor-page/novel-editor-features/index.ts",

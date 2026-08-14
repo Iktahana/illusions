@@ -1,6 +1,8 @@
 import { AllSelection, NodeSelection } from "@milkdown/prose/state";
 import type { EditorView } from "@milkdown/prose/view";
 import { redo, undo } from "@milkdown/prose/history";
+import { setBlockType, wrapIn } from "@milkdown/prose/commands";
+import { wrapInList } from "@milkdown/prose/schema-list";
 import type { DocumentAdapter, DocumentFormat } from "@/lib/document-format";
 import { commandById, commandRegistry } from "./registry";
 import type {
@@ -216,12 +218,34 @@ export class EditorInteractionStore implements EditorInteractionHandle {
         tr = active ? tr.removeMark(from, to, mark) : tr.addMark(from, to, mark.create());
       } else if (command.id === "format.clear") {
         tr = tr.removeMark(from, to);
+        const paragraph = view.state.schema.nodes.paragraph;
+        if (paragraph) {
+          view.dispatch(tr);
+          setBlockType(paragraph)(view.state, view.dispatch, view);
+          view.focus();
+          return { status: "executed" };
+        }
       } else if (command.id === "format.heading") {
         const type = view.state.schema.nodes.heading;
         if (!type) return { status: "unavailable" };
         tr.doc.nodesBetween(from, to, (node, pos) => {
           if (node.isTextblock) tr = tr.setNodeMarkup(pos, type, { level: command.level ?? 1 });
         });
+      } else if (command.id === "format.blockquote") {
+        const type = view.state.schema.nodes.blockquote;
+        if (!type || !wrapIn(type)(view.state, view.dispatch, view))
+          return { status: "unavailable" };
+        view.focus();
+        return { status: "executed" };
+      } else if (command.id === "format.bulletList" || command.id === "format.orderedList") {
+        const type =
+          view.state.schema.nodes[
+            command.id === "format.bulletList" ? "bullet_list" : "ordered_list"
+          ];
+        if (!type || !wrapInList(type)(view.state, view.dispatch, view))
+          return { status: "unavailable" };
+        view.focus();
+        return { status: "executed" };
       } else return { status: "unavailable" };
       view.dispatch(tr.scrollIntoView());
       view.focus();
