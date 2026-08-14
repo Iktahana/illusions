@@ -1,0 +1,46 @@
+name: Electron UI E2E
+
+on:
+  pull_request:
+    branches: [alpha, beta, main]
+  push:
+    branches: [alpha, beta, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: electron-e2e-${{ github.ref }}-${{ matrix.os }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  electron-e2e:
+    name: Electron E2E (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run generate:credits
+      - run: npm run build:electron-renderer
+      - run: npm run bundle:electron
+      - run: npm run test:e2e
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: electron-e2e-${{ matrix.os }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14

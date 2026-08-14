@@ -93,6 +93,7 @@
     "@milkdown/theme-nord": "^7.22.0",
     "@milkdown/transformer": "7.22.0",
     "@milkdown/utils": "7.22.0",
+    "@playwright/test": "^1.62.1",
     "@prosemirror-adapter/react": "^0.5.5",
     "@types/archiver": "^7.0.0",
     "@types/diff": "^8.0.0",
