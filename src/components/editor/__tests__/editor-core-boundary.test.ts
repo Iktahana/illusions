@@ -86,7 +86,7 @@ describe("new editor core boundary", () => {
         location.endsWith(suffix),
       );
       expect(installations, packageName).toHaveLength(1);
-      expect(installations[0]?.[1].version, packageName).toBe("7.21.3");
+      expect(installations[0]?.[1].version, packageName).toBe("7.22.0");
     }
   });
 
