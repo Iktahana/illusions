@@ -13,6 +13,7 @@ import { localPreferences } from "@/lib/storage/local-preferences";
 import type { DocumentFormat } from "@/lib/document-format";
 import { getDocumentAdapter } from "@/lib/document-format";
 import { EditorInteractionStore, type EditorInteractionHandle } from "@/lib/editor-interaction";
+import { buildEditorContextMenu } from "@/lib/editor-interaction";
 import { EditorInteractionProvider } from "@/lib/editor-interaction/context";
 import EditorToolbar from "./editor/EditorToolbar";
 import BubbleMenu from "./editor/BubbleMenu";
@@ -84,8 +85,20 @@ export default function NovelEditor({
     return () => registerWritingModeToggle?.(null);
   }, [registerWritingModeToggle, toggleWritingMode]);
 
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (!window.electronAPI?.showEditorContextMenu) return;
+      event.preventDefault();
+      void window.electronAPI.showEditorContextMenu(
+        buildEditorContextMenu(interaction.getSnapshot().availability),
+      );
+    },
+    [interaction],
+  );
+
   return (
     <div
+      onContextMenu={handleContextMenu}
       className={clsx(
         "flex h-full min-h-0 flex-col overflow-hidden bg-background-secondary",
         className,

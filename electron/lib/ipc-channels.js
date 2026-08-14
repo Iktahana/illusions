@@ -124,6 +124,7 @@ const SHELL_CHANNELS = Object.freeze({
     openExternal: "open-external",
     openDictionaryPopup: "open-dictionary-popup",
     showContextMenu: "show-context-menu",
+    showEditorContextMenu: "show-editor-context-menu",
   }),
   event: Object.freeze({}),
 });

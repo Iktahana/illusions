@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { createRequire } from "node:module";
 import { buildEditorContextMenu, commandRegistry } from "../registry";
+const loadModule = createRequire(import.meta.url);
+const { EDITOR_COMMANDS } = loadModule("../../../../electron/lib/editor-command-registry.js");
 
 describe("editor command registry", () => {
   it("has unique allowlisted IDs and native roles", () => {
@@ -7,6 +10,18 @@ describe("editor command registry", () => {
     expect(
       commandRegistry.filter(({ nativeRole }) => nativeRole).map(({ nativeRole }) => nativeRole),
     ).toEqual(["undo", "redo", "cut", "copy", "paste", "selectAll"]);
+  });
+
+  it("keeps renderer and Electron native metadata in parity", () => {
+    const rendererNative = Object.fromEntries(
+      commandRegistry
+        .filter(({ nativeRole }) => nativeRole)
+        .map(({ id, label, accelerator, nativeRole }) => [
+          id,
+          { label, accelerator, role: nativeRole },
+        ]),
+    );
+    expect(EDITOR_COMMANDS).toEqual(rendererNative);
   });
 
   it("builds context menu enabled state from availability", () => {

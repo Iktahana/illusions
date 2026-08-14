@@ -47,6 +47,12 @@ declare global {
     showContextMenu?: (
       items: Array<{ type?: string; label?: string; action?: string; accelerator?: string }>,
     ) => Promise<string | null>;
+    showEditorContextMenu?: (
+      items: Array<
+        | { command: import("@/lib/editor-interaction").EditorCommandId; enabled: boolean }
+        | { separator: true }
+      >,
+    ) => Promise<import("@/lib/editor-interaction").EditorCommandId | null>;
     onSaveBeforeClose?: (callback: () => void) => (() => void) | void;
     onFlushStateBeforeClose?: (callback: () => void) => (() => void) | void;
     onOpenFileFromSystem?: (
