@@ -449,6 +449,7 @@ describe("ElectronStorageManager — corrupt JSON recovery", () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe("proj-good");
+      expect(results[0].lastAccessedAt).toBe(2);
       expect(fakeDb.store.recent_projects).toHaveLength(1);
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining("recent_projects"),

@@ -17,12 +17,14 @@ import { useEffect, useState, useRef } from "react";
 import DesktopAppDownloadButton from "@/components/DesktopAppDownloadButton";
 import GlassDialog from "@/shared/ui/GlassDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { safeLocationTitle } from "@/lib/location/format-location";
 
 interface RecentProject {
   projectId: string;
   name: string;
   lastAccessedAt: number;
-  rootDirName?: string;
+  displayPath: string;
+  rootPath?: string;
 }
 
 interface WelcomeScreenProps {
@@ -350,9 +352,12 @@ export default function WelcomeScreen({
                     <FileText className="h-4 w-4 shrink-0 text-foreground-tertiary" />
                     <div className="min-w-0 flex-1">
                       <span className="block truncate text-sm text-foreground">{project.name}</span>
-                      {project.rootDirName && (
-                        <span className="block truncate text-xs text-foreground-muted">
-                          ~/{project.rootDirName}
+                      {project.displayPath && (
+                        <span
+                          className="block truncate text-xs text-foreground-muted"
+                          title={safeLocationTitle(project.rootPath ?? project.displayPath)}
+                        >
+                          {project.displayPath}
                         </span>
                       )}
                     </div>

@@ -26,6 +26,10 @@ declare global {
       fileType?: string,
     ) => Promise<string | null | { success: false; error?: string; code?: string }>;
     getChromeVersion: () => Promise<number>;
+    getLocationContext?: () => Promise<{
+      platform: NodeJS.Platform;
+      homePath: string;
+    }>;
     setDirty: (dirty: boolean) => Promise<void>;
     /**
      * Close-handshake terminator. Name is historical (originally tied to save).
@@ -256,7 +260,9 @@ declare global {
       clearEditorBuffer: () => Promise<void>;
       clearAll: () => Promise<void>;
       addRecentProject: (project: { id: string; rootPath: string; name: string }) => Promise<void>;
-      getRecentProjects: () => Promise<Array<{ id: string; rootPath: string; name: string }>>;
+      getRecentProjects: () => Promise<
+        Array<{ id: string; rootPath: string; name: string; lastAccessedAt: number }>
+      >;
       removeRecentProject: (projectId: string) => Promise<void>;
       setItem: (key: string, value: string) => Promise<void>;
       getItem: (key: string) => Promise<string | null>;

@@ -132,6 +132,7 @@ const SHELL_CHANNELS = Object.freeze({
 // electron/window-manager.js pushes the close-handshake events)
 const SYSTEM_CHANNELS = Object.freeze({
   invoke: Object.freeze({
+    getLocationContext: "system:get-location-context",
     getChromeVersion: "get-chrome-version",
     setDirty: "set-dirty",
     saveBeforeCloseDone: "save-before-close-done",
