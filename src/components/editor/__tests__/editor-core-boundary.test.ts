@@ -26,7 +26,6 @@ describe("new editor core boundary", () => {
       readSource("src/components/editor/MilkdownEditor.tsx"),
     ].join("\n");
     const removedFeatures = [
-      "EditorContextMenu",
       "SelectionCounter",
       "linting-plugin",
       "novel-editor-features",

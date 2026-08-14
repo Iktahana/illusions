@@ -69,6 +69,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   reevaluateUpdateChannel: invokeChannel(UPDATE_CHANNELS.invoke.reevaluateChannel, { arity: 0 }),
   openDictionaryPopup: invokeChannel(SHELL_CHANNELS.invoke.openDictionaryPopup, { arity: 2 }),
   showContextMenu: invokeChannel(SHELL_CHANNELS.invoke.showContextMenu, { arity: 1 }),
+  showEditorContextMenu: invokeChannel(SHELL_CHANNELS.invoke.showEditorContextMenu, { arity: 1 }),
   onMenuNew: eventChannel(MENU_CHANNELS.event.newTriggered, { arity: 0 }),
   onMenuOpen: eventChannel(MENU_CHANNELS.event.openTriggered, { arity: 0 }),
   onMenuSave: eventChannel(MENU_CHANNELS.event.saveTriggered, { arity: 0 }),

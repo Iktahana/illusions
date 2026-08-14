@@ -3,6 +3,7 @@
 const { ipcMain, BrowserWindow, Menu, shell, app } = require("electron");
 const { SHELL_CHANNELS } = require("../lib/ipc-channels");
 const { createOpenPathHandler, createRevealPathHandler } = require("../lib/shell-path-policy");
+const { buildEditorContextMenuTemplate } = require("../lib/editor-command-registry");
 
 function registerShellHandlers() {
   ipcMain.handle(SHELL_CHANNELS.invoke.showInFileManager, createOpenPathHandler(shell.openPath));
@@ -114,6 +115,24 @@ function registerShellHandlers() {
         window: win,
         callback: () => resolve(null),
       });
+    });
+  });
+
+  ipcMain.handle(SHELL_CHANNELS.invoke.showEditorContextMenu, (_event, items) => {
+    const template = buildEditorContextMenuTemplate(items);
+    if (!template) return null;
+    const win = BrowserWindow.getFocusedWindow();
+    if (!win) return null;
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (!settled) {
+          settled = true;
+          resolve(value);
+        }
+      };
+      const menu = Menu.buildFromTemplate(template);
+      menu.popup({ window: win, callback: () => finish(null) });
     });
   });
 }
