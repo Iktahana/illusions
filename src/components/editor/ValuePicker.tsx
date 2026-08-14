@@ -32,6 +32,8 @@ export default function ValuePicker({
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
+        aria-label={label}
         onClick={() => setOpen((prev) => !prev)}
         className="hover:text-foreground transition-colors cursor-pointer"
         title={label}
@@ -42,6 +44,8 @@ export default function ValuePicker({
         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50 min-w-[56px] max-h-[200px] overflow-y-auto rounded-lg border border-border bg-background-secondary shadow-lg py-1 text-xs">
           {options.map((opt) => (
             <button
+              type="button"
+              aria-label={`${label}: ${opt % 1 === 0 ? opt : opt.toFixed(1)}${unit}`}
               key={opt}
               onClick={() => {
                 onChange(opt);

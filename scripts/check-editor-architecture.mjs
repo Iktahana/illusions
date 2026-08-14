@@ -12,7 +12,6 @@ const retiredEditorPaths = [
   "src/components/BubbleMenu.tsx",
   "src/components/EditorContextMenu.tsx",
   "src/components/SelectionCounter.tsx",
-  "src/components/editor/EditorToolbar.tsx",
   "src/lib/editor-page/linting-plugin/index.ts",
   "src/lib/editor-page/novel-editor-features",
   "src/lib/editor-page/pos-highlight",
