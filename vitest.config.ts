@@ -37,6 +37,7 @@ export default defineConfig({
         "src/components/Editor.tsx",
         "src/components/editor/MilkdownEditor.tsx",
         "src/components/editor/EditorToolbar.tsx",
+        "src/components/editor/BubbleMenu.tsx",
         "src/components/editor/ValuePicker.tsx",
       ],
       exclude: [
