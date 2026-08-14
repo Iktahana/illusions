@@ -20,6 +20,7 @@ import {
 import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
 import { commitPendingComposition } from "@/lib/editor-page/commit-pending-composition";
+import { mdiBlockNumbers, setMdiBlockNumbers } from "@/lib/editor-page/mdi-block-numbers";
 
 interface MilkdownEditorProps {
   initialContent: string;
@@ -58,7 +59,7 @@ export default function MilkdownEditor({
   onExternalContentApplied,
   registerFlush,
 }: MilkdownEditorProps): React.ReactElement {
-  const { fontScale, lineHeight, paragraphSpacing, textIndent, fontFamily } =
+  const { fontScale, lineHeight, paragraphSpacing, showParagraphNumbers, textIndent, fontFamily } =
     useTypographySettings();
   const adapter = useMemo(() => getDocumentAdapter(documentFormat), [documentFormat]);
   const contentRef = useRef(initialContent);
@@ -67,6 +68,7 @@ export default function MilkdownEditor({
   const [readyGeneration, setReadyGeneration] = useState<number | null>(null);
   const modeRef = useRef(isVertical);
   const lineLengthRef = useRef(lineLength);
+  const showParagraphNumbersRef = useRef(showParagraphNumbers);
   const editorGenerationRef = useRef({ adapter, documentFormat, value: 0 });
 
   if (
@@ -84,6 +86,7 @@ export default function MilkdownEditor({
   onChangeRef.current = onChange;
   modeRef.current = isVertical;
   lineLengthRef.current = lineLength;
+  showParagraphNumbersRef.current = showParagraphNumbers;
 
   const editorHandle = useEditor(
     (root) => {
@@ -99,6 +102,12 @@ export default function MilkdownEditor({
             const content = encodeDocument(documentFormat, adapter, ctx, document);
             contentRef.current = content;
             onChangeRef.current?.(content);
+            if (documentFormat === "mdi") {
+              queueMicrotask(() => {
+                if (viewRef.current?.isDestroyed !== false) return;
+                setMdiBlockNumbers(showParagraphNumbersRef.current)(ctx);
+              });
+            }
           };
 
           if (documentFormat === "plain-text") {
@@ -109,7 +118,8 @@ export default function MilkdownEditor({
               .markdownUpdated((_ctx) => publish(_ctx.get(editorViewCtx).state.doc));
           }
         })
-        .use(commonmark);
+        .use(commonmark)
+        .use(mdiBlockNumbers);
 
       editor = adapter.configureEditor(editor);
       return editor
@@ -173,6 +183,11 @@ export default function MilkdownEditor({
     if (!isEditorReady) return;
     get()?.action(changeLineLength(lineLength));
   }, [get, isEditorReady, lineLength]);
+
+  useEffect(() => {
+    if (!isEditorReady) return;
+    get()?.action(setMdiBlockNumbers(documentFormat === "mdi" && showParagraphNumbers));
+  }, [documentFormat, get, isEditorReady, showParagraphNumbers]);
 
   useEffect(() => {
     if (!isEditorReady || externalContent == null) return;

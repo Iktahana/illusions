@@ -74,7 +74,7 @@ describe("new editor core boundary", () => {
     expect({ ...mdiPackage.dependencies, ...mdiPackage.peerDependencies }).not.toHaveProperty(
       "@illusions-lab/milkdown-plugin-vertical-writing",
     );
-    expect(mdiPackage.version).toBe("0.2.0");
+    expect(mdiPackage.version).toBe("0.4.0");
     expect({
       ...verticalPackage.dependencies,
       ...verticalPackage.peerDependencies,
@@ -104,12 +104,18 @@ describe("new editor core boundary", () => {
     expect(activeSources).not.toContain('from "milkdown-plugin-japanese-novel"');
   });
 
-  it("does not invent machine-addressable block numbers outside the Rust projection", () => {
+  it("renders block numbers only through the Rust projection and upstream provenance bridge", () => {
     const editor = readSource("src/components/editor/MilkdownEditor.tsx");
+    const blockNumbers = readSource("src/lib/editor-page/mdi-block-numbers.ts");
     const typography = readSource("src/app/editor-typography.css");
     const search = readSource("src/lib/editor-page/find-search-matches.ts");
 
-    expect(editor).not.toContain("editor-core--paragraph-numbers");
+    expect(editor).toContain("setMdiBlockNumbers");
+    expect(blockNumbers).toContain("getMdiTextBlocks");
+    expect(blockNumbers).toContain("createMdiEditorMapping");
+    expect(blockNumbers).toContain("mapMdiSourceSpansToEditorRanges");
+    expect(blockNumbers).not.toContain("doc.descendants");
+    expect(blockNumbers).not.toContain("snapshot.doc.textContent");
     expect(typography).not.toContain("counter-increment");
     expect(typography).not.toContain("counter-reset");
     expect(search).not.toContain("paragraphNumber");

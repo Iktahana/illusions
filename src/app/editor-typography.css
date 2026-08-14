@@ -58,6 +58,26 @@
   text-indent: 0;
 }
 
+.editor-core .milkdown > .editor :is(p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, table) {
+  position: relative;
+}
+
+.editor-core .mdi-block-number {
+  position: absolute;
+  inset-block-start: 0.15em;
+  inset-inline-end: calc(100% + 0.75rem);
+  min-inline-size: 2ch;
+  color: rgb(var(--foreground-muted));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72em;
+  font-weight: 400;
+  line-height: 1;
+  text-align: end;
+  text-indent: 0;
+  user-select: none;
+  pointer-events: none;
+}
+
 .editor-core .milkdown > .editor :is(h1, h2, h3, h4, h5, h6) {
   position: relative;
   margin-block-start: 0;
