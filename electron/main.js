@@ -218,7 +218,7 @@ app.whenReady().then(async () => {
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "img-src 'self' data: blob: https:",
             "font-src 'self' data: https://fonts.gstatic.com",
-            `connect-src 'self' https://my.illusions.app https://bug-report.api.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com${extraAiConnectSrc} ws://localhost:*`,
+            `connect-src 'self' https://my.illusions.app https://bug-report.api.illusions.app https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com http://localhost:11434 http://127.0.0.1:11434${extraAiConnectSrc} ws://localhost:*`,
             "worker-src 'self' blob:",
             "object-src blob:",
             "frame-src blob:",
