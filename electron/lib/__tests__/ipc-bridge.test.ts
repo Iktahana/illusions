@@ -241,7 +241,6 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       exportPdf: "menu-export-pdf",
       exportEpub: "menu-export-epub",
       exportDocx: "menu-export-docx",
-      editorCommand: "menu-editor-command",
       reportBug: "menu-report-bug",
       reportAiInappropriate: "menu-report-ai-inappropriate",
       openSettings: "menu-open-settings",

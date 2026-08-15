@@ -478,14 +478,10 @@ export class EditorInteractionStore implements EditorInteractionHandle {
           (!entry.requiresSelection || (selection.kind !== "caret" && selection.kind !== "none")) &&
           (!entry.requiresFormatting || formatting) &&
           (!entry.requiresCapability || capabilities[entry.requiresCapability]) &&
+          (!entry.requiresExecutor || this.executors.has(entry.id)) &&
           (entry.id !== "format.ruby" ||
             (this.view &&
               canApplyMdiEdit(this.view.state, buildRubyAvailabilityOperation(this.view)))) &&
-          (entry.id !== "format.tcy" ||
-            (this.view && canApplyMdiEdit(this.view.state, buildTcyOperation(this.view)))),
-          (!entry.requiresExecutor || this.executors.has(entry.id)),
-          (!entry.requiresCapability || capabilities[entry.requiresCapability]) &&
-          (!entry.requiresExecutor || this.executors.has(entry.id)) &&
           (entry.id !== "format.tcy" ||
             (this.view && canApplyMdiEdit(this.view.state, buildTcyOperation(this.view)))),
         ),

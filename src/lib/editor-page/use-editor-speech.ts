@@ -91,10 +91,6 @@ export function useEditorSpeech({
   const speakRangeRef = useRef<(session: SpeechSession, from: number) => void>(() => {});
   const speakRange = useCallback(
     (session: SpeechSession, from: number) => {
-      if (!isCurrent(session) || from >= session.end) {
-        stop();
-        return;
-      }
       const to = Math.min(from + MAX_SPEECH_DOC_RANGE, session.end);
       const map = buildSpeechMap(session.view.state.doc, from, to);
       const chunks = buildSpeechChunks(map.text, buildSegments(map.text));
@@ -175,8 +171,7 @@ export function useEditorSpeech({
       ({ token, view, generation }) => {
         if (state.isPlaying) pause();
         else if (state.isPaused) resume();
-        else if (token) start(view, token, generation);
-        else return { status: "stale" };
+        else start(view, token!, generation);
         return { status: "executed" };
       },
     );

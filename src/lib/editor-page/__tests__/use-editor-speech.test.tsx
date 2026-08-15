@@ -49,18 +49,30 @@ const schema = new Schema({
   },
 });
 
-function createView({ nestedScroller = false }: { nestedScroller?: boolean } = {}) {
+function createView({
+  nestedScroller = false,
+  text = "読み上げる文章",
+  selection = [1, 5],
+}: {
+  nestedScroller?: boolean;
+  text?: string;
+  selection?: readonly [number, number];
+} = {}) {
   let state = EditorState.create({
     schema,
-    doc: schema.node("doc", null, [schema.node("paragraph", null, schema.text("読み上げる文章"))]),
+    doc: schema.node("doc", null, [schema.node("paragraph", null, schema.text(text))]),
     plugins: [speechHighlightPlugin],
   });
-  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 1, 5)));
+  state = state.apply(
+    state.tr.setSelection(TextSelection.create(state.doc, selection[0], selection[1])),
+  );
   const target = document.createElement("span");
   if (nestedScroller) {
     const scroller = document.createElement("div");
     scroller.style.overflow = "auto";
     scroller.appendChild(target);
+  } else {
+    document.createElement("div").appendChild(target);
   }
   const view = {
     state,
@@ -225,5 +237,21 @@ describe("useEditorSpeech", () => {
 
     expect(interaction.getSnapshot().availability["speech.toggle"]).toBe(false);
     expect(interaction.getSnapshot().availability["speech.stop"]).toBe(false);
+  });
+
+  it("stops a selected range that contains no speakable chunks", () => {
+    const interaction = new EditorInteractionStore(
+      "speech-empty-chunks",
+      "markdown",
+      getDocumentAdapter("markdown"),
+    );
+    const view = createView({ text: "   ", selection: [1, 4] });
+    interaction.attach(view as never, 1, "markdown", getDocumentAdapter("markdown"));
+    act(() => root.render(<Harness interaction={interaction} />));
+
+    const token = interaction.getSnapshot().selection.token;
+    expect(interaction.execute({ id: "speech.toggle" }, token)).toEqual({ status: "executed" });
+    expect(mocks.stop).toHaveBeenCalled();
+    expect(mocks.speakSegments).not.toHaveBeenCalled();
   });
 });
