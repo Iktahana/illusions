@@ -132,6 +132,33 @@ describe("package-first editor runtime", () => {
     expect(editor.flush()).toBe("^12^月\n");
   });
 
+  it("publishes semantic Ruby node changes and flushes canonical MDI", async () => {
+    const editor = await mountEditor("mdi", "漢字\n");
+
+    act(() => {
+      editor.view.dispatch(
+        editor.view.state.tr.setSelection(TextSelection.create(editor.view.state.doc, 1, 3)),
+      );
+    });
+    await vi.waitFor(() => expect(editor.interaction.getSnapshot().selection.text).toBe("漢字"));
+
+    const token = editor.interaction.getSnapshot().selection.token;
+    let result: ReturnType<EditorInteractionHandle["execute"]> | null = null;
+    await act(async () => {
+      result = editor.interaction.execute(
+        {
+          id: "format.ruby",
+          mode: "apply",
+          segments: [{ base: "漢字", ruby: "かんじ" }],
+        },
+        token,
+      );
+    });
+    expect(result).toEqual({ status: "executed" });
+    await vi.waitFor(() => expect(editor.changes.at(-1)).toBe("{漢字|かんじ}\n"));
+    expect(editor.flush()).toBe("{漢字|かんじ}\n");
+  });
+
   it("executes current-document search and replace through the interaction contract", async () => {
     const editor = await mountEditor("markdown", "東京 東京");
 

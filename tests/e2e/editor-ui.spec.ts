@@ -119,6 +119,9 @@ test("Ruby stays canonical across bubble menu, save, and reopen", async ({
   await expect
     .poll(() => electronApp.windows().some((page) => page.url().includes("ruby-dialog")))
     .toBe(false);
+  await expect(mainWindow.locator(".ProseMirror").last().locator("ruby.mdi-ruby rt")).toHaveText(
+    "かんじ",
+  );
   await expect(mainWindow).toHaveTitle(/\*/);
 
   await nativeHarness.queueSavePath(filePath);

@@ -124,13 +124,10 @@ export default function MilkdownEditor({
             }
           };
 
-          if (documentFormat === "plain-text") {
-            ctx.get(listenerCtx).updated((_ctx, document) => publish(document));
-          } else {
-            ctx
-              .get(listenerCtx)
-              .markdownUpdated((_ctx) => publish(_ctx.get(editorViewCtx).state.doc));
-          }
+          // `publish` owns format-specific serialization through the adapter.
+          // Listen to the document tree directly so semantic MDI edits such as
+          // plain text -> Ruby are not lost when their textContent is unchanged.
+          ctx.get(listenerCtx).updated((_ctx, document) => publish(document));
         })
         .use(commonmark)
         .use(mdiBlockNumbers)
