@@ -9,6 +9,7 @@ import {
 } from "@playwright/test";
 import { mkdtemp, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { ensureOwnedProcessTreeExit, formatProcessTreeDiagnostics } from "./process-tree";
 
 type CapturedMenuItem = {
   label?: string;
@@ -71,6 +72,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       env: { ...process.env, ILLUSIONS_E2E: "1", ELECTRON_ENABLE_LOGGING: "1" },
       timeout: 30_000,
     });
+    const rootPid = app.process().pid;
+    if (typeof rootPid !== "number") throw new Error("Electron launch did not expose a root pid");
     const waitForExit = new Promise<void>((resolve) => {
       app.process().once("exit", () => resolve());
     });
@@ -91,7 +94,6 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
           .attach("main-process.log", { body: diagnostics.join(""), contentType: "text/plain" });
       expectedExit = true;
       const failed = test.info().status !== test.info().expectedStatus;
-      if (failed && app.process().exitCode == null) app.process().kill();
       if (!failed && app.process().exitCode == null)
         await app
           .evaluate(({ app: electronApp }) => {
@@ -103,17 +105,23 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         waitForExit,
         new Promise<void>((resolve) => setTimeout(resolve, failed ? 5_000 : 10_000)),
       ]);
-      if (app.process().exitCode == null) {
-        app.process().kill();
-        await Promise.race([
-          waitForExit,
-          new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-        ]);
-      }
+      const treeResult = await ensureOwnedProcessTreeExit(rootPid);
+      diagnostics.push(`[process-tree]\n${formatProcessTreeDiagnostics(treeResult)}`);
       await Promise.race([
         app.close().catch(() => undefined),
         new Promise<void>((resolve) => setTimeout(resolve, 3_000)),
       ]);
+      if (!treeResult.success) {
+        test.info().attach("owned-process-tree.log", {
+          body: formatProcessTreeDiagnostics(treeResult),
+          contentType: "text/plain",
+        });
+        throw new Error(
+          `Owned Electron descendants remained after teardown for root pid ${rootPid}.\n${formatProcessTreeDiagnostics(
+            treeResult,
+          )}`,
+        );
+      }
     }
   },
   nativeHarness: async ({ electronApp, mainWindow: _mainWindow }, use) => {
