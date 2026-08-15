@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type RefObject } from "react";
+import { useState, type RefObject } from "react";
 
 import { useEditorInteraction } from "@/lib/editor-interaction/context";
 import type { EditorCommand } from "@/lib/editor-interaction";
@@ -29,9 +29,10 @@ export default function BubbleMenu({
   const { handle, snapshot } = useEditorInteraction();
   const selection = snapshot.selection;
   const [dismissedRevision, setDismissedRevision] = useState<number | null>(null);
-  useEffect(() => {
-    setDismissedRevision(null);
-  }, [selection.revision]);
+  // A dismissed revision stops matching automatically when the interaction
+  // store publishes a newer selection. Avoid resetting state from an effect:
+  // selection geometry updates can be frequent and must not create a render
+  // feedback loop in the active editor pane.
   if (
     !snapshot.ready ||
     snapshot.documentFormat === "plain-text" ||

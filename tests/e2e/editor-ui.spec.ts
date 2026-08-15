@@ -27,6 +27,11 @@ async function selectEditorText(page: import("@playwright/test").Page): Promise<
     });
 }
 
+async function openStatsPanel(page: import("@playwright/test").Page): Promise<void> {
+  await page.getByRole("button", { name: /^統計(?:\s|$)/ }).click();
+  await expect(page.getByRole("heading", { name: "全体の統計" })).toBeVisible();
+}
+
 test("toolbar and bubble menu format the current MDI selection", async ({
   mainWindow,
   nativeHarness,
@@ -62,6 +67,30 @@ test("plain text does not expose the formatting bubble", async ({
   await expect(mainWindow.locator(".ProseMirror")).toContainText("plain text only");
   await selectEditorText(mainWindow);
   await expect(mainWindow.getByRole("toolbar", { name: "選択範囲の書式" })).toBeHidden();
+});
+
+test("selection statistics follow the active editor selection", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "selection-stats.mdi");
+  await writeFile(filePath, "一二\n三四", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+
+  await openStatsPanel(mainWindow);
+  await expect(mainWindow.getByRole("heading", { name: "全体の統計" })).toBeVisible();
+
+  await selectEditorText(mainWindow);
+  const statsPanel = mainWindow.locator(".stats-panel");
+  await expect(mainWindow.getByRole("heading", { name: "選択範囲の分析" })).toBeVisible();
+  await expect(statsPanel).toContainText("選択中");
+  await expect(statsPanel).toContainText("40マス");
+  await expect(statsPanel).toContainText("1枚");
+
+  await mainWindow.locator(".ProseMirror").last().click();
+  await expect(mainWindow.getByRole("heading", { name: "全体の統計" })).toBeVisible();
 });
 
 test("editor context menu crosses renderer, preload, IPC, and native role", async ({
