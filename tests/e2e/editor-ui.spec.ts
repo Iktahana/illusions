@@ -321,6 +321,11 @@ test("speech follows the active selection and cleans up on tab change", async ({
         menuEvents: 0,
       },
     });
+    const speechDebug = (
+      window as Window & {
+        __speechDebug?: Record<string, number>;
+      }
+    ).__speechDebug!;
     class MockUtterance {
       text: string;
       lang = "";
@@ -347,11 +352,11 @@ test("speech follows the active selection and cleans up on tab change", async ({
         pause: () => queue.at(0)?.onpause?.(),
         resume: () => queue.at(0)?.onresume?.(),
         speak: (utterance: MockUtterance) => {
-          window.__speechDebug!.speakCalls += 1;
+          speechDebug.speakCalls += 1;
           queue.push(utterance);
-          window.__speechDebug!.startCalls += 1;
+          speechDebug.startCalls += 1;
           utterance.onstart?.();
-          window.__speechDebug!.boundaryCalls += 1;
+          speechDebug.boundaryCalls += 1;
           utterance.onboundary?.({ charIndex: 0, charLength: Math.max(1, utterance.text.length) });
         },
         addEventListener: () => undefined,
@@ -363,7 +368,12 @@ test("speech follows the active selection and cleans up on tab change", async ({
   await mainWindow.waitForLoadState("domcontentloaded");
   await mainWindow.evaluate(() => {
     window.electronAPI?.onMenuEditorCommand?.((commandId) => {
-      if (commandId === "speech.toggle") window.__speechDebug!.menuEvents += 1;
+      if (commandId === "speech.toggle")
+        (
+          window as Window & {
+            __speechDebug?: Record<string, number>;
+          }
+        ).__speechDebug!.menuEvents += 1;
     });
   });
 

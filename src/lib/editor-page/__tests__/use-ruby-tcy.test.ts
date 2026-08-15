@@ -52,6 +52,8 @@ function makeInteraction(): EditorInteractionHandle {
         "format.orderedList": true,
         "format.inlineCode": true,
         "format.clear": true,
+        "speech.toggle": true,
+        "speech.stop": true,
         "view.toggleWritingMode": true,
       },
     }),
