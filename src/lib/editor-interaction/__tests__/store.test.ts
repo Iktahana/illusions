@@ -405,7 +405,12 @@ describe("EditorInteractionStore", () => {
     expect(view.state.doc.textContent).toBe("swap swap");
 
     const stale = result.token;
-    interaction.attach(makeView("fresh", 1, 1) as never, 3, "markdown", getDocumentAdapter("markdown"));
+    interaction.attach(
+      makeView("fresh", 1, 1) as never,
+      3,
+      "markdown",
+      getDocumentAdapter("markdown"),
+    );
     expect(
       interaction.replaceSearch({
         replacement: "older",
