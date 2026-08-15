@@ -22,6 +22,7 @@
 
 /** @type {MenuTemplateItem} */
 const SEPARATOR = { type: "separator" };
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- This shared CommonJS menu contract must load the registry synchronously in Electron main and Next.js.
 const { commands: EDITOR_COMMANDS } = require("../editor-interaction/command-registry.json");
 const EDITOR_COMMAND_BY_ID = new Map(EDITOR_COMMANDS.map((command) => [command.id, command]));
 const TCY_COMMAND = EDITOR_COMMAND_BY_ID.get("format.tcy");
