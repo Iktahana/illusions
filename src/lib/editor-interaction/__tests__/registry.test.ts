@@ -16,15 +16,15 @@ describe("editor command registry", () => {
 
   it("keeps renderer and Electron native metadata in parity", () => {
     expect(COMMAND_REGISTRY).toEqual(commandRegistry);
-    const rendererNative = Object.fromEntries(
-      commandRegistry
-        .filter(({ nativeRole }) => nativeRole)
-        .map(({ id, label, accelerator, nativeRole }) => [
-          id,
-          { label, accelerator, role: nativeRole },
-        ]),
+    const rendererCommands = Object.fromEntries(
+      commandRegistry.map(({ id, label, accelerator, nativeRole }) => [
+        id,
+        nativeRole
+          ? { label, accelerator, role: nativeRole, rendererOwned: false }
+          : { label, accelerator, rendererOwned: true },
+      ]),
     );
-    expect(EDITOR_COMMANDS).toEqual(rendererNative);
+    expect(EDITOR_COMMANDS).toEqual(rendererCommands);
   });
 
   it("builds context menu enabled state from availability", () => {
@@ -32,11 +32,12 @@ describe("editor command registry", () => {
       commandRegistry.map(({ id }) => [id, id === "edit.copy"]),
     ) as never;
     const menu = buildEditorContextMenu(availability);
-    expect(menu).toHaveLength(8);
+    expect(menu).toHaveLength(10);
     expect(menu.map((item) => ("separator" in item ? "separator" : item.command))).toEqual(
       EDITOR_CONTEXT_MENU,
     );
     expect(menu).toContainEqual({ command: "edit.copy", enabled: true });
-    expect(menu.filter((item) => "separator" in item)).toHaveLength(2);
+    expect(menu).toContainEqual({ command: "format.tcy", enabled: false });
+    expect(menu.filter((item) => "separator" in item)).toHaveLength(3);
   });
 });

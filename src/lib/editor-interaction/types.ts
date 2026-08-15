@@ -7,6 +7,7 @@ export type EditorCommandId =
   | "edit.copy"
   | "edit.paste"
   | "edit.selectAll"
+  | "format.tcy"
   | "format.strong"
   | "format.emphasis"
   | "format.strikethrough"

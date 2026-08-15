@@ -171,6 +171,7 @@ const MENU_CHANNELS = Object.freeze({
     openProject: "menu-open-project",
     openRecentProject: "menu-open-recent-project",
     showInFileManager: "menu-show-in-file-manager",
+    editorCommand: "menu-editor-command",
     toggleCompactMode: "menu-toggle-compact-mode",
     toggleWritingMode: "menu-toggle-writing-mode",
     format: "menu-format",

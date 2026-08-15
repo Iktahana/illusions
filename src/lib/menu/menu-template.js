@@ -22,6 +22,10 @@
 
 /** @type {MenuTemplateItem} */
 const SEPARATOR = { type: "separator" };
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- This shared CommonJS menu contract must load the registry synchronously in Electron main and Next.js.
+const { commands: EDITOR_COMMANDS } = require("../editor-interaction/command-registry.json");
+const EDITOR_COMMAND_BY_ID = new Map(EDITOR_COMMANDS.map((command) => [command.id, command]));
+const TCY_COMMAND = EDITOR_COMMAND_BY_ID.get("format.tcy");
 
 /**
  * Native-only Settings entry. On macOS it is placed in the application menu
@@ -373,6 +377,17 @@ const MENU_TEMPLATE = [
         ],
       },
       SEPARATOR,
+      {
+        id: "format-tcy",
+        label: TCY_COMMAND?.label ?? "縦中横を切替",
+        commandId: "format.tcy",
+        nativeAccelerator: TCY_COMMAND?.accelerator,
+        requiresActiveEditor: true,
+        webVisible: false,
+        electronChannel: "menu-editor-command",
+        electronArgs: ["format.tcy"],
+      },
+      { ...SEPARATOR, webVisible: false },
       {
         id: "format-paragraph-numbers-toggle",
         label: "区画位置を表示（準備中）",

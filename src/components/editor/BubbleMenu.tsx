@@ -6,6 +6,7 @@ import { useEditorInteraction } from "@/lib/editor-interaction/context";
 import type { EditorCommand } from "@/lib/editor-interaction";
 
 const buttons: Array<{ label: string; command: EditorCommand; text: string }> = [
+  { label: "縦中横を切替", command: { id: "format.tcy" }, text: "TCY" },
   { label: "太字", command: { id: "format.strong" }, text: "B" },
   { label: "斜体", command: { id: "format.emphasis" }, text: "I" },
   { label: "取り消し線", command: { id: "format.strikethrough" }, text: "S" },
@@ -75,20 +76,22 @@ export default function BubbleMenu({
       style={style}
       onMouseDown={(event) => event.preventDefault()}
     >
-      {buttons.map(({ label, command, text }) => (
-        <button
-          key={label}
-          type="button"
-          aria-label={label}
-          className="rounded px-2 py-1 text-xs hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-          onClick={() => {
-            const result = handle.execute(command, selection.token);
-            if (result.status !== "executed") setDismissedRevision(selection.revision);
-          }}
-        >
-          {text}
-        </button>
-      ))}
+      {buttons
+        .filter(({ command }) => snapshot.availability[command.id])
+        .map(({ label, command, text }) => (
+          <button
+            key={label}
+            type="button"
+            aria-label={label}
+            className="rounded px-2 py-1 text-xs hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            onClick={() => {
+              const result = handle.execute(command, selection.token);
+              if (result.status !== "executed") setDismissedRevision(selection.revision);
+            }}
+          >
+            {text}
+          </button>
+        ))}
     </div>
   );
 }

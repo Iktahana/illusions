@@ -14,6 +14,8 @@ describe("editor context menu contract", () => {
         { command: "edit.paste", enabled: false },
         { separator: true },
         { command: "edit.selectAll", enabled: true },
+        { separator: true },
+        { command: "format.tcy", enabled: true },
       ]),
     ).toEqual([
       { label: "取り消す", accelerator: "CmdOrCtrl+Z", role: "undo", enabled: true },
@@ -28,6 +30,13 @@ describe("editor context menu contract", () => {
         accelerator: "CmdOrCtrl+A",
         role: "selectAll",
         enabled: true,
+      },
+      { type: "separator" },
+      {
+        label: "縦中横を切替",
+        accelerator: "CmdOrCtrl+Shift+T",
+        enabled: true,
+        command: "format.tcy",
       },
     ]);
   });
@@ -44,6 +53,7 @@ describe("editor context menu contract", () => {
       { command: "edit.paste", enabled: true },
       { separator: true },
       { command: "edit.selectAll", enabled: true },
+      { separator: true },
     ],
     [
       { command: "edit.undo", enabled: true },
@@ -52,13 +62,26 @@ describe("editor context menu contract", () => {
       { command: "edit.cut", enabled: true },
       { command: "edit.copy", enabled: true },
       { command: "edit.paste", enabled: true },
-      { command: "edit.selectAll", enabled: true },
       { separator: true },
+      { command: "edit.selectAll", enabled: true },
+      { command: "format.tcy", enabled: true },
     ],
     [{ command: "system.deleteEverything", enabled: true }],
     [{ command: "edit.copy", enabled: "yes" }],
     [{ separator: true, label: "injected" }],
     [{ label: "任意", action: "arbitrary" }],
+    [
+      { command: "edit.undo", enabled: true },
+      { command: "edit.redo", enabled: true },
+      { separator: true },
+      { command: "edit.cut", enabled: true },
+      { command: "edit.copy", enabled: true },
+      { command: "edit.paste", enabled: true },
+      { separator: true },
+      { command: "edit.selectAll", enabled: true },
+      { separator: true },
+      { command: "format.strong", enabled: true },
+    ],
   ])("rejects malformed or renderer-defined menu input", (items) => {
     expect(buildEditorContextMenuTemplate(items)).toBeNull();
   });

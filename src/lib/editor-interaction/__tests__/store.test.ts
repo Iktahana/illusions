@@ -1,7 +1,24 @@
 import { Schema } from "@milkdown/prose/model";
 import { AllSelection, EditorState, NodeSelection, TextSelection } from "@milkdown/prose/state";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
+
+const mdiEditing = vi.hoisted(() => ({
+  tcyActive: false,
+  canApply: true,
+  appliedOperations: [] as Array<{ type: string; mark: string }>,
+}));
+
+vi.mock("../mdi-editing", () => ({
+  inspectMdiSelection: () => ({ marks: { tcy: mdiEditing.tcyActive } }),
+  canApplyMdiEdit: () => mdiEditing.canApply,
+  mdiEditCommand: (operation: { type: string; mark: string }) => () => {
+    mdiEditing.appliedOperations.push(operation);
+    mdiEditing.tcyActive = operation.type === "setInlineMark";
+    return mdiEditing.canApply;
+  },
+}));
+
 import { EditorInteractionStore } from "../store";
 
 const schema = new Schema({
@@ -50,6 +67,12 @@ function store(format: DocumentFormat = "markdown") {
 }
 
 describe("EditorInteractionStore", () => {
+  beforeEach(() => {
+    mdiEditing.tcyActive = false;
+    mdiEditing.canApply = true;
+    mdiEditing.appliedOperations.length = 0;
+  });
+
   it("publishes text, coordinates and a generation-bound token", () => {
     const interaction = store();
     interaction.attach(makeView() as never, 4, "markdown", getDocumentAdapter("markdown"));
@@ -81,9 +104,27 @@ describe("EditorInteractionStore", () => {
     const interaction = store("plain-text");
     interaction.attach(makeView() as never, 0, "plain-text", getDocumentAdapter("plain-text"));
     expect(interaction.getSnapshot().availability["format.strong"]).toBe(false);
+    expect(interaction.getSnapshot().availability["format.tcy"]).toBe(false);
     expect(
       interaction.execute({ id: "format.strong" }, interaction.getSnapshot().selection.token),
     ).toEqual({ status: "unavailable" });
+    expect(
+      interaction.execute({ id: "format.tcy" }, interaction.getSnapshot().selection.token),
+    ).toEqual({ status: "unavailable" });
+  });
+
+  it("keeps TCY unavailable for markdown and reflects MDI edit capability for mdi", () => {
+    const markdown = store("markdown");
+    markdown.attach(makeView() as never, 0, "markdown", getDocumentAdapter("markdown"));
+    expect(markdown.getSnapshot().availability["format.tcy"]).toBe(false);
+
+    const mdi = store("mdi");
+    mdi.attach(makeView() as never, 0, "mdi", getDocumentAdapter("mdi"));
+    expect(mdi.getSnapshot().availability["format.tcy"]).toBe(true);
+
+    mdiEditing.canApply = false;
+    mdi.update();
+    expect(mdi.getSnapshot().availability["format.tcy"]).toBe(false);
   });
 
   it("does not publish unstable selection revisions during composition", () => {
@@ -247,6 +288,25 @@ describe("EditorInteractionStore", () => {
       interaction.execute({ id: "format.strong" }, interaction.getSnapshot().selection.token),
     ).toEqual({ status: "executed" });
     expect(view.focus).toHaveBeenCalled();
+  });
+
+  it("executes TCY with the current selection token and flips the inline mark operation", () => {
+    const interaction = store("mdi");
+    interaction.attach(makeView("12月", 1, 3) as never, 0, "mdi", getDocumentAdapter("mdi"));
+    const token = interaction.getSnapshot().selection.token;
+    expect(interaction.execute({ id: "format.tcy" }, token)).toEqual({ status: "executed" });
+    expect(mdiEditing.appliedOperations).toEqual([{ type: "setInlineMark", mark: "tcy" }]);
+
+    interaction.update();
+    expect(
+      interaction.execute({ id: "format.tcy" }, interaction.getSnapshot().selection.token),
+    ).toEqual({
+      status: "executed",
+    });
+    expect(mdiEditing.appliedOperations.at(-1)).toEqual({
+      type: "removeInlineMark",
+      mark: "tcy",
+    });
   });
 
   it("executes clear and heading and rejects unsupported renderer commands", () => {

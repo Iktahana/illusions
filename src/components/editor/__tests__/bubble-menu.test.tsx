@@ -8,6 +8,18 @@ const interaction = vi.hoisted(() => ({
     ready: true,
     documentFormat: "markdown",
     composing: false,
+    availability: {
+      "format.tcy": true,
+      "format.strong": true,
+      "format.emphasis": true,
+      "format.strikethrough": true,
+      "format.heading": true,
+      "format.blockquote": true,
+      "format.bulletList": true,
+      "format.orderedList": true,
+      "format.inlineCode": true,
+      "format.clear": true,
+    },
     selection: {
       kind: "text",
       revision: 2,
@@ -45,6 +57,18 @@ describe("BubbleMenu", () => {
       documentFormat: "markdown",
       composing: false,
     });
+    Object.assign(interaction.snapshot.availability, {
+      "format.tcy": true,
+      "format.strong": true,
+      "format.emphasis": true,
+      "format.strikethrough": true,
+      "format.heading": true,
+      "format.blockquote": true,
+      "format.bulletList": true,
+      "format.orderedList": true,
+      "format.inlineCode": true,
+      "format.clear": true,
+    });
     Object.assign(interaction.snapshot.selection, { kind: "text", revision: 2 });
   });
   afterEach(() => {
@@ -62,6 +86,7 @@ describe("BubbleMenu", () => {
     render();
     expect(container.querySelector('[aria-label="選択範囲の書式"]')).not.toBeNull();
     for (const name of [
+      "縦中横を切替",
       "太字",
       "斜体",
       "取り消し線",
@@ -96,6 +121,14 @@ describe("BubbleMenu", () => {
       render();
       expect(container.querySelector('[aria-label="選択範囲の書式"]')).toBeNull();
     }
+  });
+
+  it("hides commands that are unavailable for the current snapshot", () => {
+    interaction.snapshot.availability["format.tcy"] = false;
+    render();
+    expect(container.querySelector('button[aria-label="縦中横を切替"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="太字"]')).not.toBeNull();
+    interaction.snapshot.availability["format.tcy"] = true;
   });
 
   it("executes with the captured token and closes on a stale result", () => {

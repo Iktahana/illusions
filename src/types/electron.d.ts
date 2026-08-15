@@ -101,6 +101,9 @@ declare global {
     openWithDefaultApp?: (filePath: string) => Promise<boolean>;
     openExternal?: (url: string) => Promise<boolean>;
     onMenuShowInFileManager?: (callback: () => void) => (() => void) | void;
+    onMenuEditorCommand?: (
+      callback: (commandId: import("@/lib/editor-interaction").EditorCommandId) => void,
+    ) => (() => void) | void;
     onPasteAsPlaintext?: (callback: () => void) => (() => void) | void;
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
     onToggleWritingMode?: (callback: () => void) => (() => void) | void;

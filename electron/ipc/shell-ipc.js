@@ -131,7 +131,16 @@ function registerShellHandlers() {
           resolve(value);
         }
       };
-      const menu = Menu.buildFromTemplate(template);
+      const menu = Menu.buildFromTemplate(
+        template.map((item) =>
+          item.command
+            ? {
+                ...item,
+                click: () => finish(item.command),
+              }
+            : item,
+        ),
+      );
       menu.popup({ window: win, callback: () => finish(null) });
     });
   });

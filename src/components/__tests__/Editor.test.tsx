@@ -9,6 +9,7 @@ const mockState = vi.hoisted(() => {
     adapter: unknown;
     setActive: ReturnType<typeof vi.fn>;
     getSnapshot: ReturnType<typeof vi.fn>;
+    execute: ReturnType<typeof vi.fn>;
   }> = [];
   return {
     typography: { charsPerLine: 42 },
@@ -54,7 +55,11 @@ vi.mock("@/lib/editor-interaction", () => ({
     documentFormat: string;
     adapter: unknown;
     setActive = vi.fn();
-    getSnapshot = vi.fn(() => ({ availability: { "edit.copy": true, "edit.undo": true } }));
+    getSnapshot = vi.fn(() => ({
+      availability: { "edit.copy": true, "edit.undo": true, "format.tcy": true },
+      selection: { token: { editorId: "editor-a", generation: 1, selectionRevision: 2 } },
+    }));
+    execute = vi.fn(() => ({ status: "executed" }));
 
     constructor(editorId: string, documentFormat: string, adapter: unknown) {
       this.editorId = editorId;
@@ -197,8 +202,8 @@ describe("NovelEditor", () => {
     });
   });
 
-  it("routes editor context menus through the Electron bridge only when available", () => {
-    const showEditorContextMenu = vi.fn();
+  it("routes editor context menus through the Electron bridge only when available", async () => {
+    const showEditorContextMenu = vi.fn(() => Promise.resolve("format.tcy"));
     Object.assign(window, {
       electronAPI: { showEditorContextMenu },
     });
@@ -206,12 +211,20 @@ describe("NovelEditor", () => {
 
     const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
     container.firstElementChild?.dispatchEvent(event);
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(event.defaultPrevented).toBe(true);
     expect(mockState.buildEditorContextMenu).toHaveBeenCalledWith({
       "edit.copy": true,
+      "format.tcy": true,
       "edit.undo": true,
     });
     expect(showEditorContextMenu).toHaveBeenCalledWith([{ command: "edit.copy", enabled: true }]);
+    expect(mockState.instances.at(-1)?.execute).toHaveBeenCalledWith(
+      { id: "format.tcy" },
+      { editorId: "editor-a", generation: 1, selectionRevision: 2 },
+    );
 
     showEditorContextMenu.mockClear();
     mockState.buildEditorContextMenu.mockClear();

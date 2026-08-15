@@ -1,10 +1,12 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { TextSelection } from "@milkdown/prose/state";
 import type { EditorView } from "@milkdown/prose/view";
 
 import Editor from "@/components/Editor";
 import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
+import type { EditorInteractionHandle } from "@/lib/editor-interaction";
 
 vi.mock("@/contexts/EditorSettingsContext", () => ({
   useTypographySettings: () => ({
@@ -38,6 +40,7 @@ async function mountEditor(format: DocumentFormat, source: string) {
   document.body.appendChild(container);
   root = createRoot(container);
   let view: EditorView | null = null;
+  let interaction: EditorInteractionHandle | null = null;
   let flush: (() => string | null) | null = null;
   const changes: string[] = [];
 
@@ -50,6 +53,9 @@ async function mountEditor(format: DocumentFormat, source: string) {
         onEditorViewReady={(nextView) => {
           view = nextView;
         }}
+        registerInteraction={(nextInteraction) => {
+          interaction = nextInteraction;
+        }}
         registerFlush={(nextFlush) => {
           flush = nextFlush;
         }}
@@ -58,6 +64,7 @@ async function mountEditor(format: DocumentFormat, source: string) {
   });
 
   await vi.waitFor(() => expect(view).not.toBeNull());
+  await vi.waitFor(() => expect(interaction).not.toBeNull());
   await vi.waitFor(() => expect(flush).not.toBeNull());
   return {
     get view(): EditorView {
@@ -67,6 +74,10 @@ async function mountEditor(format: DocumentFormat, source: string) {
     get flush(): () => string | null {
       if (!flush) throw new Error("flush callback is not ready");
       return flush;
+    },
+    get interaction(): EditorInteractionHandle {
+      if (!interaction) throw new Error("editor interaction is not ready");
+      return interaction;
     },
     changes,
   };
@@ -99,5 +110,25 @@ describe("package-first editor runtime", () => {
     expect(editor.view.state.doc.textContent).toBe(visibleText);
     expect(container?.querySelector("ruby.mdi-ruby")).toBeNull();
     expect(editor.flush()).toBe(source);
+  });
+
+  it("toggles TCY through the interaction contract and flushes canonical MDI", async () => {
+    const editor = await mountEditor("mdi", "12月\n");
+
+    act(() => {
+      editor.view.dispatch(
+        editor.view.state.tr.setSelection(TextSelection.create(editor.view.state.doc, 1, 3)),
+      );
+    });
+    await vi.waitFor(() => expect(editor.interaction.getSnapshot().selection.text).toBe("12"));
+
+    const token = editor.interaction.getSnapshot().selection.token;
+    let result: ReturnType<EditorInteractionHandle["execute"]> | null = null;
+    await act(async () => {
+      result = editor.interaction.execute({ id: "format.tcy" }, token);
+    });
+    expect(result).toEqual({ status: "executed" });
+    await vi.waitFor(() => expect(container?.querySelector(".mdi-tcy")?.textContent).toBe("12"));
+    expect(editor.flush()).toBe("^12^月\n");
   });
 });
