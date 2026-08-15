@@ -12,13 +12,11 @@ const mdiEditing = vi.hoisted(() => ({
 vi.mock("../mdi-editing", () => ({
   inspectMdiSelection: () => ({ marks: { tcy: mdiEditing.tcyActive } }),
   canApplyMdiEdit: () => mdiEditing.canApply,
-  mdiEditCommand:
-    (operation: { type: string; mark: string }) =>
-    () => {
-      mdiEditing.appliedOperations.push(operation);
-      mdiEditing.tcyActive = operation.type === "setInlineMark";
-      return mdiEditing.canApply;
-    },
+  mdiEditCommand: (operation: { type: string; mark: string }) => () => {
+    mdiEditing.appliedOperations.push(operation);
+    mdiEditing.tcyActive = operation.type === "setInlineMark";
+    return mdiEditing.canApply;
+  },
 }));
 
 import { EditorInteractionStore } from "../store";
@@ -300,7 +298,9 @@ describe("EditorInteractionStore", () => {
     expect(mdiEditing.appliedOperations).toEqual([{ type: "setInlineMark", mark: "tcy" }]);
 
     interaction.update();
-    expect(interaction.execute({ id: "format.tcy" }, interaction.getSnapshot().selection.token)).toEqual({
+    expect(
+      interaction.execute({ id: "format.tcy" }, interaction.getSnapshot().selection.token),
+    ).toEqual({
       status: "executed",
     });
     expect(mdiEditing.appliedOperations.at(-1)).toEqual({

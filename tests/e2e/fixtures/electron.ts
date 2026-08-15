@@ -135,9 +135,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         filePaths: state.openPaths.shift() ?? [],
       });
       Menu.buildFromTemplate = ((template: Electron.MenuItemConstructorOptions[]) => {
-        const getCommand = (
-          item: Electron.MenuItemConstructorOptions,
-        ): string | undefined =>
+        const getCommand = (item: Electron.MenuItemConstructorOptions): string | undefined =>
           (item as Electron.MenuItemConstructorOptions & { command?: string }).command;
         const isEditorContextMenu =
           template.length === 10 &&

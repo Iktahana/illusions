@@ -120,9 +120,7 @@ describe("package-first editor runtime", () => {
         editor.view.state.tr.setSelection(TextSelection.create(editor.view.state.doc, 1, 3)),
       );
     });
-    await vi.waitFor(() =>
-      expect(editor.interaction.getSnapshot().selection.text).toBe("12"),
-    );
+    await vi.waitFor(() => expect(editor.interaction.getSnapshot().selection.text).toBe("12"));
 
     const token = editor.interaction.getSnapshot().selection.token;
     let result: ReturnType<EditorInteractionHandle["execute"]> | null = null;

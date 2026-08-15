@@ -4,12 +4,14 @@ const {
 } = require("../../src/lib/editor-interaction/command-registry.json");
 
 const EDITOR_COMMANDS = Object.freeze(
-  Object.fromEntries(COMMAND_REGISTRY.map(({ id, label, accelerator, nativeRole }) => [
-    id,
-    nativeRole
-      ? { label, accelerator, role: nativeRole, rendererOwned: false }
-      : { label, accelerator, rendererOwned: true },
-  ])),
+  Object.fromEntries(
+    COMMAND_REGISTRY.map(({ id, label, accelerator, nativeRole }) => [
+      id,
+      nativeRole
+        ? { label, accelerator, role: nativeRole, rendererOwned: false }
+        : { label, accelerator, rendererOwned: true },
+    ]),
+  ),
 );
 
 function buildEditorContextMenuTemplate(items) {
