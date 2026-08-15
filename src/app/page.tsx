@@ -584,14 +584,18 @@ function EditorPageContent() {
     });
   }, [activeInteractionHandle]);
 
-  const { selectedCharCount, selectedManuscriptCells, selectedManuscriptPages, searchSelectionRange } =
-    useMemo(
-      () =>
-        activeEditorTab
-          ? computeActiveSelectionStats(activeInteractionSnapshot, activeEditorTab.fileType)
-          : emptyActiveSelectionStats(),
-      [activeEditorTab, activeInteractionSnapshot],
-    );
+  const {
+    selectedCharCount,
+    selectedManuscriptCells,
+    selectedManuscriptPages,
+    searchSelectionRange,
+  } = useMemo(
+    () =>
+      activeEditorTab
+        ? computeActiveSelectionStats(activeInteractionSnapshot, activeEditorTab.fileType)
+        : emptyActiveSelectionStats(),
+    [activeEditorTab, activeInteractionSnapshot],
+  );
 
   // Snapshot selection before SearchDialog moves focus to its input, then keep
   // a collapsed editor caret while the dialog owns DOM focus.
