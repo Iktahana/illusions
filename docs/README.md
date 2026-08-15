@@ -65,6 +65,7 @@ tags:
 - [ターミナルの使い方](guides/terminal.md)
 - [ユーザー辞書の使い方](guides/dictionary.md)
 - [オンボーディングとウェルカムフロー](guides/onboarding-and-welcome-flow.md)
+- [Electron E2E と packaged smoke](guides/electron-e2e.md)
 
 ## これから補う文書
 
