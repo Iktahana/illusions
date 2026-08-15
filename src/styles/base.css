@@ -1,0 +1,44 @@
+html {
+  background-color: #080808;
+  color-scheme: dark;
+}
+html:not(.dark) {
+  background-color: #fcfcfc;
+  color-scheme: light;
+}
+body {
+  color: rgb(var(--foreground));
+  background: rgb(var(--background));
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  transition:
+    background-color 0s,
+    color 0s;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgb(var(--background-tertiary));
+}
+::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-sm);
+  background: rgb(var(--border-secondary));
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--border));
+}
+.font-preview-select option {
+  padding: 8px;
+  font-size: 14px;
+}
+.font-preview-select optgroup {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+  color: rgb(var(--foreground-tertiary));
+  background: rgb(var(--background-tertiary));
+}
+.text-balance {
+  text-wrap: balance;
+}

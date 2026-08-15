@@ -1,0 +1,9 @@
+/* Package DOM is intentionally scoped to the editor root. Document typography lives in editor-typography.css. */
+.editor-core .milkdown {
+  background: transparent;
+  color: rgb(var(--foreground));
+}
+.editor-core .milkdown .editor {
+  min-height: 100%;
+  outline: none;
+}
