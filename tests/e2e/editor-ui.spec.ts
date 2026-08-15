@@ -27,6 +27,18 @@ async function selectEditorText(page: import("@playwright/test").Page): Promise<
     });
 }
 
+async function selectFirstEditorCharacters(
+  page: import("@playwright/test").Page,
+  count: number,
+): Promise<void> {
+  const editor = page.locator(".ProseMirror").last();
+  await editor.click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowLeft" : "Home");
+  await page.keyboard.down("Shift");
+  for (let index = 0; index < count; index++) await page.keyboard.press("ArrowRight");
+  await page.keyboard.up("Shift");
+}
+
 async function openStatsPanel(page: import("@playwright/test").Page): Promise<void> {
   await page.getByRole("button", { name: /^統計(?:\s|$)/ }).click();
   await expect(page.getByRole("heading", { name: "全体の統計" })).toBeVisible();
@@ -66,27 +78,20 @@ test("TCY stays canonical across bubble menu, save, and reopen", async ({
   await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
   const editor = mainWindow.locator(".ProseMirror").last();
 
-  await editor.evaluate((element) => {
-    const text = element.firstChild;
-    if (!text) return;
-    const range = document.createRange();
-    range.setStart(text, 0);
-    range.setEnd(text, 2);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
-  });
+  await selectFirstEditorCharacters(mainWindow, 2);
   const bubble = mainWindow.getByRole("toolbar", { name: "選択範囲の書式" });
   await expect(bubble).toBeVisible();
   await bubble.getByRole("button", { name: "縦中横を切替" }).click();
   await expect(editor.locator(".mdi-tcy")).toContainText("12");
+  await expect(mainWindow).toHaveTitle(/\*/);
 
-  await nativeHarness.save();
+  await nativeHarness.queueSavePath(filePath);
+  await nativeHarness.saveAs();
+  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("^12^月\n");
+  await nativeHarness.closeTab();
   await nativeHarness.queueOpenPaths([filePath]);
-  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
-  await expect(editor.locator(".mdi-tcy")).toContainText("12");
-  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("^12^月");
+  await nativeHarness.open();
+  await expect(mainWindow.locator(".ProseMirror").last().locator(".mdi-tcy")).toContainText("12");
 });
 
 test("plain text does not expose the formatting bubble", async ({
@@ -169,19 +174,17 @@ test("renderer-owned TCY command survives the native context-menu round-trip", a
   await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
   const editor = mainWindow.locator(".ProseMirror").last();
 
-  await editor.evaluate((element) => {
-    const text = element.firstChild;
-    if (!text) return;
-    const range = document.createRange();
-    range.setStart(text, 0);
-    range.setEnd(text, 2);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
-  });
+  await selectFirstEditorCharacters(mainWindow, 2);
 
   await nativeHarness.selectContextCommand("format.tcy");
-  await editor.click({ button: "right" });
+  await editor.evaluate((element) => {
+    element.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        button: 2,
+      }),
+    );
+  });
   await expect(editor.locator(".mdi-tcy")).toContainText("12");
 });
