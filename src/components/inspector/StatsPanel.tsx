@@ -170,14 +170,17 @@ export default function StatsPanel({
             </p>
           </div>
           <div className="text-right">
-            <span className="text-sm font-bold text-foreground">{manuscriptPages}枚</span>
+            <span className="text-sm font-bold text-foreground tabular-nums">
+              {manuscriptPages}枚
+            </span>
             {prevDayPageDiff !== null && (
-              <InfoTooltip
-                content="前日（最後に保存した日）の原稿用紙枚数からの増減です。プラスは増加、マイナスは減少を表します。"
-                className={`block text-xs font-medium ${prevDayPageDiff > 0 ? "text-success" : prevDayPageDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+              <div
+                className={`mt-0.5 text-xs font-medium tabular-nums ${prevDayPageDiff > 0 ? "text-success" : prevDayPageDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
               >
-                {formatDiff(prevDayPageDiff, "枚")}
-              </InfoTooltip>
+                <InfoTooltip content="前日（最後に保存した日）の原稿用紙枚数からの増減です。プラスは増加、マイナスは減少を表します。">
+                  {formatDiff(prevDayPageDiff, "枚")}
+                </InfoTooltip>
+              </div>
             )}
           </div>
         </div>
@@ -208,19 +211,21 @@ export default function StatsPanel({
             </p>
           </div>
           <div className="text-right">
-            <span className="text-sm font-bold text-foreground">{selectedManuscriptPages}枚</span>
+            <span className="text-sm font-bold text-foreground tabular-nums">
+              {selectedManuscriptPages}枚
+            </span>
           </div>
         </div>
       )}
 
       {/* 可読性分析 (Readability) */}
       {readabilityAnalysis && !isSelection && (
-        <div className="bg-background-secondary rounded-lg p-4 border border-border">
+        <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
           <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
             読みやすさ
           </h4>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
+          <div className="space-y-2" data-stats-stack>
+            <div className="flex items-center justify-between gap-2" data-stats-row>
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
                   content="文章の読みやすさを100点満点で評価。文の長さや句読点の配置から算出"
@@ -229,8 +234,8 @@ export default function StatsPanel({
                   スコア
                 </InfoTooltip>
               </div>
-              <div className="flex items-baseline gap-1 flex-shrink-0">
-                <span className="text-xl font-bold text-foreground">
+              <div className="flex items-baseline gap-1 flex-shrink-0" data-stats-value>
+                <span className="text-xl font-bold text-foreground tabular-nums">
                   {readabilityAnalysis.score}
                 </span>
                 <span className="text-xs text-foreground-tertiary">/100</span>
@@ -241,11 +246,16 @@ export default function StatsPanel({
                 className="h-full transition-all"
                 style={{
                   width: `${readabilityAnalysis.score}%`,
-                  backgroundColor: `var(--progress-readability)`,
+                  backgroundColor:
+                    readabilityAnalysis.score >= 75
+                      ? "rgb(var(--success))"
+                      : readabilityAnalysis.score >= 50
+                        ? "rgb(var(--warning))"
+                        : "rgb(var(--error))",
                 }}
               />
             </div>
-            <div className="flex justify-between items-baseline gap-2">
+            <div className="flex justify-between items-baseline gap-2" data-stats-row>
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
                   content={`75点以上：やさしい\n50〜74点：普通\n50点未満：難しい`}
@@ -254,7 +264,24 @@ export default function StatsPanel({
                   難易度
                 </InfoTooltip>
               </div>
-              <span className="text-sm font-semibold text-foreground flex-shrink-0">
+              <span
+                data-stats-value
+                className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                style={{
+                  color:
+                    readabilityAnalysis.score >= 75
+                      ? "rgb(var(--success))"
+                      : readabilityAnalysis.score >= 50
+                        ? "rgb(var(--warning))"
+                        : "rgb(var(--error))",
+                  backgroundColor:
+                    readabilityAnalysis.score >= 75
+                      ? "rgb(var(--success) / 0.12)"
+                      : readabilityAnalysis.score >= 50
+                        ? "rgb(var(--warning) / 0.12)"
+                        : "rgb(var(--error) / 0.12)",
+                }}
+              >
                 {getReadabilityLevelLabel(readabilityAnalysis.level)}
               </span>
             </div>
@@ -325,16 +352,21 @@ export default function StatsPanel({
                     ],
                   ] as [string, number, string][]
                 ).map(([label, value, tooltip]) => (
-                  <div key={label} className="flex items-center gap-2">
-                    <InfoTooltip
-                      content={tooltip}
-                      className="text-[10px] text-foreground-tertiary whitespace-nowrap w-20 flex-shrink-0"
-                    >
-                      {label}
-                    </InfoTooltip>
-                    <div className="flex-1 h-1.5 bg-background rounded-full overflow-hidden border border-border-secondary">
+                  <div key={label} className="space-y-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <InfoTooltip
+                        content={tooltip}
+                        className="text-[11px] text-foreground-tertiary whitespace-nowrap"
+                      >
+                        {label}
+                      </InfoTooltip>
+                      <span className="text-[11px] font-medium text-foreground tabular-nums flex-shrink-0">
+                        {value}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-background rounded-full overflow-hidden border border-border-secondary">
                       <div
-                        className="h-full rounded-full transition-all"
+                        className="h-full transition-all"
                         style={{
                           width: `${value}%`,
                           backgroundColor:
@@ -346,9 +378,6 @@ export default function StatsPanel({
                         }}
                       />
                     </div>
-                    <span className="text-[10px] text-foreground-tertiary w-6 text-right flex-shrink-0">
-                      {value}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -358,12 +387,12 @@ export default function StatsPanel({
       )}
 
       {/* 文字数内訳 */}
-      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+      <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
           文字数
         </h4>
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center gap-2">
+        <div className="space-y-1.5" data-stats-stack>
+          <div className="flex justify-between items-center gap-2" data-stats-row>
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="記法を除いた可視本文の文字数（空白・改行は含まない）"
@@ -373,20 +402,21 @@ export default function StatsPanel({
               </InfoTooltip>
             </div>
             <div className="flex-shrink-0 text-right">
-              <span className="text-base font-semibold text-foreground">
+              <span className="text-base font-semibold text-foreground tabular-nums">
                 {activeCharCount.toLocaleString()}
               </span>
               {!isSelection && prevDayCharDiff !== null && (
-                <InfoTooltip
-                  content="前日（最後に保存した日）の総字数からの増減です。プラスは増加、マイナスは減少を表します。"
-                  className={`block text-xs font-medium ${prevDayCharDiff > 0 ? "text-success" : prevDayCharDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
+                <div
+                  className={`mt-0.5 text-xs font-medium tabular-nums ${prevDayCharDiff > 0 ? "text-success" : prevDayCharDiff < 0 ? "text-error" : "text-foreground-tertiary"}`}
                 >
-                  {formatDiff(prevDayCharDiff, "字")}
-                </InfoTooltip>
+                  <InfoTooltip content="前日（最後に保存した日）の総字数からの増減です。プラスは増加、マイナスは減少を表します。">
+                    {formatDiff(prevDayCharDiff, "字")}
+                  </InfoTooltip>
+                </div>
               )}
             </div>
           </div>
-          <div className="flex justify-between items-baseline gap-2">
+          <div className="flex justify-between items-baseline gap-2" data-stats-row>
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="文末の句点（。）で区切られる文の数"
@@ -395,12 +425,12 @@ export default function StatsPanel({
                 文数
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">
+            <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
               {sentenceCount}文
             </span>
           </div>
           {sentenceCount > 0 && (
-            <div className="flex justify-between items-baseline gap-2">
+            <div className="flex justify-between items-baseline gap-2" data-stats-row>
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
                   content="1文あたりの平均文字数。短いほど読みやすい"
@@ -409,12 +439,12 @@ export default function StatsPanel({
                   一文平均
                 </InfoTooltip>
               </div>
-              <span className="text-sm font-medium text-foreground flex-shrink-0">
+              <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
                 {readabilityAnalysis ? `${readabilityAnalysis.avgSentenceLength}字/文` : "-"}
               </span>
             </div>
           )}
-          <div className="flex justify-between items-baseline gap-2">
+          <div className="flex justify-between items-baseline gap-2" data-stats-row>
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="句読点・記号を除いた本文のみの文字数"
@@ -423,11 +453,11 @@ export default function StatsPanel({
                 本文字数
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">
+            <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
               {pureTextCount.toLocaleString()}
             </span>
           </div>
-          <div className="flex justify-between items-baseline gap-2">
+          <div className="flex justify-between items-baseline gap-2" data-stats-row>
             <div className="min-w-0">
               <div className="flex items-center gap-1">
                 <InfoTooltip
@@ -439,7 +469,7 @@ export default function StatsPanel({
               </div>
               <div className="text-xs text-foreground-tertiary">({styleHint})</div>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">
+            <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
               {punctuationRatio}%
             </span>
           </div>
@@ -448,12 +478,12 @@ export default function StatsPanel({
 
       {/* 文字種内訳 (Character Type Analysis) */}
       {charTypeAnalysis && !isSelection && (
-        <div className="bg-background-secondary rounded-lg p-4 border border-border">
+        <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
           <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
             文字種別
           </h4>
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-baseline gap-2">
+          <div className="space-y-1.5" data-stats-stack>
+            <div className="flex justify-between items-baseline gap-2" data-stats-row>
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
                   content="漢字の使用数と割合。一般的に20-30%が読みやすい"
@@ -462,12 +492,12 @@ export default function StatsPanel({
                   漢字
                 </InfoTooltip>
               </div>
-              <span className="text-sm font-medium text-foreground flex-shrink-0">
+              <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
                 {charTypeAnalysis.kanji} 字{" "}
                 {charUsageRates ? `(${charUsageRates.kanjiRate.toFixed(1)}%)` : ""}
               </span>
             </div>
-            <div className="flex justify-between items-baseline gap-2">
+            <div className="flex justify-between items-baseline gap-2" data-stats-row>
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
                   content="ひらがなの使用数と割合。通常50-70%程度"
@@ -476,12 +506,12 @@ export default function StatsPanel({
                   ひらがな
                 </InfoTooltip>
               </div>
-              <span className="text-sm font-medium text-foreground flex-shrink-0">
+              <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
                 {charTypeAnalysis.hiragana} 字{" "}
                 {charUsageRates ? `(${charUsageRates.hiraganaRate.toFixed(1)}%)` : ""}
               </span>
             </div>
-            <div className="flex justify-between items-baseline gap-2">
+            <div className="flex justify-between items-baseline gap-2" data-stats-row>
               <div className="flex items-center gap-1 min-w-0">
                 <InfoTooltip
                   content="カタカナの使用数と割合。外来語や擬音語に使用"
@@ -490,7 +520,7 @@ export default function StatsPanel({
                   カタカナ
                 </InfoTooltip>
               </div>
-              <span className="text-sm font-medium text-foreground flex-shrink-0">
+              <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
                 {charTypeAnalysis.katakana} 字{" "}
                 {charUsageRates ? `(${charUsageRates.katakanaRate.toFixed(1)}%)` : ""}
               </span>
@@ -551,7 +581,7 @@ export default function StatsPanel({
                   </>
                 )}
               </div>
-              <div className="grid grid-cols-4 gap-2 text-xs">
+              <div className="grid grid-cols-4 gap-2 text-xs" data-stats-grid>
                 <div className="flex items-center gap-1">
                   <div
                     className="w-2 h-2 shrink-0 rounded-full"
@@ -587,12 +617,12 @@ export default function StatsPanel({
       )}
 
       {/* 段落構成 */}
-      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+      <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
           段落
         </h4>
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-baseline gap-2">
+        <div className="space-y-1.5" data-stats-stack>
+          <div className="flex justify-between items-baseline gap-2" data-stats-row>
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="改行で区切られる段落の総数"
@@ -601,11 +631,11 @@ export default function StatsPanel({
                 段落数
               </InfoTooltip>
             </div>
-            <span className="text-base font-semibold text-foreground flex-shrink-0">
+            <span className="text-base font-semibold text-foreground flex-shrink-0 tabular-nums">
               {paragraphCount}
             </span>
           </div>
-          <div className="flex justify-between items-baseline gap-2">
+          <div className="flex justify-between items-baseline gap-2" data-stats-row>
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="段落構成の傾向を見るための指標です。良し悪しを示すものではなく、文章設計を振り返るための参考値です。"
@@ -614,7 +644,7 @@ export default function StatsPanel({
                 一段落平均
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">
+            <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
               {avgParagraphLength}字/段
             </span>
           </div>
@@ -630,12 +660,12 @@ export default function StatsPanel({
       </div>
 
       {/* 読了時間（目安） */}
-      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+      <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
           読了時間
         </h4>
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-baseline gap-2">
+        <div className="space-y-1.5" data-stats-stack>
+          <div className="flex justify-between items-baseline gap-2" data-stats-row>
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="分速900字で計算"
@@ -644,11 +674,11 @@ export default function StatsPanel({
                 速読時
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">
+            <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
               {fastReadTime}
             </span>
           </div>
-          <div className="flex justify-between items-baseline gap-2">
+          <div className="flex justify-between items-baseline gap-2" data-stats-row>
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="通常の読書速度（分速500字、日本語の平均的な速度）"
@@ -657,11 +687,11 @@ export default function StatsPanel({
                 通常時
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">
+            <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
               {normalReadTime}
             </span>
           </div>
-          <div className="flex justify-between items-baseline gap-2">
+          <div className="flex justify-between items-baseline gap-2" data-stats-row>
             <div className="flex items-center gap-1 min-w-0">
               <InfoTooltip
                 content="じっくり読む速度（分速250字で計算）"
@@ -670,7 +700,7 @@ export default function StatsPanel({
                 精読時
               </InfoTooltip>
             </div>
-            <span className="text-sm font-medium text-foreground flex-shrink-0">
+            <span className="text-sm font-medium text-foreground flex-shrink-0 tabular-nums">
               {deepReadTime}
             </span>
           </div>

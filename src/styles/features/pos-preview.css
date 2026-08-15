@@ -1,0 +1,17 @@
+.pos-preview-editor {
+  height: 100%;
+  padding: 1rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.pos-preview-editor .milkdown {
+  min-height: 100%;
+  background: transparent;
+}
+.pos-preview-editor .milkdown .ProseMirror {
+  min-height: 100%;
+  outline: none;
+  cursor: default;
+  overflow-wrap: break-word;
+  writing-mode: horizontal-tb;
+}

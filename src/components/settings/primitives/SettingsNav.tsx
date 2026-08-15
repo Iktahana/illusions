@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Search } from "lucide-react";
 import clsx from "clsx";
+import { Button, TextInput } from "@/shared/ui/primitives";
 
 import { matchesQuery } from "./fuzzy-match";
 
@@ -69,13 +70,13 @@ export default function SettingsNav<C extends string>({
             className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-foreground-tertiary"
             aria-hidden
           />
-          <input
+          <TextInput
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={searchPlaceholder}
             aria-label="設定を検索"
-            className="w-full rounded-md border border-border bg-background py-1.5 pl-7 pr-2 text-sm placeholder:text-foreground-tertiary focus:border-accent focus:outline-none"
+            className="border-border pl-7 pr-2"
           />
         </div>
       </div>
@@ -105,13 +106,13 @@ export default function SettingsNav<C extends string>({
                     const isActive = item.id === active;
                     return (
                       <li key={item.id}>
-                        <button
-                          type="button"
+                        <Button
                           onClick={() => onSelect(item.id)}
                           aria-current={isActive ? "page" : undefined}
+                          variant={isActive ? "primary" : "ghost"}
+                          fullWidth
                           className={clsx(
-                            "flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                            "justify-start gap-1.5 px-3 text-left",
                             isActive
                               ? "bg-accent text-accent-foreground"
                               : "text-foreground-secondary hover:bg-hover hover:text-foreground",
@@ -119,7 +120,7 @@ export default function SettingsNav<C extends string>({
                         >
                           {Icon && <Icon className="h-4 w-4" aria-hidden />}
                           <span>{item.label}</span>
-                        </button>
+                        </Button>
                       </li>
                     );
                   })}

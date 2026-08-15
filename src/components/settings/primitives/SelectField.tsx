@@ -3,6 +3,7 @@
 import type React from "react";
 import { useId } from "react";
 import clsx from "clsx";
+import { Select } from "@/shared/ui/primitives";
 
 export interface SelectOption<T extends string> {
   value: T;
@@ -80,19 +81,20 @@ export default function SelectField<T extends string>({
       <label htmlFor={id} className="mb-2 block text-sm font-medium text-foreground">
         {label}
       </label>
-      <select
+      <Select
         id={id}
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value as T)}
-        className="w-full rounded-lg border border-border-secondary bg-background px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+        size="md"
+        className="px-3"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 }
