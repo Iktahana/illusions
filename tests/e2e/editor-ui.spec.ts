@@ -28,7 +28,7 @@ async function selectEditorText(page: import("@playwright/test").Page): Promise<
 }
 
 async function openStatsPanel(page: import("@playwright/test").Page): Promise<void> {
-  await page.getByRole("button", { name: "統計" }).click();
+  await page.getByRole("button", { name: /^統計(?:\s|$)/ }).click();
   await expect(page.getByRole("heading", { name: "全体の統計" })).toBeVisible();
 }
 
