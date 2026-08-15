@@ -31,7 +31,6 @@ describe("new editor core boundary", () => {
       "novel-editor-features",
       "pos-highlight",
       "search-highlight-plugin",
-      "speech-highlight-plugin",
       "use-selection-tracking",
     ];
 

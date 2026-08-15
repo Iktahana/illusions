@@ -16,6 +16,7 @@ interface UseKeyboardShortcutsParams {
   handleToggleWritingMode: () => void;
   handleOpenRubyDialog: () => void;
   handleToggleTcy: () => void;
+  handleEditorCommand?: (command: "speech.toggle" | "speech.stop") => void;
   setShowSettingsModal: (value: boolean) => void;
   setSearchOpenTrigger: Dispatch<SetStateAction<number>>;
   /** Opens search from its keyboard binding, preserving selected editor text when present. */
@@ -67,6 +68,7 @@ export function useKeyboardShortcuts({
   handleToggleWritingMode,
   handleOpenRubyDialog,
   handleToggleTcy,
+  handleEditorCommand,
   setShowSettingsModal,
   setSearchOpenTrigger,
   openSearchFromShortcut,
@@ -149,6 +151,8 @@ export function useKeyboardShortcuts({
       "view.toggleWritingMode": isEditorTabActive ? handleToggleWritingMode : undefined,
       "format.ruby": isEditorTabActive ? handleOpenRubyDialog : undefined,
       "format.tcy": isEditorTabActive ? handleToggleTcy : undefined,
+      "speech.toggle": isEditorTabActive ? () => handleEditorCommand?.("speech.toggle") : undefined,
+      "speech.stop": isEditorTabActive ? () => handleEditorCommand?.("speech.stop") : undefined,
       // On desktop, ⌘, / Ctrl+, belongs to the single global Settings window.
       // The in-editor modal remains available for document/project-scoped tabs.
       "nav.settings": () => {
@@ -195,6 +199,7 @@ export function useKeyboardShortcuts({
     handleToggleWritingMode,
     handleOpenRubyDialog,
     handleToggleTcy,
+    handleEditorCommand,
     setShowSettingsModal,
     setSearchOpenTrigger,
     openSearchFromShortcut,

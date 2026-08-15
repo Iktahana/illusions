@@ -9,6 +9,12 @@ import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
 import type { EditorInteractionHandle } from "@/lib/editor-interaction";
 
 vi.mock("@/contexts/EditorSettingsContext", () => ({
+  useSpeechSettings: () => ({
+    speechVoiceURI: "",
+    speechRate: 1,
+    speechPitch: 1,
+    speechVolume: 1,
+  }),
   useTypographySettings: () => ({
     fontScale: 100,
     lineHeight: 1.8,

@@ -47,6 +47,7 @@ interface Spies {
   newTab: ReturnType<typeof vi.fn<() => void>>;
   switchToIndex: ReturnType<typeof vi.fn<(index: number) => void>>;
   openSearchFromShortcut: ReturnType<typeof vi.fn<() => void>>;
+  editorCommand: ReturnType<typeof vi.fn<(command: "speech.toggle" | "speech.stop") => void>>;
 }
 
 function makeSpies(): Spies {
@@ -57,6 +58,7 @@ function makeSpies(): Spies {
     newTab: vi.fn<() => void>(),
     switchToIndex: vi.fn<(index: number) => void>(),
     openSearchFromShortcut: vi.fn<() => void>(),
+    editorCommand: vi.fn<(command: "speech.toggle" | "speech.stop") => void>(),
   };
 }
 
@@ -81,6 +83,7 @@ function HookHost({ spies, isElectron }: { spies: Spies; isElectron: boolean }):
     handleToggleWritingMode: () => {},
     handleOpenRubyDialog: () => {},
     handleToggleTcy: () => {},
+    handleEditorCommand: spies.editorCommand,
     setShowSettingsModal: () => {},
     setSearchOpenTrigger: () => {},
     openSearchFromShortcut: spies.openSearchFromShortcut,
@@ -154,6 +157,15 @@ function dispatchCtrl(key: string, extra: Partial<KeyboardEventInit> = {}): void
 }
 
 describe("useKeyboardShortcuts — tab navigation must not remount the editor (#1878)", () => {
+  it("routes the speech accelerator through the shared editor command", () => {
+    const spies = makeSpies();
+    mount(spies);
+
+    dispatchCmdOrCtrl("s", { altKey: true });
+
+    expect(spies.editorCommand).toHaveBeenCalledWith("speech.toggle");
+  });
+
   it("opens search through the selection-aware callback for CmdOrCtrl+F (#2218)", () => {
     const spies = makeSpies();
     mount(spies);

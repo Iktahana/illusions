@@ -54,6 +54,8 @@ const baseSnapshot = (
     "format.inlineCode": true,
     "format.clear": true,
     "format.tcy": true,
+    "speech.toggle": true,
+    "speech.stop": true,
     "view.toggleWritingMode": true,
   },
   ...overrides,

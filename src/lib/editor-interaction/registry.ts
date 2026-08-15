@@ -8,8 +8,10 @@ export interface CommandDefinition {
   accelerator?: string;
   nativeRole?: "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll";
   requiresSelection?: boolean;
+  requiresSelectionToken?: boolean;
   requiresFormatting?: boolean;
   requiresCapability?: keyof Pick<DocumentCapabilities, "ruby" | "tcy">;
+  requiresExecutor?: boolean;
 }
 
 const { commands, editorContextMenu } = commandRegistryData as {

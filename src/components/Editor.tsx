@@ -23,6 +23,8 @@ import { EditorInteractionProvider } from "@/lib/editor-interaction/context";
 import EditorToolbar from "./editor/EditorToolbar";
 import BubbleMenu from "./editor/BubbleMenu";
 import PosHighlightController from "./editor/PosHighlightController";
+import { useEditorSpeech } from "@/lib/editor-page/use-editor-speech";
+import { speechHighlightPlugin } from "@/lib/editor-page/speech-highlight-plugin";
 
 interface EditorProps {
   initialContent?: string;
@@ -69,6 +71,8 @@ export default function NovelEditor({
     () => new EditorInteractionStore(editorId, documentFormat, getDocumentAdapter(documentFormat)),
     [documentFormat, editorId],
   );
+  const applicationPlugins = useMemo(() => [speechHighlightPlugin], []);
+  const speech = useEditorSpeech({ interaction, isVertical, editorSurface: editorSurfaceRef });
   useEffect(() => {
     interaction.setActive(active);
   }, [active, interaction]);
@@ -134,7 +138,13 @@ export default function NovelEditor({
       )}
     >
       <EditorInteractionProvider value={interaction}>
-        <EditorToolbar isVertical={isVertical} onToggleWritingMode={toggleWritingMode} />
+        <EditorToolbar
+          isVertical={isVertical}
+          onToggleWritingMode={toggleWritingMode}
+          speechState={speech.state}
+          onToggleSpeech={speech.toggle}
+          onStopSpeech={speech.stop}
+        />
         <MilkdownProvider>
           <ProsemirrorAdapterProvider>
             <MilkdownEditor
@@ -148,6 +158,7 @@ export default function NovelEditor({
               onExternalContentApplied={onExternalContentApplied}
               registerFlush={registerFlush}
               interaction={interaction}
+              applicationPlugins={applicationPlugins}
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>

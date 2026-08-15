@@ -32,6 +32,12 @@ vi.mock("@prosemirror-adapter/react", () => ({
   ProsemirrorAdapterProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/contexts/EditorSettingsContext", () => ({
+  useSpeechSettings: () => ({
+    speechVoiceURI: "",
+    speechRate: 1,
+    speechPitch: 1,
+    speechVolume: 1,
+  }),
   useTypographySettings: () => mockState.typography,
   usePosHighlightSettings: () => ({
     posHighlightEnabled: false,
@@ -76,6 +82,8 @@ vi.mock("@/lib/editor-interaction", () => ({
         "edit.undo": true,
         "format.ruby": true,
         "format.tcy": true,
+        "speech.toggle": true,
+        "speech.stop": true,
       },
       selection: { token: { editorId: "editor-a", generation: 1, selectionRevision: 2 } },
     }));
@@ -93,6 +101,13 @@ vi.mock("@/lib/editor-interaction", () => ({
 }));
 vi.mock("@/lib/editor-interaction/context", () => ({
   EditorInteractionProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+vi.mock("@/lib/editor-page/use-editor-speech", () => ({
+  useEditorSpeech: () => ({
+    state: { isPlaying: false, isPaused: false, isSupported: false },
+    toggle: vi.fn(),
+    stop: vi.fn(),
+  }),
 }));
 vi.mock("../editor/MilkdownEditor", () => ({
   default: (props: Record<string, unknown>) => {
@@ -225,8 +240,8 @@ describe("NovelEditor", () => {
     });
   });
 
-  it("routes editor context menus through the Electron bridge only when available", async () => {
-    const showEditorContextMenu = vi.fn(() => Promise.resolve("format.tcy"));
+  it("routes allowlisted editor context-menu results through the interaction handle", async () => {
+    const showEditorContextMenu = vi.fn().mockResolvedValue("speech.toggle");
     Object.assign(window, {
       electronAPI: { showEditorContextMenu },
     });
@@ -243,10 +258,12 @@ describe("NovelEditor", () => {
       "format.ruby": true,
       "format.tcy": true,
       "edit.undo": true,
+      "speech.toggle": true,
+      "speech.stop": true,
     });
     expect(showEditorContextMenu).toHaveBeenCalledWith([{ command: "edit.copy", enabled: true }]);
     expect(mockState.instances.at(-1)?.execute).toHaveBeenCalledWith(
-      { id: "format.tcy" },
+      { id: "speech.toggle" },
       { editorId: "editor-a", generation: 1, selectionRevision: 2 },
     );
 

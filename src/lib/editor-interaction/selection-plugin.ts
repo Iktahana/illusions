@@ -43,6 +43,9 @@ export function createSelectionBridgePlugin(interaction: EditorInteractionStore)
     props: {
       handleDOMEvents: {
         focus: () => {
+          // Focus ownership affects availability/visual state but does not make
+          // the captured selection stale. Native menus temporarily blur the
+          // renderer and must still be able to use the token they opened with.
           interaction.refreshGeometry();
           return false;
         },

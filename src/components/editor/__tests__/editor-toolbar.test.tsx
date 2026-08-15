@@ -59,4 +59,32 @@ describe("EditorToolbar", () => {
     act(() => option.click());
     expect(settings.onFontScaleChange).toHaveBeenCalledWith(125);
   });
+
+  it("exposes accessible speech pause and stop controls only when supported", () => {
+    const toggleSpeech = vi.fn();
+    const stopSpeech = vi.fn();
+    act(() =>
+      root.render(
+        <EditorToolbar
+          isVertical={false}
+          onToggleWritingMode={vi.fn()}
+          speechState={{ isSupported: true, isPlaying: true, isPaused: false }}
+          onToggleSpeech={toggleSpeech}
+          onStopSpeech={stopSpeech}
+        />,
+      ),
+    );
+    const pause = container.querySelector(
+      'button[aria-label="読み上げを一時停止"]',
+    ) as HTMLButtonElement;
+    const stop = container.querySelector(
+      'button[aria-label="読み上げを停止"]',
+    ) as HTMLButtonElement;
+    act(() => {
+      pause.click();
+      stop.click();
+    });
+    expect(toggleSpeech).toHaveBeenCalledOnce();
+    expect(stopSpeech).toHaveBeenCalledOnce();
+  });
 });

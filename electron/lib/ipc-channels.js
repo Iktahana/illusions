@@ -187,6 +187,7 @@ const MENU_CHANNELS = Object.freeze({
     editorCommand: "menu-editor-command",
     toggleCompactMode: "menu-toggle-compact-mode",
     toggleWritingMode: "menu-toggle-writing-mode",
+    editorCommand: "menu-editor-command",
     format: "menu-format",
     theme: "menu-theme",
     print: "menu-print",
