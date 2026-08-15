@@ -115,6 +115,15 @@ const PROJECT_DIALOG_CHANNELS = Object.freeze({
   event: Object.freeze({}),
 });
 
+const RUBY_DIALOG_CHANNELS = Object.freeze({
+  invoke: Object.freeze({
+    open: "ruby-dialog:open",
+    getRequest: "ruby-dialog:get-request",
+    complete: "ruby-dialog:complete",
+  }),
+  event: Object.freeze({}),
+});
+
 // Shell / OS integration (electron/ipc/shell-ipc.js)
 const SHELL_CHANNELS = Object.freeze({
   invoke: Object.freeze({
@@ -352,6 +361,7 @@ module.exports = {
   FILE_CHANNELS,
   EXPORT_CHANNELS,
   PROJECT_DIALOG_CHANNELS,
+  RUBY_DIALOG_CHANNELS,
   SHELL_CHANNELS,
   SYSTEM_CHANNELS,
   MENU_CHANNELS,

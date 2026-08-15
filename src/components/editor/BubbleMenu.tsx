@@ -3,9 +3,14 @@
 import { useState, type RefObject } from "react";
 
 import { useEditorInteraction } from "@/lib/editor-interaction/context";
-import type { EditorCommand } from "@/lib/editor-interaction";
+import type {
+  EditorCommand,
+  EditorInteractionHandle,
+  SelectionToken,
+} from "@/lib/editor-interaction";
 
 const buttons: Array<{ label: string; command: EditorCommand; text: string }> = [
+  { label: "ルビを設定", command: { id: "format.ruby", mode: "apply", segments: [] }, text: "ル" },
   { label: "縦中横を切替", command: { id: "format.tcy" }, text: "TCY" },
   { label: "太字", command: { id: "format.strong" }, text: "B" },
   { label: "斜体", command: { id: "format.emphasis" }, text: "I" },
@@ -23,9 +28,15 @@ const buttons: Array<{ label: string; command: EditorCommand; text: string }> = 
 export default function BubbleMenu({
   isVertical,
   editorSurface,
+  onEditorCommand,
 }: {
   isVertical: boolean;
   editorSurface?: RefObject<HTMLElement | null>;
+  onEditorCommand?: (
+    handle: EditorInteractionHandle,
+    command: EditorCommand,
+    token?: SelectionToken,
+  ) => void;
 }): React.ReactElement | null {
   const { handle, snapshot } = useEditorInteraction();
   const selection = snapshot.selection;
@@ -77,7 +88,11 @@ export default function BubbleMenu({
       onMouseDown={(event) => event.preventDefault()}
     >
       {buttons
-        .filter(({ command }) => snapshot.availability[command.id])
+        .filter(
+          ({ command }) =>
+            snapshot.availability[command.id] &&
+            (command.id !== "format.ruby" || Boolean(onEditorCommand)),
+        )
         .map(({ label, command, text }) => (
           <button
             key={label}
@@ -85,6 +100,10 @@ export default function BubbleMenu({
             aria-label={label}
             className="rounded px-2 py-1 text-xs hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             onClick={() => {
+              if (onEditorCommand) {
+                onEditorCommand(handle, command, selection.token);
+                return;
+              }
               const result = handle.execute(command, selection.token);
               if (result.status !== "executed") setDismissedRevision(selection.revision);
             }}

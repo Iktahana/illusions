@@ -94,6 +94,47 @@ test("toolbar and bubble menu format the current MDI selection", async ({
   await expect(bubble).toBeHidden();
 });
 
+test("Ruby stays canonical across bubble menu, save, and reopen", async ({
+  electronApp,
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "ruby.mdi");
+  await writeFile(filePath, "漢字\n", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+
+  await selectFirstEditorCharacters(mainWindow, 2);
+  const bubble = mainWindow.getByRole("toolbar", { name: "選択範囲の書式" });
+  await expect(bubble).toBeVisible();
+  const rubyWindowPromise = electronApp.waitForEvent("window");
+  await bubble.getByRole("button", { name: "ルビを設定" }).click();
+  const rubyWindow = await rubyWindowPromise;
+  await rubyWindow.waitForLoadState("domcontentloaded");
+  await expect(rubyWindow.getByRole("dialog", { name: "ルビ設定" })).toBeVisible();
+  const reading = rubyWindow.getByPlaceholder("読み");
+  await reading.fill("かんじ");
+  await rubyWindow.getByRole("button", { name: "適用" }).click();
+  await expect
+    .poll(() => electronApp.windows().some((page) => page.url().includes("ruby-dialog")))
+    .toBe(false);
+  await expect(mainWindow.locator(".ProseMirror").last().locator("ruby.mdi-ruby rt")).toHaveText(
+    "かんじ",
+  );
+  await expect(mainWindow).toHaveTitle(/\*/);
+
+  await nativeHarness.queueSavePath(filePath);
+  await nativeHarness.saveAs();
+  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}\n");
+  await nativeHarness.closeTab();
+  await nativeHarness.queueOpenPaths([filePath]);
+  await nativeHarness.open();
+  await expect(mainWindow.locator(".ProseMirror").last().locator("ruby.mdi-ruby rt")).toHaveText(
+    "かんじ",
+  );
+});
+
 test("TCY stays canonical across bubble menu, save, and reopen", async ({
   mainWindow,
   nativeHarness,
@@ -177,17 +218,56 @@ test("editor context menu crosses renderer, preload, IPC, and native role", asyn
 
   const menus = await nativeHarness.takeContextMenus();
   const editorMenu = menus.at(-1) ?? [];
-  expect(editorMenu.map((item) => item.role)).toEqual([
+  expect(editorMenu.map((item) => item.command ?? item.role ?? item.type)).toEqual([
     "undo",
     "redo",
-    undefined,
+    "separator",
     "cut",
     "copy",
     "paste",
-    undefined,
+    "separator",
     "selectAll",
-    undefined,
+    "separator",
+    "format.ruby",
+    "separator",
+    "format.tcy",
   ]);
+});
+
+test("renderer-owned Ruby command survives the native context-menu round-trip", async ({
+  electronApp,
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "context-ruby.mdi");
+  await writeFile(filePath, "漢字\n", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  const editor = mainWindow.locator(".ProseMirror").last();
+
+  await selectFirstEditorCharacters(mainWindow, 2);
+  await nativeHarness.selectContextCommand("format.ruby");
+  const rubyWindowPromise = electronApp.waitForEvent("window");
+  await editor.evaluate((element) => {
+    element.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }),
+    );
+  });
+  const rubyWindow = await rubyWindowPromise;
+  await rubyWindow.waitForLoadState("domcontentloaded");
+  await expect(rubyWindow.getByRole("dialog", { name: "ルビ設定" })).toBeVisible();
+  const reading = rubyWindow.getByPlaceholder("読み");
+  await reading.fill("かんじ");
+  await rubyWindow.getByRole("button", { name: "適用" }).click();
+  await expect
+    .poll(() => electronApp.windows().some((page) => page.url().includes("ruby-dialog")))
+    .toBe(false);
+  await expect(mainWindow).toHaveTitle(/\*/);
+
+  await nativeHarness.queueSavePath(filePath);
+  await nativeHarness.saveAs();
+  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}\n");
 });
 
 test("renderer-owned TCY command survives the native context-menu round-trip", async ({

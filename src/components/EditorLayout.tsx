@@ -52,6 +52,7 @@ import type { UnifiedExportSettings } from "@/lib/export/export-settings";
 import type { EpubExportOptions } from "@/lib/export/epub-shared";
 import type { HtmlExportOptions } from "@/lib/export/html-shared";
 import type { ExportMetadata } from "@/lib/export/types";
+import type { ExistingRubySelection } from "@/lib/editor-interaction";
 import { decideResponsivePanels } from "@/lib/editor-page/responsive-layout";
 import { useWindowWidth } from "@/lib/editor-page/use-window-width";
 import { documentFormatForExtension } from "@/lib/document-format";
@@ -103,8 +104,9 @@ interface EditorLayoutProps {
       category: React.ComponentProps<typeof SettingsModal>["initialCategory"],
     ) => void;
     showRubyDialog: boolean;
-    setShowRubyDialog: (show: boolean) => void;
+    handleCloseRubyDialog: () => void;
     rubySelectedText: string;
+    rubyInitialSelection: ExistingRubySelection | null;
     handleApplyRuby: React.ComponentProps<typeof RubyDialog>["onApply"];
     exportDialog: {
       state: {
@@ -201,6 +203,7 @@ interface EditorLayoutProps {
       React.ComponentProps<typeof NovelEditor>["registerWritingModeToggle"]
     >;
     registerInteraction?: React.ComponentProps<typeof NovelEditor>["registerInteraction"];
+    handleDispatchEditorCommand?: React.ComponentProps<typeof NovelEditor>["onEditorCommand"];
   };
   inspector: {
     isRightPanelCollapsed: boolean;
@@ -310,8 +313,9 @@ export default function EditorLayout({
 
               <RubyDialog
                 isOpen={dialogs.showRubyDialog}
-                onClose={() => dialogs.setShowRubyDialog(false)}
+                onClose={dialogs.handleCloseRubyDialog}
                 selectedText={dialogs.rubySelectedText}
+                initialRuby={dialogs.rubyInitialSelection}
                 onApply={dialogs.handleApplyRuby}
               />
 
@@ -593,6 +597,7 @@ export default function EditorLayout({
                                   registerInteraction={
                                     isActivePanel ? mainArea.registerInteraction : undefined
                                   }
+                                  onEditorCommand={mainArea.handleDispatchEditorCommand}
                                   externalContent={panelPendingExternalContent}
                                   onExternalContentApplied={() => {
                                     mainArea.updateTab(panelBufferId, {

@@ -144,10 +144,11 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         const getCommand = (item: Electron.MenuItemConstructorOptions): string | undefined =>
           (item as Electron.MenuItemConstructorOptions & { command?: string }).command;
         const isEditorContextMenu =
-          template.length === 10 &&
-          template.filter((item) => item.type === "separator").length === 3 &&
+          template.length === 12 &&
+          template.filter((item) => item.type === "separator").length === 4 &&
           template.some((item) => item.role === "undo") &&
           template.some((item) => item.role === "selectAll") &&
+          template.some((item) => getCommand(item) === "format.ruby") &&
           template.some((item) => getCommand(item) === "format.tcy");
         if (!isEditorContextMenu) return originalBuildFromTemplate(template);
 
@@ -198,7 +199,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         return menu;
       }) as typeof Menu.buildFromTemplate;
     });
-    const mutate = async (operation: string, value?: string | string[]) =>
+    const mutate = async (operation: string, value?: unknown) =>
       electronApp.evaluate(
         ({ BrowserWindow, Menu }, { operation: op, value: next }) => {
           const state = (

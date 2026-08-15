@@ -5,16 +5,26 @@ import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
 
 const mdiEditing = vi.hoisted(() => ({
   tcyActive: false,
+  rubySelection: null as null | { base: string; reading: string | readonly string[] },
   canApply: true,
-  appliedOperations: [] as Array<{ type: string; mark: string }>,
+  appliedOperations: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock("../mdi-editing", () => ({
-  inspectMdiSelection: () => ({ marks: { tcy: mdiEditing.tcyActive } }),
+  inspectMdiSelection: () => ({
+    marks: { tcy: mdiEditing.tcyActive },
+    ruby: mdiEditing.rubySelection,
+  }),
   canApplyMdiEdit: () => mdiEditing.canApply,
-  mdiEditCommand: (operation: { type: string; mark: string }) => () => {
+  mdiEditCommand: (operation: Record<string, unknown>) => () => {
     mdiEditing.appliedOperations.push(operation);
     mdiEditing.tcyActive = operation.type === "setInlineMark";
+    if (operation.type === "removeRuby") mdiEditing.rubySelection = null;
+    if (operation.type === "setRuby")
+      mdiEditing.rubySelection = {
+        base: mdiEditing.rubySelection?.base ?? "",
+        reading: operation.reading as string | readonly string[],
+      };
     return mdiEditing.canApply;
   },
 }));
@@ -69,6 +79,7 @@ function store(format: DocumentFormat = "markdown") {
 describe("EditorInteractionStore", () => {
   beforeEach(() => {
     mdiEditing.tcyActive = false;
+    mdiEditing.rubySelection = null;
     mdiEditing.canApply = true;
     mdiEditing.appliedOperations.length = 0;
   });
@@ -104,26 +115,36 @@ describe("EditorInteractionStore", () => {
     const interaction = store("plain-text");
     interaction.attach(makeView() as never, 0, "plain-text", getDocumentAdapter("plain-text"));
     expect(interaction.getSnapshot().availability["format.strong"]).toBe(false);
+    expect(interaction.getSnapshot().availability["format.ruby"]).toBe(false);
     expect(interaction.getSnapshot().availability["format.tcy"]).toBe(false);
     expect(
       interaction.execute({ id: "format.strong" }, interaction.getSnapshot().selection.token),
+    ).toEqual({ status: "unavailable" });
+    expect(
+      interaction.execute(
+        { id: "format.ruby", mode: "remove" },
+        interaction.getSnapshot().selection.token,
+      ),
     ).toEqual({ status: "unavailable" });
     expect(
       interaction.execute({ id: "format.tcy" }, interaction.getSnapshot().selection.token),
     ).toEqual({ status: "unavailable" });
   });
 
-  it("keeps TCY unavailable for markdown and reflects MDI edit capability for mdi", () => {
+  it("keeps Ruby/TCY unavailable for markdown and reflects MDI edit capability for mdi", () => {
     const markdown = store("markdown");
     markdown.attach(makeView() as never, 0, "markdown", getDocumentAdapter("markdown"));
+    expect(markdown.getSnapshot().availability["format.ruby"]).toBe(false);
     expect(markdown.getSnapshot().availability["format.tcy"]).toBe(false);
 
     const mdi = store("mdi");
     mdi.attach(makeView() as never, 0, "mdi", getDocumentAdapter("mdi"));
+    expect(mdi.getSnapshot().availability["format.ruby"]).toBe(true);
     expect(mdi.getSnapshot().availability["format.tcy"]).toBe(true);
 
     mdiEditing.canApply = false;
     mdi.update();
+    expect(mdi.getSnapshot().availability["format.ruby"]).toBe(false);
     expect(mdi.getSnapshot().availability["format.tcy"]).toBe(false);
   });
 
@@ -307,6 +328,65 @@ describe("EditorInteractionStore", () => {
       type: "removeInlineMark",
       mark: "tcy",
     });
+  });
+
+  it("executes Ruby over a plain-text MDI selection and preserves grouped readings", () => {
+    const interaction = store("mdi");
+    interaction.attach(makeView("東京駅", 1, 4) as never, 0, "mdi", getDocumentAdapter("mdi"));
+    const token = interaction.getSnapshot().selection.token;
+
+    expect(
+      interaction.execute(
+        {
+          id: "format.ruby",
+          mode: "apply",
+          segments: [
+            { base: "東京", ruby: ["とう", "きょう"] },
+            { base: "駅", ruby: "えき" },
+          ],
+        },
+        token,
+      ),
+    ).toEqual({ status: "executed" });
+
+    expect(mdiEditing.appliedOperations).toEqual([
+      { type: "setRuby", reading: "えき" },
+      { type: "setRuby", reading: ["とう", "きょう"] },
+    ]);
+  });
+
+  it("edits and removes an existing Ruby selection through the current token", () => {
+    const interaction = store("mdi");
+    interaction.attach(makeView("漢字", 1, 3) as never, 0, "mdi", getDocumentAdapter("mdi"));
+    mdiEditing.rubySelection = { base: "漢字", reading: "かんじ" };
+    interaction.update();
+    const token = interaction.getSnapshot().selection.token;
+
+    expect(interaction.getSnapshot().selection.ruby).toEqual({
+      base: "漢字",
+      reading: "かんじ",
+    });
+    expect(
+      interaction.execute(
+        {
+          id: "format.ruby",
+          mode: "apply",
+          segments: [{ base: "漢字", ruby: ["かん", "じ"] }],
+        },
+        token,
+      ),
+    ).toEqual({ status: "executed" });
+    expect(mdiEditing.appliedOperations.at(-1)).toEqual({
+      type: "setRuby",
+      reading: ["かん", "じ"],
+    });
+
+    interaction.update();
+    const removeToken = interaction.getSnapshot().selection.token;
+    expect(interaction.execute({ id: "format.ruby", mode: "remove" }, removeToken)).toEqual({
+      status: "executed",
+    });
+    expect(mdiEditing.appliedOperations.at(-1)).toEqual({ type: "removeRuby" });
   });
 
   it("executes clear and heading and rejects unsupported renderer commands", () => {

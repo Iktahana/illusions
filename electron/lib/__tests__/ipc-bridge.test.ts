@@ -35,6 +35,7 @@ const {
   FILE_CHANNELS,
   EXPORT_CHANNELS,
   PROJECT_DIALOG_CHANNELS,
+  RUBY_DIALOG_CHANNELS,
   SHELL_CHANNELS,
   SYSTEM_CHANNELS,
   MENU_CHANNELS,
@@ -158,6 +159,15 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       complete: "project-dialog:complete",
     });
     expect(PROJECT_DIALOG_CHANNELS.event).toEqual({});
+  });
+
+  it("ruby dialog invoke channels keep their string values", () => {
+    expect(RUBY_DIALOG_CHANNELS.invoke).toEqual({
+      open: "ruby-dialog:open",
+      getRequest: "ruby-dialog:get-request",
+      complete: "ruby-dialog:complete",
+    });
+    expect(RUBY_DIALOG_CHANNELS.event).toEqual({});
   });
 
   it("shell invoke channels keep their historical string values", () => {
@@ -384,6 +394,11 @@ describe("ipc bridge: preload ↔ main handler registration cannot drift", () =>
       constName: "PROJECT_DIALOG_CHANNELS",
       group: PROJECT_DIALOG_CHANNELS,
       mainFile: "ipc/project-dialog-ipc.js",
+    },
+    {
+      constName: "RUBY_DIALOG_CHANNELS",
+      group: RUBY_DIALOG_CHANNELS,
+      mainFile: "ipc/ruby-dialog-ipc.js",
     },
     { constName: "SHELL_CHANNELS", group: SHELL_CHANNELS, mainFile: "ipc/shell-ipc.js" },
     { constName: "SYSTEM_CHANNELS", group: SYSTEM_CHANNELS, mainFile: "ipc/system-ipc.js" },

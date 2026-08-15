@@ -1,6 +1,11 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  EditorCommand,
+  EditorInteractionHandle,
+  SelectionToken,
+} from "@/lib/editor-interaction";
 
 const interaction = vi.hoisted(() => ({
   handle: { execute: vi.fn(() => ({ status: "executed" })) },
@@ -9,6 +14,7 @@ const interaction = vi.hoisted(() => ({
     documentFormat: "markdown",
     composing: false,
     availability: {
+      "format.ruby": true,
       "format.tcy": true,
       "format.strong": true,
       "format.emphasis": true,
@@ -58,6 +64,7 @@ describe("BubbleMenu", () => {
       composing: false,
     });
     Object.assign(interaction.snapshot.availability, {
+      "format.ruby": true,
       "format.tcy": true,
       "format.strong": true,
       "format.emphasis": true,
@@ -75,17 +82,31 @@ describe("BubbleMenu", () => {
     act(() => root.unmount());
     container.remove();
   });
-  const render = (vertical = false) =>
+  const render = (
+    vertical = false,
+    onEditorCommand?: (
+      handle: EditorInteractionHandle,
+      command: EditorCommand,
+      token?: SelectionToken,
+    ) => void,
+  ) =>
     act(() =>
-      root.render(<BubbleMenu isVertical={vertical} editorSurface={{ current: editorSurface }} />),
+      root.render(
+        <BubbleMenu
+          isVertical={vertical}
+          editorSurface={{ current: editorSurface }}
+          onEditorCommand={onEditorCommand}
+        />,
+      ),
     );
   const renderWithoutSurface = (vertical = false) =>
     act(() => root.render(<BubbleMenu isVertical={vertical} />));
 
   it("shows every formatting command for a current rich-text selection", () => {
-    render();
+    render(false, vi.fn());
     expect(container.querySelector('[aria-label="選択範囲の書式"]')).not.toBeNull();
     for (const name of [
+      "ルビを設定",
       "縦中横を切替",
       "太字",
       "斜体",
@@ -98,6 +119,12 @@ describe("BubbleMenu", () => {
       "書式をクリア",
     ])
       expect(container.querySelector(`button[aria-label="${name}"]`)).not.toBeNull();
+  });
+
+  it("hides the Ruby action when no shared prompt callback is available", () => {
+    render();
+    expect(container.querySelector('button[aria-label="ルビを設定"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="縦中横を切替"]')).not.toBeNull();
   });
 
   it("does not exist for caret, plain text, composition, or disposed editors", () => {
@@ -140,6 +167,20 @@ describe("BubbleMenu", () => {
       interaction.snapshot.selection.token,
     );
     expect(container.querySelector('[aria-label="選択範囲の書式"]')).toBeNull();
+  });
+
+  it("routes Ruby actions through the shared prompt callback", () => {
+    const onEditorCommand = vi.fn();
+    render(false, onEditorCommand);
+    act(() =>
+      (container.querySelector('button[aria-label="ルビを設定"]') as HTMLButtonElement).click(),
+    );
+    expect(onEditorCommand).toHaveBeenCalledWith(
+      interaction.handle,
+      { id: "format.ruby", mode: "apply", segments: [] },
+      interaction.snapshot.selection.token,
+    );
+    expect(interaction.handle.execute).not.toHaveBeenCalled();
   });
 
   it("places vertical controls on the read side and clamps to the viewport", () => {

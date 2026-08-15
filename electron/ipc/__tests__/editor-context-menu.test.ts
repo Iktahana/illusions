@@ -2,6 +2,21 @@ import { describe, expect, it } from "vitest";
 
 const { buildEditorContextMenuTemplate } = require("../../lib/editor-command-registry.js");
 
+const validItems = [
+  { command: "edit.undo", enabled: true },
+  { command: "edit.redo", enabled: true },
+  { separator: true },
+  { command: "edit.cut", enabled: true },
+  { command: "edit.copy", enabled: true },
+  { command: "edit.paste", enabled: true },
+  { separator: true },
+  { command: "edit.selectAll", enabled: true },
+  { separator: true },
+  { command: "format.ruby", enabled: true },
+  { separator: true },
+  { command: "format.tcy", enabled: true },
+] as const;
+
 describe("editor context menu contract", () => {
   it("resolves allowlisted IDs to Japanese native editing roles", () => {
     expect(
@@ -14,6 +29,8 @@ describe("editor context menu contract", () => {
         { command: "edit.paste", enabled: false },
         { separator: true },
         { command: "edit.selectAll", enabled: true },
+        { separator: true },
+        { command: "format.ruby", enabled: false },
         { separator: true },
         { command: "format.tcy", enabled: true },
       ]),
@@ -30,6 +47,13 @@ describe("editor context menu contract", () => {
         accelerator: "CmdOrCtrl+A",
         role: "selectAll",
         enabled: true,
+      },
+      { type: "separator" },
+      {
+        label: "ルビを設定",
+        accelerator: "CmdOrCtrl+Shift+R",
+        enabled: false,
+        command: "format.ruby",
       },
       { type: "separator" },
       {
@@ -54,6 +78,8 @@ describe("editor context menu contract", () => {
       { separator: true },
       { command: "edit.selectAll", enabled: true },
       { separator: true },
+      { command: "format.ruby", enabled: true },
+      { separator: true },
     ],
     [
       { command: "edit.undo", enabled: true },
@@ -64,6 +90,7 @@ describe("editor context menu contract", () => {
       { command: "edit.paste", enabled: true },
       { separator: true },
       { command: "edit.selectAll", enabled: true },
+      { separator: true },
       { command: "format.tcy", enabled: true },
     ],
     [{ command: "system.deleteEverything", enabled: true }],
@@ -83,6 +110,17 @@ describe("editor context menu contract", () => {
       { command: "format.strong", enabled: true },
     ],
   ])("rejects malformed or renderer-defined menu input", (items) => {
+    expect(buildEditorContextMenuTemplate(items)).toBeNull();
+  });
+
+  it.each([
+    [2, { separator: true, label: "injected" }],
+    [0, null],
+    [0, { command: "edit.redo", enabled: true }],
+    [0, { command: "edit.undo", enabled: "yes" }],
+  ] as const)("rejects an invalid item at the expected menu position", (index, replacement) => {
+    const items: unknown[] = [...validItems];
+    items[index] = replacement;
     expect(buildEditorContextMenuTemplate(items)).toBeNull();
   });
 });

@@ -56,7 +56,12 @@ vi.mock("@/lib/editor-interaction", () => ({
     adapter: unknown;
     setActive = vi.fn();
     getSnapshot = vi.fn(() => ({
-      availability: { "edit.copy": true, "edit.undo": true, "format.tcy": true },
+      availability: {
+        "edit.copy": true,
+        "edit.undo": true,
+        "format.ruby": true,
+        "format.tcy": true,
+      },
       selection: { token: { editorId: "editor-a", generation: 1, selectionRevision: 2 } },
     }));
     execute = vi.fn(() => ({ status: "executed" }));
@@ -217,6 +222,7 @@ describe("NovelEditor", () => {
     expect(event.defaultPrevented).toBe(true);
     expect(mockState.buildEditorContextMenu).toHaveBeenCalledWith({
       "edit.copy": true,
+      "format.ruby": true,
       "format.tcy": true,
       "edit.undo": true,
     });
@@ -234,5 +240,27 @@ describe("NovelEditor", () => {
     expect(noBridgeEvent.defaultPrevented).toBe(false);
     expect(mockState.buildEditorContextMenu).not.toHaveBeenCalled();
     expect(showEditorContextMenu).not.toHaveBeenCalled();
+  });
+
+  it("routes Ruby commands through the shared prompt callback", async () => {
+    const showEditorContextMenu = vi.fn(() => Promise.resolve("format.ruby"));
+    const onEditorCommand = vi.fn();
+    Object.assign(window, {
+      electronAPI: { showEditorContextMenu },
+    });
+    act(() => root.render(<NovelEditor documentFormat="mdi" onEditorCommand={onEditorCommand} />));
+
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    container.firstElementChild?.dispatchEvent(event);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(onEditorCommand).toHaveBeenCalledWith(
+      mockState.instances.at(-1),
+      { id: "format.ruby", mode: "apply", segments: [] },
+      { editorId: "editor-a", generation: 1, selectionRevision: 2 },
+    );
+    expect(mockState.instances.at(-1)?.execute).not.toHaveBeenCalled();
   });
 });

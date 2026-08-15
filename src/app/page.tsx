@@ -9,6 +9,7 @@ import SettingsModal from "@/components/SettingsModal";
 import SettingsWindow from "@/components/SettingsWindow";
 import ExportDialogWindow from "@/components/ExportDialogWindow";
 import CreateProjectWindow from "@/components/CreateProjectWindow";
+import RubyDialogWindow from "@/components/RubyDialogWindow";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import StartupRestoreScreen from "@/components/StartupRestoreScreen";
 import PopoutEditorWindow from "@/components/PopoutEditorWindow";
@@ -89,10 +90,12 @@ import {
   commandById,
   computeActiveSelectionStats,
   emptyActiveSelectionStats,
+  type EditorCommand,
   type EditorCommandId,
   type EditorInteractionHandle,
   type EditorSearchQueryResult,
   type EditorInteractionSnapshot,
+  type SelectionToken,
 } from "@/lib/editor-interaction";
 
 import type { EditorView } from "@milkdown/prose/view";
@@ -322,6 +325,7 @@ function EditorPageContent() {
     switchToCorrectionsTrigger,
     showRubyDialog,
     rubySelectedText,
+    rubyInitialSelection,
     editorDiff,
   } = panelState;
   const {
@@ -331,6 +335,7 @@ function EditorPageContent() {
     setSettingsInitialCategory,
     setShowRubyDialog,
     setRubySelectedText,
+    setRubyInitialSelection,
     setEditorDiff,
     setSearchTerm,
     setCaseSensitive,
@@ -611,15 +616,6 @@ function EditorPageContent() {
         : emptyActiveSelectionStats(),
     [activeEditorTab, activeInteractionSnapshot],
   );
-  const handleExecuteEditorCommand = useCallback((commandId: EditorCommandId) => {
-    const handle = activeInteractionRef.current;
-    if (!handle) return;
-    const snapshot = handle.getSnapshot();
-    const token = commandById.get(commandId)?.requiresSelection
-      ? snapshot.selection.token
-      : undefined;
-    handle.execute({ id: commandId }, token);
-  }, []);
 
   // Snapshot selection before SearchDialog moves focus to its input, then keep
   // a collapsed editor caret while the dialog owns DOM focus.
@@ -755,11 +751,38 @@ function EditorPageContent() {
   }, [searchOpenTrigger]);
 
   // --- Ruby/TCY hook ---
-  const { handleOpenRubyDialog, handleApplyRuby } = useRubyTcy({
-    editorViewRef,
-    setRubySelectedText: panelHandlers.setRubySelectedText,
-    setShowRubyDialog: panelHandlers.setShowRubyDialog,
+  const { handleOpenRubyDialog, handleApplyRuby, handleCloseRubyDialog } = useRubyTcy({
+    getInteraction: () => activeInteractionRef.current,
+    setRubySelectedText,
+    setRubyInitialSelection,
+    setShowRubyDialog,
   });
+  const handleExecuteEditorCommand = useCallback(
+    (commandId: EditorCommandId) => {
+      const handle = activeInteractionRef.current;
+      if (!handle) return;
+      const snapshot = handle.getSnapshot();
+      const token = commandById.get(commandId)?.requiresSelection
+        ? snapshot.selection.token
+        : undefined;
+      if (commandId === "format.ruby") {
+        void handleOpenRubyDialog(handle, token);
+        return;
+      }
+      handle.execute({ id: commandId }, token);
+    },
+    [handleOpenRubyDialog],
+  );
+  const handleDispatchEditorCommand = useCallback(
+    (handle: EditorInteractionHandle, command: EditorCommand, token?: SelectionToken) => {
+      if (command.id === "format.ruby") {
+        void handleOpenRubyDialog(handle, token);
+        return;
+      }
+      handle.execute(command, token);
+    },
+    [handleOpenRubyDialog],
+  );
   const handleToggleTcy = useCallback(() => {
     handleExecuteEditorCommand("format.tcy");
   }, [handleExecuteEditorCommand]);
@@ -1853,8 +1876,9 @@ function EditorPageContent() {
           settingsInitialCategory,
           setSettingsInitialCategory,
           showRubyDialog,
-          setShowRubyDialog,
+          handleCloseRubyDialog,
           rubySelectedText,
+          rubyInitialSelection,
           handleApplyRuby,
           exportDialog: {
             state: exportDialogState,
@@ -1943,6 +1967,7 @@ function EditorPageContent() {
           switchTab,
           updateTab,
           registerFlush,
+          handleDispatchEditorCommand,
           registerWritingModeToggle: (toggle) => {
             toggleWritingModeRef.current = toggle ?? (() => {});
           },
@@ -1991,7 +2016,7 @@ function EditorPageContent() {
  */
 export default function EditorPage() {
   const [route, setRoute] = useState<
-    "pending" | "editor" | "settings" | "export" | "create-project"
+    "pending" | "editor" | "settings" | "export" | "create-project" | "ruby-dialog"
   >("pending");
 
   useEffect(() => {
@@ -2001,9 +2026,11 @@ export default function EditorPage() {
         ? "settings"
         : query.has("export-dialog")
           ? "export"
-          : query.has("create-project")
-            ? "create-project"
-            : "editor",
+          : query.has("ruby-dialog")
+            ? "ruby-dialog"
+            : query.has("create-project")
+              ? "create-project"
+              : "editor",
     );
   }, []);
 
@@ -2012,6 +2039,8 @@ export default function EditorPage() {
     <SettingsWindow />
   ) : route === "export" ? (
     <ExportDialogWindow />
+  ) : route === "ruby-dialog" ? (
+    <RubyDialogWindow />
   ) : route === "create-project" ? (
     <CreateProjectWindow />
   ) : (

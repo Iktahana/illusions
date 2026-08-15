@@ -6,8 +6,13 @@ import GlassDialog from "@/shared/ui/GlassDialog";
 import { getNlpClient } from "@/lib/nlp-client/nlp-client";
 import { getDictAccess } from "@/lib/dict/dict-access";
 import { getDictService } from "@/lib/dict/dict-service";
+import type { ExistingRubySelection, RubyApplicationSegment } from "@/lib/editor-interaction";
+import {
+  normalizeRubyReading,
+  serializeRubyReading,
+  type RubyDialogResult,
+} from "@/lib/editor-page/ruby-dialog-contract";
 import { buildBatchReadingCandidates } from "@/lib/utils/ruby-readings";
-import type { RubyApplicationSegment } from "@/lib/editor-page/use-ruby-tcy";
 
 import type { Token } from "@/lib/nlp-client/types";
 import type { DictLookup, DictEntry } from "@/lib/dict/dict-types";
@@ -24,7 +29,9 @@ interface RubyDialogProps {
   isOpen: boolean;
   onClose: () => void;
   selectedText: string;
-  onApply: (segments: readonly RubyApplicationSegment[]) => void;
+  initialRuby?: ExistingRubySelection | null;
+  presentation?: "overlay" | "window";
+  onApply: (result: Exclude<RubyDialogResult, null>) => void;
 }
 
 /** Regex to detect kanji characters */
@@ -58,9 +65,36 @@ function buildRubyApplication(segments: RubySegment[]): RubyApplicationSegment[]
   return segments.map((segment) => ({
     base: segment.surface,
     ...(segment.hasKanji && segment.reading && segment.reading !== segment.surface
-      ? { ruby: segment.reading }
+      ? { ruby: normalizeRubyReading(segment.reading) }
       : {}),
   }));
+}
+
+function splitGraphemes(text: string): string[] {
+  if (typeof Intl.Segmenter === "function") {
+    return [...new Intl.Segmenter("ja", { granularity: "grapheme" }).segment(text)].map(
+      (segment) => segment.segment,
+    );
+  }
+  return Array.from(text);
+}
+
+function existingRubyToSegments(existingRuby: ExistingRubySelection): RubySegment[] {
+  if (Array.isArray(existingRuby.reading)) {
+    const bases = splitGraphemes(existingRuby.base);
+    return bases.map((surface, index) => ({
+      surface,
+      reading: existingRuby.reading[index] ?? "",
+      hasKanji: KANJI_REGEX.test(surface),
+    }));
+  }
+  return [
+    {
+      surface: existingRuby.base,
+      reading: serializeRubyReading(existingRuby.reading),
+      hasKanji: KANJI_REGEX.test(existingRuby.base),
+    },
+  ];
 }
 
 /**
@@ -125,7 +159,14 @@ async function fetchGenjiCandidates(segments: RubySegment[]): Promise<Map<string
   return result;
 }
 
-export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: RubyDialogProps) {
+export default function RubyDialog({
+  isOpen,
+  onClose,
+  selectedText,
+  initialRuby = null,
+  presentation = "overlay",
+  onApply,
+}: RubyDialogProps) {
   const [segments, setSegments] = useState<RubySegment[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +185,14 @@ export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: R
       setCandidatesMap(new Map());
 
       try {
+        if (initialRuby && initialRuby.base === selectedText) {
+          const segs = existingRubyToSegments(initialRuby);
+          if (!cancelled) {
+            setSegments(segs);
+            setIsAnalyzing(false);
+          }
+          return;
+        }
         let nlpClient;
         try {
           nlpClient = getNlpClient();
@@ -179,7 +228,7 @@ export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: R
     return () => {
       cancelled = true;
     };
-  }, [isOpen, selectedText]);
+  }, [initialRuby, isOpen, selectedText]);
 
   const handleReadingChange = useCallback((index: number, newReading: string) => {
     setSegments((prev) =>
@@ -188,9 +237,13 @@ export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: R
   }, []);
 
   const handleApply = useCallback(() => {
-    onApply(buildRubyApplication(segments));
+    onApply({ action: "apply", segments: buildRubyApplication(segments) });
     onClose();
   }, [segments, onApply, onClose]);
+  const handleRemove = useCallback(() => {
+    onApply({ action: "remove" });
+    onClose();
+  }, [onApply, onClose]);
 
   const preview = segments
     .map((segment) =>
@@ -203,9 +256,14 @@ export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: R
   return (
     <GlassDialog
       isOpen={isOpen}
+      presentation={presentation}
       onBackdropClick={onClose}
       ariaLabel="ルビ設定"
-      panelClassName="mx-4 w-full max-w-lg p-6"
+      panelClassName={
+        presentation === "window"
+          ? "h-screen w-screen overflow-y-auto rounded-xl border border-border bg-background-elevated/95 p-8 shadow-2xl"
+          : "mx-4 w-full max-w-lg p-6"
+      }
     >
       <h2 className="text-lg font-semibold text-foreground mb-4">ルビ設定</h2>
 
@@ -308,13 +366,24 @@ export default function RubyDialog({ isOpen, onClose, selectedText, onApply }: R
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-2">
+            {initialRuby && (
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="px-4 py-2 text-sm font-medium text-error hover:text-error rounded transition-colors"
+              >
+                ルビを削除
+              </button>
+            )}
             <button
+              type="button"
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-foreground-secondary hover:text-foreground rounded transition-colors"
             >
               キャンセル
             </button>
             <button
+              type="button"
               onClick={handleApply}
               className="px-4 py-2 text-sm font-medium bg-accent text-accent-foreground rounded hover:bg-accent-hover transition-colors"
             >

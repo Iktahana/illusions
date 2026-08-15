@@ -34,6 +34,13 @@
       "nativeRole": "selectAll"
     },
     {
+      "id": "format.ruby",
+      "label": "ルビを設定",
+      "accelerator": "CmdOrCtrl+Shift+R",
+      "requiresSelection": true,
+      "requiresCapability": "ruby"
+    },
+    {
       "id": "format.tcy",
       "label": "縦中横を切替",
       "accelerator": "CmdOrCtrl+Shift+T",
@@ -105,6 +112,8 @@
     "edit.paste",
     "separator",
     "edit.selectAll",
+    "separator",
+    "format.ruby",
     "separator",
     "format.tcy"
   ]

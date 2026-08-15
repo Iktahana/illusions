@@ -1,101 +1,118 @@
 import { useCallback, useRef } from "react";
-import type { MutableRefObject } from "react";
-import { Fragment } from "@milkdown/prose/model";
-import { toggleMark } from "@milkdown/prose/commands";
-import type { EditorView } from "@milkdown/prose/view";
-import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
-import { trackUsageEvent } from "@/lib/analytics/usage-events";
+import type {
+  EditorInteractionHandle,
+  ExistingRubySelection,
+  RubyApplicationSegment,
+  SelectionToken,
+} from "@/lib/editor-interaction";
+import type { RubyDialogResult } from "./ruby-dialog-contract";
 
-export interface RubyApplicationSegment {
-  base: string;
-  ruby?: string;
+interface PendingRubyRequest {
+  handle: EditorInteractionHandle;
+  token: SelectionToken;
+  selectedText: string;
+  existingRuby: ExistingRubySelection | null;
 }
 
 interface UseRubyTcyOptions {
-  editorViewRef: MutableRefObject<EditorView | null>;
+  getInteraction: () => EditorInteractionHandle | null;
   setRubySelectedText: (text: string) => void;
+  setRubyInitialSelection: (selection: ExistingRubySelection | null) => void;
   setShowRubyDialog: (show: boolean) => void;
 }
 
 export function useRubyTcy({
-  editorViewRef,
+  getInteraction,
   setRubySelectedText,
+  setRubyInitialSelection,
   setShowRubyDialog,
 }: UseRubyTcyOptions) {
-  const rubySelectionRef = useRef<{ from: number; to: number } | null>(null);
+  const pendingRubyRequestRef = useRef<PendingRubyRequest | null>(null);
 
-  /** Open the Ruby dialog with current editor selection */
-  const handleOpenRubyDialog = useCallback(() => {
-    const view = editorViewRef.current;
-    if (!view) return;
-    try {
-      const { from, to } = view.state.selection;
-      if (from === to) return; // No selection
-      const text = view.state.doc.textBetween(from, to);
-      if (!text.trim()) return;
-      rubySelectionRef.current = { from, to };
-      setRubySelectedText(text);
-      setShowRubyDialog(true);
-    } catch {
-      // Defensive: view may be torn down during unmount/remount
-      return;
-    }
-    // editorViewRef is a stable ref object; including it here satisfies the React Compiler
-    // without causing extra re-renders (ref identity never changes)
-  }, [editorViewRef, setRubySelectedText, setShowRubyDialog]);
+  const clearRubyDialogState = useCallback(() => {
+    pendingRubyRequestRef.current = null;
+    setRubySelectedText("");
+    setRubyInitialSelection(null);
+    setShowRubyDialog(false);
+  }, [setRubyInitialSelection, setRubySelectedText, setShowRubyDialog]);
 
-  /** Replace the saved selection with structured Ruby nodes from the MDI plugin. */
-  const handleApplyRuby = useCallback(
-    (segments: readonly RubyApplicationSegment[]) => {
-      const view = editorViewRef.current;
-      if (!view) return;
-      const sel = rubySelectionRef.current;
-      if (!sel) return;
-      const { state } = view;
-      const rubyNodeType = state.schema.nodes.mdiRuby;
-      if (!rubyNodeType) {
-        rubySelectionRef.current = null;
-        return;
-      }
-      const nodes = segments.map((segment) =>
-        segment.ruby
-          ? rubyNodeType.create({ base: segment.base, ruby: segment.ruby })
-          : state.schema.text(segment.base),
+  const applyRubyResult = useCallback(
+    (result: Exclude<RubyDialogResult, null>) => {
+      const pending = pendingRubyRequestRef.current;
+      clearRubyDialogState();
+      if (!pending) return;
+      pending.handle.execute(
+        result.action === "remove"
+          ? { id: "format.ruby", mode: "remove" }
+          : { id: "format.ruby", mode: "apply", segments: result.segments },
+        pending.token,
       );
-      const fragment = Fragment.from(nodes);
-      const applied = dispatchIfEditorViewAlive(view, (aliveView) =>
-        aliveView.state.tr.replaceWith(sel.from, sel.to, fragment),
-      );
-      if (applied) {
-        trackUsageEvent("editor_format_applied", { format: "ruby", operation: "apply" });
-      }
-      rubySelectionRef.current = null;
     },
-    // editorViewRef is a stable ref object; including it here satisfies the React Compiler
-    [editorViewRef],
+    [clearRubyDialogState],
   );
 
-  /** Toggle the semantic TCY mark without constructing MDI delimiters. */
-  const handleToggleTcy = useCallback(() => {
-    const view = editorViewRef.current;
-    if (!view) return;
-    const { state } = view;
-    const { from, to } = state.selection;
-    if (from === to) return;
-    if (!state.doc.textBetween(from, to).trim()) return;
-    const markType = state.schema.marks.mdiTcy;
-    if (!markType) return;
-    const operation = state.doc.rangeHasMark(from, to, markType) ? "remove" : "apply";
-    const applied = toggleMark(markType)(state, view.dispatch, view);
-    if (applied) {
-      trackUsageEvent("editor_format_applied", { format: "tcy", operation });
-    }
-    // editorViewRef is a stable ref object; including it here satisfies the React Compiler
-  }, [editorViewRef]);
+  const handleOpenRubyDialog = useCallback(
+    async (
+      interactionOverride?: EditorInteractionHandle | null,
+      tokenOverride?: SelectionToken,
+    ) => {
+      const handle = interactionOverride ?? getInteraction();
+      if (!handle) return;
+      const snapshot = handle.getSnapshot();
+      if (!snapshot.availability["format.ruby"]) return;
+      const token = tokenOverride ?? snapshot.selection.token;
+      const selectedText = snapshot.selection.ruby?.base ?? snapshot.selection.text;
+      if (!selectedText.trim()) return;
+
+      const request: PendingRubyRequest = {
+        handle,
+        token,
+        selectedText,
+        existingRuby: snapshot.selection.ruby,
+      };
+      pendingRubyRequestRef.current = request;
+
+      if (window.electronAPI?.openRubyDialog) {
+        try {
+          const result = await window.electronAPI.openRubyDialog({
+            selectedText,
+            existingRuby: snapshot.selection.ruby,
+          });
+          if (pendingRubyRequestRef.current !== request) return;
+          if (result) applyRubyResult(result);
+          else clearRubyDialogState();
+          return;
+        } catch {
+          // Fall through to the in-page dialog below.
+        }
+      }
+
+      setRubySelectedText(selectedText);
+      setRubyInitialSelection(snapshot.selection.ruby);
+      setShowRubyDialog(true);
+    },
+    [
+      applyRubyResult,
+      clearRubyDialogState,
+      getInteraction,
+      setRubyInitialSelection,
+      setRubySelectedText,
+      setShowRubyDialog,
+    ],
+  );
+
+  const handleApplyRuby = useCallback(
+    (result: Exclude<RubyDialogResult, null>) => {
+      applyRubyResult(result);
+    },
+    [applyRubyResult],
+  );
 
   return {
     handleOpenRubyDialog,
     handleApplyRuby,
-    handleToggleTcy,
+    handleCloseRubyDialog: clearRubyDialogState,
   };
 }
+
+export type { RubyApplicationSegment };

@@ -6,6 +6,7 @@ import { isBottomView } from "@/components/ActivityBar";
 import type { SettingsCategory } from "@/components/SettingsModal";
 import type { SearchTarget } from "./find-search-matches";
 import { trackUsageEvent } from "@/lib/analytics/usage-events";
+import type { ExistingRubySelection } from "@/lib/editor-interaction";
 
 export interface PanelState {
   topView: ActivityBarView;
@@ -28,6 +29,7 @@ export interface PanelState {
   switchToCorrectionsTrigger: number;
   showRubyDialog: boolean;
   rubySelectedText: string;
+  rubyInitialSelection: ExistingRubySelection | null;
   editorDiff: { snapshotContent: string; currentContent: string; label: string } | null;
 }
 
@@ -38,6 +40,7 @@ export interface PanelHandlers {
   setSettingsInitialCategory: (category: SettingsCategory | undefined) => void;
   setShowRubyDialog: (show: boolean) => void;
   setRubySelectedText: (text: string) => void;
+  setRubyInitialSelection: (selection: ExistingRubySelection | null) => void;
   setEditorDiff: (
     diff: { snapshotContent: string; currentContent: string; label: string } | null,
   ) => void;
@@ -93,6 +96,9 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
   const [switchToCorrectionsTrigger, setSwitchToCorrectionsTrigger] = useState(0);
   const [showRubyDialog, setShowRubyDialog] = useState(false);
   const [rubySelectedText, setRubySelectedText] = useState("");
+  const [rubyInitialSelection, setRubyInitialSelection] = useState<ExistingRubySelection | null>(
+    null,
+  );
   const [editorDiff, setEditorDiff] = useState<{
     snapshotContent: string;
     currentContent: string;
@@ -171,6 +177,7 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
       switchToCorrectionsTrigger,
       showRubyDialog,
       rubySelectedText,
+      rubyInitialSelection,
       editorDiff,
     },
     handlers: {
@@ -180,6 +187,7 @@ export function usePanelState({ setShowSettingsModal }: UsePanelStateParams): {
       setSettingsInitialCategory,
       setShowRubyDialog,
       setRubySelectedText,
+      setRubyInitialSelection,
       setEditorDiff,
       handleOpenDictionary,
       setSearchTerm,

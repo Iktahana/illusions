@@ -32,12 +32,13 @@ describe("editor command registry", () => {
       commandRegistry.map(({ id }) => [id, id === "edit.copy"]),
     ) as never;
     const menu = buildEditorContextMenu(availability);
-    expect(menu).toHaveLength(10);
+    expect(menu).toHaveLength(12);
     expect(menu.map((item) => ("separator" in item ? "separator" : item.command))).toEqual(
       EDITOR_CONTEXT_MENU,
     );
     expect(menu).toContainEqual({ command: "edit.copy", enabled: true });
+    expect(menu).toContainEqual({ command: "format.ruby", enabled: false });
     expect(menu).toContainEqual({ command: "format.tcy", enabled: false });
-    expect(menu.filter((item) => "separator" in item)).toHaveLength(3);
+    expect(menu.filter((item) => "separator" in item)).toHaveLength(4);
   });
 });
