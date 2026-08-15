@@ -17,9 +17,11 @@ import {
   changeWritingMode,
   verticalWriting,
 } from "@illusions-lab/milkdown-plugin-vertical-writing";
+import { createMdiEditorMapping } from "@illusions-lab/milkdown-plugin-mdi";
 
 import { useTypographySettings } from "@/contexts/EditorSettingsContext";
 import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
+import { posDecorations, setPosDecorations } from "@/lib/editor-interaction/pos-decorations";
 import { commitPendingComposition } from "@/lib/editor-page/commit-pending-composition";
 import { mdiBlockNumbers, setMdiBlockNumbers } from "@/lib/editor-page/mdi-block-numbers";
 import { createSelectionBridgePlugin, EditorInteractionStore } from "@/lib/editor-interaction";
@@ -131,6 +133,7 @@ export default function MilkdownEditor({
         })
         .use(commonmark)
         .use(mdiBlockNumbers)
+        .use(posDecorations)
         .use(interactionBridge);
 
       editor = adapter.configureEditor(editor);
@@ -261,6 +264,35 @@ export default function MilkdownEditor({
     registerFlush(flush);
     return () => registerFlush(null);
   }, [adapter, documentFormat, get, registerFlush]);
+
+  useEffect(() => {
+    interaction.setMdiMappingGetter(() => {
+      const editor = get();
+      if (!editor || documentFormat !== "mdi") return null;
+      try {
+        let snapshot = null;
+        editor.action((ctx) => {
+          snapshot = createMdiEditorMapping()(ctx);
+        });
+        return snapshot;
+      } catch {
+        return null;
+      }
+    });
+    interaction.setPosHighlightDispatcher((decorations) => {
+      const editor = get();
+      if (!editor) return;
+      try {
+        editor.action(setPosDecorations(decorations));
+      } catch {
+        /* detached editor */
+      }
+    });
+    return () => {
+      interaction.setMdiMappingGetter(null);
+      interaction.setPosHighlightDispatcher(null);
+    };
+  }, [documentFormat, get, interaction]);
 
   return (
     <div

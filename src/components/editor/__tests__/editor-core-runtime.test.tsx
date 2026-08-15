@@ -17,6 +17,21 @@ vi.mock("@/contexts/EditorSettingsContext", () => ({
     fontFamily: "serif",
     charsPerLine: 40,
   }),
+  usePosHighlightSettings: () => ({
+    posHighlightEnabled: false,
+    posHighlightColors: {},
+    posHighlightDisabledTypes: [],
+    onPosHighlightEnabledChange: vi.fn(),
+    onPosHighlightColorsChange: vi.fn(),
+    onPosHighlightDisabledTypesChange: vi.fn(),
+  }),
+  usePowerSettings: () => ({
+    powerSaveMode: false,
+    autoPowerSaveOnBattery: false,
+    onPowerSaveModeChange: vi.fn(),
+    onTemporarilyDisablePowerSave: vi.fn(),
+    onAutoPowerSaveOnBatteryChange: vi.fn(),
+  }),
 }));
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

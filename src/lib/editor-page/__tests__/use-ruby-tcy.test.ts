@@ -59,6 +59,8 @@ function makeInteraction(): EditorInteractionHandle {
     execute: vi.fn<(command: EditorCommand, token?: SelectionToken) => EditorCommandResult>(() => ({
       status: "executed",
     })),
+    createPosHighlightRequest: () => null,
+    syncPosHighlightPresentation: () => {},
     prepareSearchSelection: () => undefined,
     querySearch: () => ({
       token: { editorId: "editor-a", generation: 1, contentRevision: 1 },

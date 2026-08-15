@@ -197,6 +197,82 @@ describe("MilkdownEditor real runtime", () => {
     });
   });
 
+  it("rejects stale POS highlight presentations after external replacement", async () => {
+    await getDocumentAdapter("markdown").initialize();
+    const adapter = getDocumentAdapter("markdown");
+    const interaction = new EditorInteractionStore("pos-highlight-runtime", "markdown", adapter);
+    const views: EditorView[] = [];
+
+    await render({
+      documentFormat: "markdown",
+      initialContent: "東京へ行く",
+      isVertical: false,
+      lineLength: 40,
+      onEditorViewReady: (view) => views.push(view),
+      interaction,
+    });
+
+    await waitFor(() => expect(views).toHaveLength(1));
+    const firstRequest = interaction.createPosHighlightRequest();
+    expect(firstRequest?.segments).toHaveLength(1);
+
+    interaction.syncPosHighlightPresentation({
+      token: firstRequest!.token,
+      request: firstRequest,
+      matches: [{ segmentIndex: 0, start: 0, end: 2, category: "名詞" }],
+      colors: { 名詞: "#4A90E2" },
+      disabledTypes: [],
+      visible: true,
+    });
+    await waitFor(() =>
+      expect(container.querySelectorAll('[data-pos-highlight-category="名詞"]').length).toBe(1),
+    );
+
+    const onExternalContentApplied = vi.fn();
+    await render({
+      documentFormat: "markdown",
+      initialContent: "東京へ行く",
+      externalContent: "大阪へ行く",
+      isVertical: false,
+      lineLength: 40,
+      onEditorViewReady: (view) => views.push(view),
+      onExternalContentApplied,
+      interaction,
+    });
+
+    await waitFor(() => expect(onExternalContentApplied).toHaveBeenCalled());
+    await waitFor(() => expect(container.textContent).toContain("大阪"));
+    expect(container.textContent).not.toContain("東京へ行く");
+
+    interaction.syncPosHighlightPresentation({
+      token: firstRequest!.token,
+      request: firstRequest,
+      matches: [{ segmentIndex: 0, start: 0, end: 2, category: "名詞" }],
+      colors: { 名詞: "#4A90E2" },
+      disabledTypes: [],
+      visible: true,
+    });
+    await waitFor(() =>
+      expect(container.querySelectorAll('[data-pos-highlight-category="名詞"]').length).toBe(0),
+    );
+
+    const secondRequest = interaction.createPosHighlightRequest();
+    expect(secondRequest?.token.contentRevision).toBeGreaterThan(
+      firstRequest!.token.contentRevision,
+    );
+    interaction.syncPosHighlightPresentation({
+      token: secondRequest!.token,
+      request: secondRequest,
+      matches: [{ segmentIndex: 0, start: 0, end: 2, category: "名詞" }],
+      colors: { 名詞: "#4A90E2" },
+      disabledTypes: [],
+      visible: true,
+    });
+    await waitFor(() =>
+      expect(container.querySelectorAll('[data-pos-highlight-category="名詞"]').length).toBe(1),
+    );
+  });
+
   it("recreates the real editor for a format switch without applying commands to the old view", async () => {
     await getDocumentAdapter("mdi").initialize();
     const views: EditorView[] = [];

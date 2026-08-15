@@ -186,6 +186,8 @@ describe("MilkdownEditor initialization lifecycle", () => {
   });
 
   it("does not reuse readiness from the previous document format", () => {
+    const nonLifecycleCommands = () =>
+      mdiEditor.action.mock.calls.filter(([command]) => typeof command !== "function");
     const mdiEditor = finishCreation("mdi");
     render();
     act(() => vi.runAllTimers());
@@ -196,12 +198,12 @@ describe("MilkdownEditor initialization lifecycle", () => {
     // prevent commands from reaching that stale context in this window.
     mocks.runtime.markdown = { editor: mdiEditor, loading: false };
     render({ documentFormat: "markdown" });
-    expect(mdiEditor.action).not.toHaveBeenCalled();
+    expect(nonLifecycleCommands()).toEqual([]);
 
     mocks.runtime.markdown = { editor: mdiEditor, loading: true };
     render({ documentFormat: "markdown" });
     act(() => vi.runAllTimers());
-    expect(mdiEditor.action).not.toHaveBeenCalled();
+    expect(nonLifecycleCommands()).toEqual([]);
 
     const markdownEditor = finishCreation("markdown");
     render({ documentFormat: "markdown" });

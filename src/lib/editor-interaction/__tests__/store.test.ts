@@ -51,6 +51,20 @@ function makeState(text = "選択範囲", from = 1, to = 3) {
 }
 
 function makeViewFromState(state: EditorState) {
+  const dom = document.createElement("div");
+  dom.getBoundingClientRect = () =>
+    ({
+      top: 0,
+      bottom: 200,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+  document.body.appendChild(dom);
   const view = {
     state,
     dispatch: vi.fn((transaction) => {
@@ -64,6 +78,7 @@ function makeViewFromState(state: EditorState) {
     })),
     hasFocus: vi.fn(() => true),
     focus: vi.fn(),
+    dom,
   };
   return view;
 }
@@ -614,5 +629,80 @@ describe("EditorInteractionStore", () => {
       }),
     ).not.toThrow();
     expect(() => interaction.detach()).not.toThrow();
+  });
+
+  it("creates a viewport-bound POS highlight request for visible paragraphs", () => {
+    const interaction = store();
+    const view = makeViewFromState(
+      EditorState.create({
+        schema,
+        doc: schema.node("doc", null, [
+          schema.node("paragraph", null, schema.text("一段落")),
+          schema.node("paragraph", null, schema.text("二段落")),
+        ]),
+      }),
+    );
+    interaction.attach(view as never, 2, "markdown", getDocumentAdapter("markdown"));
+
+    const request = interaction.createPosHighlightRequest();
+    expect(request).not.toBeNull();
+    expect(request?.token).toMatchObject({
+      editorId: "editor-a",
+      generation: 2,
+      contentRevision: 1,
+      viewportRevision: 1,
+    });
+    expect(request?.segments).toEqual([
+      expect.objectContaining({
+        segmentType: "paragraph",
+        pos: 0,
+        text: "一段落",
+      }),
+      expect.objectContaining({
+        segmentType: "paragraph",
+        pos: 5,
+        text: "二段落",
+      }),
+    ]);
+  });
+
+  it("maps plain-text POS highlight matches through paragraph offsets and stale guards", () => {
+    const interaction = store("plain-text");
+    const view = makeView("東京へ行く", 1, 1);
+    const dispatch = vi.fn();
+    interaction.setPosHighlightDispatcher(dispatch);
+    interaction.attach(view as never, 3, "plain-text", getDocumentAdapter("plain-text"));
+
+    const request = interaction.createPosHighlightRequest();
+    expect(request?.segments).toHaveLength(1);
+
+    interaction.syncPosHighlightPresentation({
+      token: request!.token,
+      request,
+      matches: [
+        { segmentIndex: 0, start: 0, end: 2, category: "名詞" },
+        { segmentIndex: 0, start: 3, end: 5, category: "動詞" },
+      ],
+      colors: { 名詞: "#4A90E2", 動詞: "#27AE60" },
+      disabledTypes: [],
+      visible: true,
+    });
+
+    expect(dispatch).toHaveBeenLastCalledWith([
+      { from: 1, to: 3, category: "名詞", color: "#4A90E2" },
+      { from: 4, to: 6, category: "動詞", color: "#27AE60" },
+    ]);
+
+    interaction.update({ docChanged: true });
+    interaction.syncPosHighlightPresentation({
+      token: request!.token,
+      request,
+      matches: [{ segmentIndex: 0, start: 0, end: 2, category: "名詞" }],
+      colors: { 名詞: "#4A90E2" },
+      disabledTypes: [],
+      visible: true,
+    });
+
+    expect(dispatch).toHaveBeenLastCalledWith([]);
   });
 });

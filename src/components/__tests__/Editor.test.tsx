@@ -33,6 +33,21 @@ vi.mock("@prosemirror-adapter/react", () => ({
 }));
 vi.mock("@/contexts/EditorSettingsContext", () => ({
   useTypographySettings: () => mockState.typography,
+  usePosHighlightSettings: () => ({
+    posHighlightEnabled: false,
+    posHighlightColors: {},
+    posHighlightDisabledTypes: [],
+    onPosHighlightEnabledChange: vi.fn(),
+    onPosHighlightColorsChange: vi.fn(),
+    onPosHighlightDisabledTypesChange: vi.fn(),
+  }),
+  usePowerSettings: () => ({
+    powerSaveMode: false,
+    autoPowerSaveOnBattery: false,
+    onPowerSaveModeChange: vi.fn(),
+    onTemporarilyDisablePowerSave: vi.fn(),
+    onAutoPowerSaveOnBatteryChange: vi.fn(),
+  }),
 }));
 vi.mock("@/lib/analytics/usage-events", () => ({
   trackUsageEvent: (...args: unknown[]) => mockState.trackUsageEvent(...args),
@@ -108,6 +123,9 @@ vi.mock("../editor/BubbleMenu", () => ({
     mockState.bubbleProps = props;
     return <div data-testid="bubble-menu" />;
   },
+}));
+vi.mock("../editor/PosHighlightController", () => ({
+  default: () => <div data-testid="pos-highlight-controller" />,
 }));
 
 import NovelEditor from "../Editor";
