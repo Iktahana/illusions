@@ -100,7 +100,7 @@ import {
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
-import type { EditorCommandId, EditorInteractionHandle } from "@/lib/editor-interaction";
+import type { EditorCommandId } from "@/lib/editor-interaction";
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
 // but resets on page refresh (module re-evaluated).
