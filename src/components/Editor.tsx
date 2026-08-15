@@ -12,7 +12,12 @@ import { trackUsageEvent } from "@/lib/analytics/usage-events";
 import { localPreferences } from "@/lib/storage/local-preferences";
 import type { DocumentFormat } from "@/lib/document-format";
 import { getDocumentAdapter } from "@/lib/document-format";
-import { EditorInteractionStore, type EditorInteractionHandle } from "@/lib/editor-interaction";
+import {
+  EditorInteractionStore,
+  type EditorCommand,
+  type EditorInteractionHandle,
+  type SelectionToken,
+} from "@/lib/editor-interaction";
 import { buildEditorContextMenu } from "@/lib/editor-interaction";
 import { EditorInteractionProvider } from "@/lib/editor-interaction/context";
 import EditorToolbar from "./editor/EditorToolbar";
@@ -30,6 +35,11 @@ interface EditorProps {
   registerWritingModeToggle?: (toggle: (() => void) | null) => void;
   active?: boolean;
   registerInteraction?: (handle: EditorInteractionHandle | null) => void;
+  onEditorCommand?: (
+    handle: EditorInteractionHandle,
+    command: EditorCommand,
+    token?: SelectionToken,
+  ) => void;
 }
 
 /** Minimal application shell around the package-owned Milkdown editor. */
@@ -45,6 +55,7 @@ export default function NovelEditor({
   registerWritingModeToggle,
   active = true,
   registerInteraction,
+  onEditorCommand,
 }: EditorProps): React.ReactElement {
   const { charsPerLine } = useTypographySettings();
   const [isVertical, setIsVertical] = useState(() => {
@@ -95,10 +106,20 @@ export default function NovelEditor({
         .showEditorContextMenu(buildEditorContextMenu(snapshot.availability))
         .then((commandId) => {
           if (!commandId) return;
-          interaction.execute({ id: commandId }, snapshot.selection.token);
+          if (commandId === "format.ruby" && !onEditorCommand) return;
+          if (commandId === "format.ruby") {
+            onEditorCommand?.(
+              interaction,
+              { id: "format.ruby", mode: "apply", segments: [] },
+              snapshot.selection.token,
+            );
+            return;
+          }
+          if (onEditorCommand) onEditorCommand(interaction, { id: commandId }, snapshot.selection.token);
+          else interaction.execute({ id: commandId }, snapshot.selection.token);
         });
     },
-    [interaction],
+    [interaction, onEditorCommand],
   );
 
   return (
@@ -128,7 +149,11 @@ export default function NovelEditor({
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
-        <BubbleMenu isVertical={isVertical} editorSurface={editorSurfaceRef} />
+        <BubbleMenu
+          isVertical={isVertical}
+          editorSurface={editorSurfaceRef}
+          onEditorCommand={onEditorCommand}
+        />
       </EditorInteractionProvider>
     </div>
   );

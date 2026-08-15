@@ -307,7 +307,7 @@ export const SHORTCUT_REGISTRY: Record<CommandId, ShortcutEntry> = {
   // -- Format ----------------------------------------------------------------
   "format.ruby": {
     id: "format.ruby",
-    label: "ルビを挿入",
+    label: "ルビを設定",
     category: "format",
     defaultBinding: { modifiers: ["CmdOrCtrl", "Shift"], key: "r" },
     scope: "all",

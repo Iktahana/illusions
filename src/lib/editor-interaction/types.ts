@@ -8,6 +8,7 @@ export type EditorCommandId =
   | "edit.copy"
   | "edit.paste"
   | "edit.selectAll"
+  | "format.ruby"
   | "format.tcy"
   | "format.strong"
   | "format.emphasis"
@@ -20,10 +21,23 @@ export type EditorCommandId =
   | "format.clear"
   | "view.toggleWritingMode";
 
-export interface EditorCommand {
-  id: EditorCommandId;
-  level?: 1 | 2 | 3;
+export interface ExistingRubySelection {
+  base: string;
+  reading: string | readonly string[];
 }
+
+export interface RubyApplicationSegment {
+  base: string;
+  ruby?: string | readonly string[];
+}
+
+export type EditorCommand =
+  | { id: "format.heading"; level?: 1 | 2 | 3 }
+  | { id: "format.ruby"; mode: "apply"; segments: readonly RubyApplicationSegment[] }
+  | { id: "format.ruby"; mode: "remove" }
+  | {
+      id: Exclude<EditorCommandId, "format.heading" | "format.ruby">;
+    };
 
 export interface SelectionToken {
   editorId: string;
@@ -48,6 +62,7 @@ export interface EditorSelectionSnapshot {
   } | null;
   revision: number;
   token: SelectionToken;
+  ruby: ExistingRubySelection | null;
 }
 
 export interface EditorInteractionSnapshot {

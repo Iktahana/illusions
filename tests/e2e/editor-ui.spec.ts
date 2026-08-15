@@ -94,6 +94,37 @@ test("toolbar and bubble menu format the current MDI selection", async ({
   await expect(bubble).toBeHidden();
 });
 
+test("Ruby stays canonical across bubble menu, save, and reopen", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "ruby.mdi");
+  await writeFile(filePath, "漢字", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  const editor = mainWindow.locator(".ProseMirror").last();
+
+  await selectEditorText(mainWindow);
+  await nativeHarness.queueRubyDialogResult({
+    action: "apply",
+    segments: [{ base: "漢字", ruby: "かんじ" }],
+  });
+  const bubble = mainWindow.getByRole("toolbar", { name: "選択範囲の書式" });
+  await expect(bubble).toBeVisible();
+  await bubble.getByRole("button", { name: "ルビを設定" }).click();
+
+  await nativeHarness.save();
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  await expect(editor).toContainText("漢字");
+  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}");
+  await expect.poll(() => nativeHarness.takeRubyDialogRequests()).toContainEqual({
+    selectedText: "漢字",
+    existingRuby: null,
+  });
+});
+
 test("TCY stays canonical across bubble menu, save, and reopen", async ({
   mainWindow,
   nativeHarness,
@@ -177,17 +208,43 @@ test("editor context menu crosses renderer, preload, IPC, and native role", asyn
 
   const menus = await nativeHarness.takeContextMenus();
   const editorMenu = menus.at(-1) ?? [];
-  expect(editorMenu.map((item) => item.role)).toEqual([
+  expect(editorMenu.map((item) => item.command ?? item.role ?? item.type)).toEqual([
     "undo",
     "redo",
-    undefined,
+    "separator",
     "cut",
     "copy",
     "paste",
-    undefined,
+    "separator",
     "selectAll",
-    undefined,
+    "separator",
+    "format.ruby",
+    "separator",
+    "format.tcy",
   ]);
+});
+
+test("renderer-owned Ruby command survives the native context-menu round-trip", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "context-ruby.mdi");
+  await writeFile(filePath, "漢字", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  const editor = mainWindow.locator(".ProseMirror").last();
+
+  await selectEditorText(mainWindow);
+  await nativeHarness.queueRubyDialogResult({
+    action: "apply",
+    segments: [{ base: "漢字", ruby: "かんじ" }],
+  });
+  await nativeHarness.selectContextCommand("format.ruby");
+  await editor.click({ button: "right" });
+
+  await nativeHarness.save();
+  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}");
 });
 
 test("renderer-owned TCY command survives the native context-menu round-trip", async ({

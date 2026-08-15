@@ -12,6 +12,7 @@ import type { KeymapOverrides } from "@/lib/keymap/keymap-types";
 import type { DictEntry, DictDownloadStatus, DictLookup } from "@/lib/dict/dict-types";
 import type { PdfGenerationOptions } from "@/lib/export/types";
 import type { AppRuntimeInfo } from "@/lib/utils/runtime-env";
+import type { RubyDialogRequest, RubyDialogResult } from "@/lib/editor-page/ruby-dialog-contract";
 
 export {};
 
@@ -195,6 +196,9 @@ declare global {
         fileExtension: import("@/lib/project/project-types").SupportedFileExtension;
       } | null,
     ) => Promise<boolean>;
+    openRubyDialog?: (request: RubyDialogRequest) => Promise<RubyDialogResult>;
+    getRubyDialogRequest?: () => Promise<RubyDialogRequest | null>;
+    completeRubyDialog?: (result: RubyDialogResult) => Promise<boolean>;
     onMenuPrint?: (callback: () => void) => (() => void) | void;
     onMenuExportHTML?: (callback: () => void) => (() => void) | void;
     onMenuExportTxt?: (callback: () => void) => (() => void) | void;

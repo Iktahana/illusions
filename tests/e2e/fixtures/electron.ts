@@ -19,6 +19,11 @@ type CapturedMenuItem = {
   type?: string;
 };
 
+type RubyDialogResult =
+  | { action: "apply"; segments: Array<{ base: string; ruby?: string | string[] }> }
+  | { action: "remove" }
+  | null;
+
 type NativeHarness = {
   newTab(): Promise<void>;
   save(): Promise<void>;
@@ -31,6 +36,8 @@ type NativeHarness = {
   openReplace(): Promise<void>;
   queueSavePath(filePath: string): Promise<void>;
   queueOpenPaths(filePaths: string[]): Promise<void>;
+  queueRubyDialogResult(result: RubyDialogResult): Promise<void>;
+  takeRubyDialogRequests(): Promise<Array<Record<string, unknown>>>;
   selectContextCommand(command: string): Promise<void>;
   takeContextMenus(): Promise<CapturedMenuItem[][]>;
   readSavedFile(filePath: string): Promise<string>;
@@ -117,7 +124,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     }
   },
   nativeHarness: async ({ electronApp, mainWindow: _mainWindow }, use) => {
-    await electronApp.evaluate(({ dialog, Menu, BrowserWindow }) => {
+    await electronApp.evaluate(({ dialog, Menu, BrowserWindow, ipcMain }) => {
       const originalBuildFromTemplate = Menu.buildFromTemplate.bind(Menu);
       const originalGetFocusedWindow = BrowserWindow.getFocusedWindow.bind(BrowserWindow);
       // E2E windows are intentionally hidden, so Electron has no OS-focused
@@ -128,6 +135,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       const state = {
         savePaths: [] as string[],
         openPaths: [] as string[][],
+        rubyDialogResults: [] as RubyDialogResult[],
+        rubyDialogRequests: [] as Array<Record<string, unknown>>,
         selectedCommand: null as string | null,
         menus: [] as CapturedMenuItem[][],
       };
@@ -140,14 +149,20 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         canceled: state.openPaths.length === 0,
         filePaths: state.openPaths.shift() ?? [],
       });
+      ipcMain.removeHandler?.("ruby-dialog:open");
+      ipcMain.handle("ruby-dialog:open", async (_event, request) => {
+        state.rubyDialogRequests.push(request as Record<string, unknown>);
+        return state.rubyDialogResults.shift() ?? null;
+      });
       Menu.buildFromTemplate = ((template: Electron.MenuItemConstructorOptions[]) => {
         const getCommand = (item: Electron.MenuItemConstructorOptions): string | undefined =>
           (item as Electron.MenuItemConstructorOptions & { command?: string }).command;
         const isEditorContextMenu =
-          template.length === 10 &&
-          template.filter((item) => item.type === "separator").length === 3 &&
+          template.length === 12 &&
+          template.filter((item) => item.type === "separator").length === 4 &&
           template.some((item) => item.role === "undo") &&
           template.some((item) => item.role === "selectAll") &&
+          template.some((item) => getCommand(item) === "format.ruby") &&
           template.some((item) => getCommand(item) === "format.tcy");
         if (!isEditorContextMenu) return originalBuildFromTemplate(template);
 
@@ -198,7 +213,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         return menu;
       }) as typeof Menu.buildFromTemplate;
     });
-    const mutate = async (operation: string, value?: string | string[]) =>
+    const mutate = async (operation: string, value?: unknown) =>
       electronApp.evaluate(
         ({ BrowserWindow, Menu }, { operation: op, value: next }) => {
           const state = (
@@ -206,6 +221,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
               __illusionsE2E: {
                 savePaths: string[];
                 openPaths: string[][];
+                rubyDialogResults: RubyDialogResult[];
+                rubyDialogRequests: Array<Record<string, unknown>>;
                 selectedCommand: string | null;
                 menus: CapturedMenuItem[][];
               };
@@ -213,6 +230,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
           ).__illusionsE2E;
           if (op === "save") state.savePaths.push(next as string);
           if (op === "open") state.openPaths.push(next as string[]);
+          if (op === "ruby-result") state.rubyDialogResults.push(next as RubyDialogResult);
+          if (op === "take-ruby-requests") return state.rubyDialogRequests.splice(0);
           if (op === "context") state.selectedCommand = next as string;
           if (op === "take-menus") return state.menus.splice(0);
           const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
@@ -261,6 +280,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       openReplace: async () => invokeMenu("open-replace"),
       queueSavePath: async (filePath) => void (await mutate("save", filePath)),
       queueOpenPaths: async (filePaths) => void (await mutate("open", filePaths)),
+      queueRubyDialogResult: async (result) => void (await mutate("ruby-result", result)),
+      takeRubyDialogRequests: async () =>
+        ((await mutate("take-ruby-requests")) as Array<Record<string, unknown>> | undefined) ?? [],
       selectContextCommand: async (command) => void (await mutate("context", command)),
       takeContextMenus: async () =>
         ((await mutate("take-menus")) as CapturedMenuItem[][] | undefined) ?? [],

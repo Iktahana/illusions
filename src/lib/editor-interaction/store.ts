@@ -4,6 +4,7 @@ import { redo, undo } from "@milkdown/prose/history";
 import { setBlockType, wrapIn } from "@milkdown/prose/commands";
 import { wrapInList } from "@milkdown/prose/schema-list";
 import type { DocumentAdapter, DocumentFormat } from "@/lib/document-format";
+import { normalizeRubyReading } from "@/lib/editor-page/ruby-dialog-contract";
 import {
   canApplyMdiEdit,
   inspectMdiSelection,
@@ -29,6 +30,13 @@ import type {
 } from "./types";
 
 const EMPTY_RECT = null;
+
+function buildRubyAvailabilityOperation(view: EditorView): MdiEditOperation {
+  const selectionState = inspectMdiSelection(view.state);
+  return selectionState.ruby
+    ? { type: "removeRuby" }
+    : { type: "setRuby", reading: "ふりがな" };
+}
 
 function buildTcyOperation(view: EditorView): MdiEditOperation {
   const selectionState = inspectMdiSelection(view.state);
@@ -216,8 +224,10 @@ export class EditorInteractionStore implements EditorInteractionHandle {
         rect: EMPTY_RECT,
         revision: this.revision,
         token,
+        ruby: null,
       };
     const { selection } = view.state;
+    const inspection = inspectMdiSelection(view.state);
     let anchor = null;
     let head = null;
     let rect: EditorSelectionSnapshot["rect"] = EMPTY_RECT;
@@ -258,6 +268,7 @@ export class EditorInteractionStore implements EditorInteractionHandle {
       rect,
       revision: this.revision,
       token,
+      ruby: inspection.ruby,
     };
   }
 
@@ -280,6 +291,8 @@ export class EditorInteractionStore implements EditorInteractionHandle {
           (!entry.requiresSelection || (selection.kind !== "caret" && selection.kind !== "none")) &&
           (!entry.requiresFormatting || formatting) &&
           (!entry.requiresCapability || capabilities[entry.requiresCapability]) &&
+          (entry.id !== "format.ruby" ||
+            (this.view && canApplyMdiEdit(this.view.state, buildRubyAvailabilityOperation(this.view)))) &&
           (entry.id !== "format.tcy" ||
             (this.view && canApplyMdiEdit(this.view.state, buildTcyOperation(this.view)))),
         ),
@@ -321,6 +334,42 @@ export class EditorInteractionStore implements EditorInteractionHandle {
       }
       if (command.id === "edit.selectAll") {
         view.dispatch(view.state.tr.setSelection(new AllSelection(view.state.doc)));
+        return { status: "executed" };
+      }
+      if (command.id === "format.ruby") {
+        if (command.mode === "remove") {
+          const ran = mdiEditCommand({ type: "removeRuby" })(view.state, view.dispatch, view);
+          return { status: ran ? "executed" : "unavailable" };
+        }
+        const selectionState = inspectMdiSelection(view.state);
+        if (selectionState.ruby) {
+          if (command.segments.length !== 1) return { status: "unavailable" };
+          const [segment] = command.segments;
+          if (!segment?.ruby) return { status: "unavailable" };
+          const ran = mdiEditCommand({
+            type: "setRuby",
+            reading: normalizeRubyReading(segment.ruby),
+          })(view.state, view.dispatch, view);
+          return { status: ran ? "executed" : "unavailable" };
+        }
+        const { from, to } = view.state.selection;
+        const selectedText = view.state.doc.textBetween(from, to, "", "");
+        const combinedBase = command.segments.map((segment) => segment.base).join("");
+        if (!selectedText || combinedBase !== selectedText) return { status: "unavailable" };
+        let end = to;
+        for (const segment of [...command.segments].reverse()) {
+          const start = end - segment.base.length;
+          if (segment.ruby) {
+            view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, start, end)));
+            const ran = mdiEditCommand({
+              type: "setRuby",
+              reading: normalizeRubyReading(segment.ruby),
+            })(view.state, view.dispatch, view);
+            if (!ran) return { status: "unavailable" };
+          }
+          end = start;
+        }
+        view.focus();
         return { status: "executed" };
       }
       if (command.id === "format.tcy") {

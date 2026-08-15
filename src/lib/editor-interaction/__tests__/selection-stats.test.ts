@@ -34,6 +34,7 @@ const baseSnapshot = (
       generation: 1,
       selectionRevision: 2,
     },
+    ruby: null,
   },
   availability: {
     "edit.undo": true,
@@ -42,6 +43,7 @@ const baseSnapshot = (
     "edit.copy": true,
     "edit.paste": true,
     "edit.selectAll": true,
+    "format.ruby": false,
     "format.strong": true,
     "format.emphasis": true,
     "format.strikethrough": true,

@@ -15,6 +15,8 @@ describe("editor context menu contract", () => {
         { separator: true },
         { command: "edit.selectAll", enabled: true },
         { separator: true },
+        { command: "format.ruby", enabled: false },
+        { separator: true },
         { command: "format.tcy", enabled: true },
       ]),
     ).toEqual([
@@ -30,6 +32,13 @@ describe("editor context menu contract", () => {
         accelerator: "CmdOrCtrl+A",
         role: "selectAll",
         enabled: true,
+      },
+      { type: "separator" },
+      {
+        label: "ルビを設定",
+        accelerator: "CmdOrCtrl+Shift+R",
+        enabled: false,
+        command: "format.ruby",
       },
       { type: "separator" },
       {
@@ -54,6 +63,8 @@ describe("editor context menu contract", () => {
       { separator: true },
       { command: "edit.selectAll", enabled: true },
       { separator: true },
+      { command: "format.ruby", enabled: true },
+      { separator: true },
     ],
     [
       { command: "edit.undo", enabled: true },
@@ -64,6 +75,7 @@ describe("editor context menu contract", () => {
       { command: "edit.paste", enabled: true },
       { separator: true },
       { command: "edit.selectAll", enabled: true },
+      { separator: true },
       { command: "format.tcy", enabled: true },
     ],
     [{ command: "system.deleteEverything", enabled: true }],
