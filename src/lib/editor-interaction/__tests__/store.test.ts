@@ -348,6 +348,19 @@ describe("EditorInteractionStore", () => {
     });
   });
 
+  it("does not prepare search text without a live non-collapsed selection", () => {
+    const interaction = store();
+    expect(interaction.prepareSearchSelection()).toBeUndefined();
+
+    interaction.attach(
+      makeView("検索対象", 2, 2) as never,
+      0,
+      "markdown",
+      getDocumentAdapter("markdown"),
+    );
+    expect(interaction.prepareSearchSelection()).toBeUndefined();
+  });
+
   it("queries current-document search matches with a content-bound token", () => {
     const interaction = store();
     interaction.attach(
@@ -419,5 +432,107 @@ describe("EditorInteractionStore", () => {
         options: { caseSensitive: true },
       }),
     ).toEqual({ status: "stale" });
+  });
+
+  it("publishes search decorations, navigates once per nonce, and clears stale presentation", () => {
+    const interaction = store();
+    const view = makeView("target and target", 1, 1);
+    interaction.attach(view as never, 7, "markdown", getDocumentAdapter("markdown"));
+    const result = interaction.querySearch({
+      term: "target",
+      options: { caseSensitive: true },
+    });
+    const presentation = {
+      token: result.token,
+      visible: true,
+      searchTerm: "target",
+      matches: result.matches,
+      currentMatchIndex: 0,
+      navigationNonce: 1,
+    };
+
+    interaction.syncSearchPresentation(presentation);
+    expect(view.dispatch).toHaveBeenCalledTimes(2);
+    expect(view.state.selection).toMatchObject({ from: result.matches[0].from, empty: true });
+
+    interaction.syncSearchPresentation(presentation);
+    expect(view.dispatch).toHaveBeenCalledTimes(3);
+
+    interaction.syncSearchPresentation({ ...presentation, visible: false });
+    expect(view.dispatch).toHaveBeenCalledTimes(4);
+
+    interaction.syncSearchPresentation({
+      ...presentation,
+      token: { ...result.token, contentRevision: result.token.contentRevision - 1 },
+    });
+    expect(view.dispatch).toHaveBeenCalledTimes(5);
+  });
+
+  it("returns empty or unavailable search results for inactive and empty inputs", () => {
+    const interaction = store();
+    expect(interaction.querySearch({ term: "target", options: {} }).matches).toEqual([]);
+
+    const view = makeView("target", 1, 1);
+    interaction.attach(view as never, 1, "markdown", getDocumentAdapter("markdown"));
+    expect(interaction.querySearch({ term: "", options: {} }).matches).toEqual([]);
+    const current = interaction.querySearch({ term: "target", options: {} });
+    expect(
+      interaction.replaceSearch({
+        replacement: "swap",
+        matches: [],
+        token: current.token,
+        options: {},
+      }),
+    ).toEqual({ status: "unavailable" });
+
+    interaction.setActive(false);
+    expect(interaction.querySearch({ term: "target", options: {} }).matches).toEqual([]);
+    expect(
+      interaction.replaceSearch({
+        replacement: "swap",
+        matches: current.matches,
+        token: current.token,
+        options: {},
+      }),
+    ).toEqual({ status: "unavailable" });
+    interaction.syncSearchPresentation({
+      token: current.token,
+      visible: true,
+      searchTerm: "target",
+      matches: current.matches,
+      currentMatchIndex: 0,
+      navigationNonce: 1,
+    });
+  });
+
+  it("reports replacement failure and tolerates decoration dispatch after disposal", () => {
+    const interaction = store();
+    const view = makeView("target", 1, 1);
+    interaction.attach(view as never, 1, "markdown", getDocumentAdapter("markdown"));
+    const result = interaction.querySearch({ term: "target", options: {} });
+    view.dispatch.mockImplementation(() => {
+      throw new Error("destroyed");
+    });
+
+    expect(
+      interaction.replaceSearch({
+        replacement: "swap",
+        matches: result.matches,
+        token: result.token,
+        options: {},
+      }),
+    ).toMatchObject({ status: "failed", error: expect.any(Error) });
+
+    expect(() =>
+      interaction.syncSearchPresentation({
+        token: result.token,
+        visible: true,
+        searchTerm: "target",
+        matches: result.matches,
+        currentMatchIndex: 0,
+        navigationNonce: 2,
+      }),
+    ).not.toThrow();
+    expect(() => interaction.detach()).not.toThrow();
   });
 });
