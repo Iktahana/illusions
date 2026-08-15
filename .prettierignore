@@ -5,3 +5,4 @@ out/
 .next/
 public/
 coverage/
+test-results/

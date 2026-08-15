@@ -108,18 +108,22 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     let head = null;
     let rect: EditorSelectionSnapshot["rect"] = EMPTY_RECT;
     try {
-      const a = view.coordsAtPos(selection.from);
-      const h = view.coordsAtPos(selection.to);
+      const a = view.coordsAtPos(selection.anchor);
+      const h = view.coordsAtPos(selection.head);
       anchor = { x: a.left, y: a.top };
       head = { x: h.right, y: h.bottom };
-      rect = {
-        left: Math.min(a.left, h.left),
-        top: Math.min(a.top, h.top),
-        right: Math.max(a.right, h.right),
-        bottom: Math.max(a.bottom, h.bottom),
-        width: Math.max(a.right, h.right) - Math.min(a.left, h.left),
-        height: Math.max(a.bottom, h.bottom) - Math.min(a.top, h.top),
-      };
+      const domSelection = view.dom?.ownerDocument?.getSelection?.();
+      const domRange =
+        domSelection?.rangeCount &&
+        view.dom?.contains(domSelection.anchorNode) &&
+        view.dom.contains(domSelection.focusNode)
+          ? domSelection.getRangeAt(0).getBoundingClientRect()
+          : null;
+      const left = domRange?.left ?? Math.min(a.left, h.left);
+      const top = domRange?.top ?? Math.min(a.top, h.top);
+      const right = domRange?.right ?? Math.max(a.right, h.right);
+      const bottom = domRange?.bottom ?? Math.max(a.bottom, h.bottom);
+      rect = { left, top, right, bottom, width: right - left, height: bottom - top };
     } catch {
       /* detached or temporarily unmeasurable view */
     }

@@ -1,0 +1,95 @@
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import { test, expect } from "./fixtures/electron";
+
+async function replaceEditorText(
+  page: import("@playwright/test").Page,
+  text: string,
+): Promise<void> {
+  const editor = page.locator(".ProseMirror").last();
+  await editor.click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type(text);
+}
+
+async function selectEditorText(page: import("@playwright/test").Page): Promise<void> {
+  await page
+    .locator(".ProseMirror")
+    .last()
+    .evaluate((editor) => {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      editor.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+    });
+}
+
+test("toolbar and bubble menu format the current MDI selection", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "format.mdi");
+  await writeFile(filePath, "書式を適用する本文", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  const editor = mainWindow.locator(".ProseMirror").last();
+  await replaceEditorText(mainWindow, "書式を適用する本文");
+  await expect(mainWindow.getByRole("toolbar", { name: "エディター表示" })).toBeVisible();
+
+  await selectEditorText(mainWindow);
+  const bubble = mainWindow.getByRole("toolbar", { name: "選択範囲の書式" });
+  await expect(bubble).toBeVisible();
+  await bubble.getByRole("button", { name: "太字" }).click();
+  await expect(editor.locator("strong")).toContainText("書式を適用する本文");
+
+  await editor.click();
+  await expect(bubble).toBeHidden();
+});
+
+test("plain text does not expose the formatting bubble", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "plain.txt");
+  await writeFile(filePath, "plain text only", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  await expect(mainWindow.locator(".ProseMirror")).toContainText("plain text only");
+  await selectEditorText(mainWindow);
+  await expect(mainWindow.getByRole("toolbar", { name: "選択範囲の書式" })).toBeHidden();
+});
+
+test("editor context menu crosses renderer, preload, IPC, and native role", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "context.mdi");
+  await writeFile(filePath, "first", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  const editor = mainWindow.locator(".ProseMirror").last();
+  await replaceEditorText(mainWindow, "first");
+  await editor.pressSequentially(" second");
+  await nativeHarness.selectContextCommand("edit.undo");
+  await editor.click({ button: "right" });
+  await expect(editor).toHaveText("first");
+
+  const menus = await nativeHarness.takeContextMenus();
+  const editorMenu = menus.at(-1) ?? [];
+  expect(editorMenu.map((item) => item.role)).toEqual([
+    "undo",
+    "redo",
+    undefined,
+    "cut",
+    "copy",
+    "paste",
+    undefined,
+    "selectAll",
+  ]);
+});

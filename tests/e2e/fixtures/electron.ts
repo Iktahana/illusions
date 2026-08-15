@@ -6,18 +6,46 @@ import {
   type Page,
 } from "@playwright/test";
 import { mkdtemp, mkdir } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
-type Fixtures = { electronApp: ElectronApplication; mainWindow: Page };
+type CapturedMenuItem = {
+  label?: string;
+  accelerator?: string;
+  role?: string;
+  enabled?: boolean;
+  type?: string;
+};
+
+type NativeHarness = {
+  newTab(): Promise<void>;
+  save(): Promise<void>;
+  saveAs(): Promise<void>;
+  open(): Promise<void>;
+  closeTab(): Promise<void>;
+  queueSavePath(filePath: string): Promise<void>;
+  queueOpenPaths(filePaths: string[]): Promise<void>;
+  selectContextCommand(command: string): Promise<void>;
+  takeContextMenus(): Promise<CapturedMenuItem[][]>;
+};
+
+type Fixtures = {
+  electronApp: ElectronApplication;
+  mainWindow: Page;
+  nativeHarness: NativeHarness;
+};
 type WorkerFixtures = { workerRoot: string };
 
 export const test = base.extend<Fixtures, WorkerFixtures>({
   workerRoot: [
     async ({}, use, workerInfo) => {
-      const root = await mkdtemp(
-        path.join(os.tmpdir(), `illusions-e2e-w${workerInfo.workerIndex}-`),
+      const artifactsRoot = path.join(
+        process.cwd(),
+        "test-results",
+        "e2e-workers",
+        `run-${process.pid}`,
       );
+      await mkdir(artifactsRoot, { recursive: true });
+      const root = await mkdtemp(path.join(artifactsRoot, `worker-${workerInfo.workerIndex}-`));
       for (const name of ["user-data", "projects", "downloads", "exports"])
         await mkdir(path.join(root, name));
       await use(root);
@@ -27,15 +55,16 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   electronApp: async ({ workerRoot }, use) => {
     const diagnostics: string[] = [];
     const executablePath = process.env.ILLUSIONS_E2E_EXECUTABLE;
+    const userDataDir = await mkdtemp(path.join(workerRoot, "user-data-"));
     let expectedExit = false;
     const app = await electron.launch({
       ...(executablePath ? { executablePath } : {}),
-      args: [
-        ...(executablePath ? [] : ["."]),
-        `--user-data-dir=${path.join(workerRoot, "user-data")}`,
-      ],
+      args: [...(executablePath ? [] : ["."]), `--user-data-dir=${userDataDir}`],
       env: { ...process.env, ILLUSIONS_E2E: "1", ELECTRON_ENABLE_LOGGING: "1" },
       timeout: 30_000,
+    });
+    const waitForExit = new Promise<void>((resolve) => {
+      app.process().once("exit", () => resolve());
     });
     app.process().stdout?.on("data", (chunk) => diagnostics.push(`[main:stdout] ${chunk}`));
     app.process().stderr?.on("data", (chunk) => diagnostics.push(`[main:stderr] ${chunk}`));
@@ -53,9 +82,166 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
           .info()
           .attach("main-process.log", { body: diagnostics.join(""), contentType: "text/plain" });
       expectedExit = true;
-      await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined);
-      await app.close().catch(() => undefined);
+      const failed = test.info().status !== test.info().expectedStatus;
+      if (failed && app.process().exitCode == null) app.process().kill();
+      if (!failed && app.process().exitCode == null)
+        await app
+          .evaluate(({ app: electronApp }) => {
+            electronApp.releaseSingleInstanceLock?.();
+            electronApp.quit();
+          })
+          .catch(() => undefined);
+      await Promise.race([
+        waitForExit,
+        new Promise<void>((resolve) => setTimeout(resolve, failed ? 5_000 : 10_000)),
+      ]);
+      if (app.process().exitCode == null) {
+        app.process().kill();
+        await Promise.race([
+          waitForExit,
+          new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+        ]);
+      }
+      await Promise.race([
+        app.close().catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 3_000)),
+      ]);
     }
+  },
+  nativeHarness: async ({ electronApp, mainWindow: _mainWindow }, use) => {
+    await electronApp.evaluate(({ dialog, Menu, BrowserWindow }) => {
+      const originalBuildFromTemplate = Menu.buildFromTemplate.bind(Menu);
+      const originalGetFocusedWindow = BrowserWindow.getFocusedWindow.bind(BrowserWindow);
+      // E2E windows are intentionally hidden, so Electron has no OS-focused
+      // window.  Production menu handlers use getFocusedWindow(); make their
+      // existing event route deterministic without adding a production IPC.
+      BrowserWindow.getFocusedWindow = () =>
+        originalGetFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null;
+      const state = {
+        savePaths: [] as string[],
+        openPaths: [] as string[][],
+        selectedCommand: null as string | null,
+        menus: [] as CapturedMenuItem[][],
+      };
+      Object.assign(globalThis, { __illusionsE2E: state });
+      dialog.showSaveDialog = async () => ({
+        canceled: state.savePaths.length === 0,
+        filePath: state.savePaths.shift() ?? "",
+      });
+      dialog.showOpenDialog = async () => ({
+        canceled: state.openPaths.length === 0,
+        filePaths: state.openPaths.shift() ?? [],
+      });
+      Menu.buildFromTemplate = ((template: Electron.MenuItemConstructorOptions[]) => {
+        const isEditorContextMenu =
+          template.length === 8 &&
+          template.filter((item) => item.type === "separator").length === 2 &&
+          template.some((item) => item.role === "undo") &&
+          template.some((item) => item.role === "selectAll");
+        if (!isEditorContextMenu) return originalBuildFromTemplate(template);
+
+        state.menus.push(
+          template.map(({ label, accelerator, role, enabled, type }) => ({
+            label,
+            accelerator: typeof accelerator === "string" ? accelerator : undefined,
+            role,
+            enabled,
+            type,
+          })),
+        );
+        const menu = originalBuildFromTemplate(template);
+        const originalPopup = menu.popup.bind(menu);
+        menu.popup = ((options?: Electron.PopupOptions) => {
+          const commandToRole: Record<string, string> = {
+            "edit.undo": "undo",
+            "edit.redo": "redo",
+            "edit.cut": "cut",
+            "edit.copy": "copy",
+            "edit.paste": "paste",
+            "edit.selectAll": "selectAll",
+          };
+          const role = state.selectedCommand ? commandToRole[state.selectedCommand] : undefined;
+          state.selectedCommand = null;
+          const item = role ? template.find((candidate) => candidate.role === role) : undefined;
+          if (item && options?.window) {
+            if (item.click)
+              item.click({} as Electron.MenuItem, options.window, {} as Electron.KeyboardEvent);
+            else if ("webContents" in options.window) {
+              const contents = (options.window as Electron.BrowserWindow).webContents;
+              if (role === "undo") contents.undo();
+              if (role === "redo") contents.redo();
+              if (role === "cut") contents.cut();
+              if (role === "copy") contents.copy();
+              if (role === "paste") contents.paste();
+              if (role === "selectAll") contents.selectAll();
+            }
+            options.callback?.();
+            return;
+          }
+          return originalPopup(options);
+        }) as typeof menu.popup;
+        return menu;
+      }) as typeof Menu.buildFromTemplate;
+    });
+    const mutate = async (operation: string, value?: string | string[]) =>
+      electronApp.evaluate(
+        ({ BrowserWindow, Menu }, { operation: op, value: next }) => {
+          const state = (
+            globalThis as typeof globalThis & {
+              __illusionsE2E: {
+                savePaths: string[];
+                openPaths: string[][];
+                selectedCommand: string | null;
+                menus: CapturedMenuItem[][];
+              };
+            }
+          ).__illusionsE2E;
+          if (op === "save") state.savePaths.push(next as string);
+          if (op === "open") state.openPaths.push(next as string[]);
+          if (op === "context") state.selectedCommand = next as string;
+          if (op === "take-menus") return state.menus.splice(0);
+          const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+          const labels: Record<string, string> = {
+            "new-tab": "新しいタブ",
+            "save-menu": "保存",
+            "save-as-menu": "別名で保存...",
+            "open-menu": "ファイルを開く...",
+            "close-tab": "タブを閉じる",
+          };
+          const label = labels[op];
+          if (label) {
+            const pending = [...(Menu.getApplicationMenu()?.items ?? [])];
+            while (pending.length) {
+              const item = pending.shift();
+              if (!item) continue;
+              if (item.label === label && item.click) {
+                item.click(item, window, {} as Electron.KeyboardEvent);
+                return true;
+              }
+              if (item.submenu) pending.push(...item.submenu.items);
+            }
+            return false;
+          }
+          return undefined;
+        },
+        { operation, value },
+      );
+    const invokeMenu = async (operation: string): Promise<void> => {
+      if ((await mutate(operation)) !== true)
+        throw new Error(`Application menu action was not found: ${operation}`);
+    };
+    await use({
+      newTab: async () => invokeMenu("new-tab"),
+      save: async () => invokeMenu("save-menu"),
+      saveAs: async () => invokeMenu("save-as-menu"),
+      open: async () => invokeMenu("open-menu"),
+      closeTab: async () => invokeMenu("close-tab"),
+      queueSavePath: async (filePath) => void (await mutate("save", filePath)),
+      queueOpenPaths: async (filePaths) => void (await mutate("open", filePaths)),
+      selectContextCommand: async (command) => void (await mutate("context", command)),
+      takeContextMenus: async () =>
+        ((await mutate("take-menus")) as CapturedMenuItem[][] | undefined) ?? [],
+    });
   },
   mainWindow: async ({ electronApp }, use) => {
     const page = await electronApp.firstWindow();
@@ -63,11 +249,20 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     page.on("console", (message) => {
       if (message.type() === "error") rendererErrors.push(`[console] ${message.text()}`);
     });
-    page.on("pageerror", (error) =>
-      rendererErrors.push(`[pageerror] ${error.stack ?? error.message}`),
-    );
+    page.on("pageerror", (error) => {
+      const detail = [error.name, error.message, error.stack]
+        .filter((part): part is string => Boolean(part?.trim()))
+        .join("\n");
+      if (detail) rendererErrors.push(`[pageerror] ${detail}`);
+    });
     await page.waitForLoadState("domcontentloaded");
+    await page.waitForFunction(
+      () => document.readyState === "complete" && document.body.childElementCount > 0,
+    );
     await expect(page.locator("body")).toBeVisible();
+    await expect(
+      page.locator('.ProseMirror, button:has-text("ファイルを開く")').first(),
+    ).toBeVisible();
     await use(page);
     if (rendererErrors.length) throw new Error(`Renderer errors:\n${rendererErrors.join("\n")}`);
   },

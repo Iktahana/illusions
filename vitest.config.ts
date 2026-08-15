@@ -39,6 +39,7 @@ export default defineConfig({
         "src/components/editor/EditorToolbar.tsx",
         "src/components/editor/BubbleMenu.tsx",
         "src/components/editor/ValuePicker.tsx",
+        "electron/lib/editor-command-registry.js",
       ],
       exclude: [
         "**/__tests__/**",
@@ -46,7 +47,6 @@ export default defineConfig({
         "src/lib/hooks/**",
         "src/lib/menu/**",
         "src/lib/nlp-backend/**",
-        "src/lib/editor-page/**",
         "src/lib/dockview/**",
       ],
     },

@@ -110,7 +110,7 @@ if (!isDev) {
   app.setAsDefaultProtocolClient("illusions");
 }
 
-const gotTheLock = isDev || app.requestSingleInstanceLock();
+const gotTheLock = isDev || IS_E2E || app.requestSingleInstanceLock();
 console.log("[DEBUG] Single instance lock:", gotTheLock, isDev ? "(skipped in dev)" : "");
 if (!gotTheLock) {
   console.log("[DEBUG] Another instance is running, quitting.");

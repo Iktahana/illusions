@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { MilkdownProvider } from "@milkdown/react";
 import { ProsemirrorAdapterProvider } from "@prosemirror-adapter/react";
 import type { EditorView } from "@milkdown/prose/view";
@@ -52,6 +52,7 @@ export default function NovelEditor({
     return localPreferences.getWritingMode() === "vertical";
   });
   const editorId = useId();
+  const editorSurfaceRef = useRef<HTMLDivElement>(null);
   const interaction = useMemo(
     () => new EditorInteractionStore(editorId, documentFormat, getDocumentAdapter(documentFormat)),
     [documentFormat, editorId],
@@ -98,6 +99,7 @@ export default function NovelEditor({
 
   return (
     <div
+      ref={editorSurfaceRef}
       onContextMenu={handleContextMenu}
       className={clsx(
         "flex h-full min-h-0 flex-col overflow-hidden bg-background-secondary",
@@ -122,7 +124,7 @@ export default function NovelEditor({
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
-        <BubbleMenu isVertical={isVertical} />
+        <BubbleMenu isVertical={isVertical} editorSurface={editorSurfaceRef} />
       </EditorInteractionProvider>
     </div>
   );
