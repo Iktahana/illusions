@@ -51,8 +51,8 @@ vi.mock("@milkdown/utils", () => ({
 }));
 
 describe("pos decorations", async () => {
-  const module = await import("../pos-decorations");
-  const { posDecorations, setPosDecorations, clearPosDecorations } = module;
+  const posDecorationModule = await import("../pos-decorations");
+  const { posDecorations, setPosDecorations, clearPosDecorations } = posDecorationModule;
   const plugin = posDecorations as unknown as { spec: any };
 
   it("replaces, preserves, and maps decoration state", () => {
