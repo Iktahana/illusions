@@ -44,4 +44,32 @@ describe("scrollToSpeechTarget", () => {
     frame?.(100);
     expect(container.scrollLeft).toBeLessThan(0);
   });
+
+  it("animates an offscreen horizontal target and cancels an active frame", () => {
+    const container = document.createElement("div");
+    const target = document.createElement("span");
+    Object.defineProperty(container, "scrollTop", { value: 10, writable: true });
+    container.getBoundingClientRect = () => rect(0, 0, 400, 400);
+    target.getBoundingClientRect = () => rect(20, 390, 10, 10);
+
+    scrollToSpeechTarget({ container, target, isVertical: false, duration: 100 });
+    expect(frame).not.toBeNull();
+    frame?.(50);
+    expect(container.scrollTop).toBeGreaterThan(10);
+    expect(frame).not.toBeNull();
+
+    cancelSpeechScroll();
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+  });
+
+  it("does not move a comfortable vertical target", () => {
+    const container = document.createElement("div");
+    const target = document.createElement("span");
+    container.getBoundingClientRect = () => rect(0, 0, 400, 500);
+    target.getBoundingClientRect = () => rect(195, 20, 10, 10);
+
+    scrollToSpeechTarget({ container, target, isVertical: true });
+
+    expect(frame).toBeNull();
+  });
 });
