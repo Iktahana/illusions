@@ -101,6 +101,18 @@
       "requiresSelection": true,
       "requiresFormatting": true
     },
+    {
+      "id": "speech.toggle",
+      "label": "読み上げ／一時停止",
+      "accelerator": "CmdOrCtrl+Alt+S",
+      "requiresSelectionToken": true,
+      "requiresExecutor": true
+    },
+    {
+      "id": "speech.stop",
+      "label": "読み上げを停止",
+      "requiresExecutor": true
+    },
     { "id": "view.toggleWritingMode", "label": "縦書き／横書き" }
   ],
   "editorContextMenu": [
@@ -115,6 +127,8 @@
     "separator",
     "format.ruby",
     "separator",
-    "format.tcy"
+    "format.tcy",
+    "speech.toggle",
+    "speech.stop"
   ]
 }

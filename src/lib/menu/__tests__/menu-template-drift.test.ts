@@ -455,6 +455,8 @@ describe("WEB_MENU_STRUCTURE", () => {
           { label: "次を検索", accelerator: "Ctrl+G", action: "search-next" },
           { label: "前を検索", accelerator: "Shift+Ctrl+G", action: "search-previous" },
           { label: "置換...", action: "replace" },
+          { label: "読み上げ／一時停止", action: "speech-toggle" },
+          { label: "読み上げを停止", action: "speech-stop" },
         ],
       },
       {
@@ -556,6 +558,8 @@ describe("WEB_MENU_STRUCTURE", () => {
       redo: "edit.redo",
       "paste-plaintext": "edit.pasteAsPlaintext",
       "select-all": "edit.selectAll",
+      "speech-toggle": "speech.toggle",
+      "speech-stop": "speech.stop",
       "reset-zoom": "view.resetZoom",
       "zoom-in": "view.zoomIn",
       "zoom-out": "view.zoomOut",

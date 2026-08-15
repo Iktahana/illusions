@@ -112,6 +112,9 @@ declare global {
     onPasteAsPlaintext?: (callback: () => void) => (() => void) | void;
     onToggleCompactMode?: (callback: () => void) => (() => void) | void;
     onToggleWritingMode?: (callback: () => void) => (() => void) | void;
+    onEditorCommand?: (
+      callback: (command: import("@/lib/editor-interaction").EditorCommandId) => void,
+    ) => (() => void) | void;
     onFormatChange?: (callback: (setting: string, action: string) => void) => (() => void) | void;
     onThemeChange?: (callback: (mode: "auto" | "light" | "dark") => void) => (() => void) | void;
     // Export

@@ -33,6 +33,11 @@ describe("editor context menu contract", () => {
         { command: "format.ruby", enabled: false },
         { separator: true },
         { command: "format.tcy", enabled: true },
+        { command: "speech.toggle", enabled: true },
+        { command: "speech.stop", enabled: false },
+        { command: "format.tcy", enabled: true },
+        { command: "speech.toggle", enabled: true },
+        { command: "speech.stop", enabled: false },
       ]),
     ).toEqual([
       { label: "取り消す", accelerator: "CmdOrCtrl+Z", role: "undo", enabled: true },
@@ -61,6 +66,18 @@ describe("editor context menu contract", () => {
         accelerator: "CmdOrCtrl+Shift+T",
         enabled: true,
         command: "format.tcy",
+      },
+      {
+        label: "読み上げ／一時停止",
+        accelerator: "CmdOrCtrl+Alt+S",
+        enabled: true,
+        command: "speech.toggle",
+      },
+      {
+        label: "読み上げを停止",
+        accelerator: undefined,
+        enabled: false,
+        command: "speech.stop",
       },
     ]);
   });

@@ -30,6 +30,7 @@ type NativeHarness = {
   findNext(): Promise<void>;
   findPrevious(): Promise<void>;
   openReplace(): Promise<void>;
+  speechToggle(): Promise<void>;
   queueSavePath(filePath: string): Promise<void>;
   queueOpenPaths(filePaths: string[]): Promise<void>;
   selectContextCommand(command: string): Promise<void>;
@@ -152,12 +153,14 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         const getCommand = (item: Electron.MenuItemConstructorOptions): string | undefined =>
           (item as Electron.MenuItemConstructorOptions & { command?: string }).command;
         const isEditorContextMenu =
-          template.length === 12 &&
+          template.length === 14 &&
           template.filter((item) => item.type === "separator").length === 4 &&
           template.some((item) => item.role === "undo") &&
           template.some((item) => item.role === "selectAll") &&
           template.some((item) => getCommand(item) === "format.ruby") &&
-          template.some((item) => getCommand(item) === "format.tcy");
+          template.some((item) => getCommand(item) === "format.tcy") &&
+          template.some((item) => getCommand(item) === "speech.toggle") &&
+          template.some((item) => getCommand(item) === "speech.stop");
         if (!isEditorContextMenu) return originalBuildFromTemplate(template);
 
         state.menus.push(
@@ -235,6 +238,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
             "find-next": "次を検索",
             "find-previous": "前を検索",
             "open-replace": "置換...",
+            "speech-toggle": "読み上げ／一時停止",
           };
           const label = labels[op];
           if (label) {
@@ -268,6 +272,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       findNext: async () => invokeMenu("find-next"),
       findPrevious: async () => invokeMenu("find-previous"),
       openReplace: async () => invokeMenu("open-replace"),
+      speechToggle: async () => invokeMenu("speech-toggle"),
       queueSavePath: async (filePath) => void (await mutate("save", filePath)),
       queueOpenPaths: async (filePaths) => void (await mutate("open", filePaths)),
       selectContextCommand: async (command) => void (await mutate("context", command)),

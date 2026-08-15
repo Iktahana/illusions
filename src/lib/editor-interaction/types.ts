@@ -26,6 +26,8 @@ export type EditorCommandId =
   | "format.orderedList"
   | "format.inlineCode"
   | "format.clear"
+  | "speech.toggle"
+  | "speech.stop"
   | "view.toggleWritingMode";
 
 export interface ExistingRubySelection {

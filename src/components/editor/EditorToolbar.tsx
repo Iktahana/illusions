@@ -1,15 +1,22 @@
 "use client";
 
-import { Columns2, Rows2 } from "lucide-react";
+import { BookAudio, Columns2, Pause, Rows2, Square } from "lucide-react";
 import { useTypographySettings } from "@/contexts/EditorSettingsContext";
+import type { SpeechState } from "@/lib/hooks/use-speech";
 import ValuePicker from "./ValuePicker";
 
 export default function EditorToolbar({
   isVertical,
   onToggleWritingMode,
+  speechState,
+  onToggleSpeech,
+  onStopSpeech,
 }: {
   isVertical: boolean;
   onToggleWritingMode: () => void;
+  speechState?: SpeechState;
+  onToggleSpeech?: () => void;
+  onStopSpeech?: () => void;
 }): React.ReactElement {
   const {
     fontScale,
@@ -53,6 +60,28 @@ export default function EditorToolbar({
         onChange={onParagraphSpacingChange}
         unit="em"
       />
+      {speechState?.isSupported && (
+        <div role="group" aria-label="読み上げ" className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            aria-label={speechState.isPlaying ? "読み上げを一時停止" : "読み上げを開始"}
+            onClick={onToggleSpeech}
+            className="rounded p-1.5 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            {speechState.isPlaying ? <Pause size={15} /> : <BookAudio size={15} />}
+          </button>
+          {(speechState.isPlaying || speechState.isPaused) && (
+            <button
+              type="button"
+              aria-label="読み上げを停止"
+              onClick={onStopSpeech}
+              className="rounded p-1.5 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <Square size={14} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

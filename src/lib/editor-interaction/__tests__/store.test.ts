@@ -705,4 +705,28 @@ describe("EditorInteractionStore", () => {
 
     expect(dispatch).toHaveBeenLastCalledWith([]);
   });
+
+  it("enables registered feature executors and keeps their selection token generation-bound", () => {
+    const interaction = store();
+    const view = makeView();
+    interaction.attach(view as never, 7, "markdown", getDocumentAdapter("markdown"));
+    const executor = vi.fn(() => ({ status: "executed" as const }));
+
+    expect(interaction.getSnapshot().availability["speech.toggle"]).toBe(false);
+    const unregister = interaction.registerExecutor("speech.toggle", executor);
+    const token = interaction.getSnapshot().selection.token;
+    expect(interaction.getSnapshot().availability["speech.toggle"]).toBe(true);
+    expect(interaction.execute({ id: "speech.toggle" }, token)).toEqual({ status: "executed" });
+    expect(executor).toHaveBeenCalledWith({
+      command: { id: "speech.toggle" },
+      token,
+      view,
+      generation: 7,
+    });
+
+    interaction.update();
+    expect(interaction.execute({ id: "speech.toggle" }, token)).toEqual({ status: "stale" });
+    unregister();
+    expect(interaction.getSnapshot().availability["speech.toggle"]).toBe(false);
+  });
 });

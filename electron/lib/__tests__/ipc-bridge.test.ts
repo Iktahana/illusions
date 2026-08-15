@@ -233,6 +233,7 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       exportNote: "menu-export-note",
       copyTxt: "menu-copy-txt",
       copyTxtRuby: "menu-copy-txt-ruby",
+      editorCommand: "menu-editor-command",
       copyNarou: "menu-copy-narou",
       copyKakuyomu: "menu-copy-kakuyomu",
       copyAozora: "menu-copy-aozora",

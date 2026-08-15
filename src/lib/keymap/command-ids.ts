@@ -14,6 +14,8 @@ export const ALL_COMMAND_IDS = [
   "edit.redo",
   "edit.pasteAsPlaintext",
   "edit.selectAll",
+  "speech.toggle",
+  "speech.stop",
   "view.zoomIn",
   "view.zoomOut",
   "view.resetZoom",

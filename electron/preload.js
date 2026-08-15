@@ -106,6 +106,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMenuEditorCommand: eventChannel(MENU_CHANNELS.event.editorCommand, { arity: 1 }),
   onToggleCompactMode: eventChannel(MENU_CHANNELS.event.toggleCompactMode, { arity: 0 }),
   onToggleWritingMode: eventChannel(MENU_CHANNELS.event.toggleWritingMode, { arity: 0 }),
+  onEditorCommand: eventChannel(MENU_CHANNELS.event.editorCommand),
   onFormatChange: eventChannel(MENU_CHANNELS.event.format, { arity: 2 }),
   onThemeChange: eventChannel(MENU_CHANNELS.event.theme),
   // Export

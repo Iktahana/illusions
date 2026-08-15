@@ -309,6 +309,22 @@ const MENU_TEMPLATE = [
         requiresActiveEditor: true,
         electronChannel: "menu-search-replace",
       },
+      {
+        id: "speech-toggle",
+        label: "読み上げ／一時停止",
+        commandId: "speech.toggle",
+        requiresActiveEditor: true,
+        electronChannel: "menu-editor-command",
+        electronArgs: ["speech.toggle"],
+      },
+      {
+        id: "speech-stop",
+        label: "読み上げを停止",
+        commandId: "speech.stop",
+        requiresActiveEditor: true,
+        electronChannel: "menu-editor-command",
+        electronArgs: ["speech.stop"],
+      },
     ],
   },
   {

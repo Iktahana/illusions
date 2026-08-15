@@ -7,7 +7,7 @@ import { history } from "@milkdown/plugin-history";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
 import type { Node as ProseNode } from "@milkdown/prose/model";
-import { Selection } from "@milkdown/prose/state";
+import { Selection, type Plugin } from "@milkdown/prose/state";
 import type { EditorView } from "@milkdown/prose/view";
 import { Milkdown, useEditor } from "@milkdown/react";
 import { nord } from "@milkdown/theme-nord";
@@ -37,6 +37,7 @@ interface MilkdownEditorProps {
   onExternalContentApplied?: () => void;
   registerFlush?: (flush: (() => string | null) | null) => void;
   interaction?: EditorInteractionStore;
+  applicationPlugins?: readonly Plugin[];
 }
 
 function encodeDocument(
@@ -64,6 +65,7 @@ export default function MilkdownEditor({
   onExternalContentApplied,
   registerFlush,
   interaction: providedInteraction,
+  applicationPlugins = [],
 }: MilkdownEditorProps): React.ReactElement {
   const { fontScale, lineHeight, paragraphSpacing, showParagraphNumbers, textIndent, fontFamily } =
     useTypographySettings();
@@ -97,6 +99,10 @@ export default function MilkdownEditor({
   const interactionBridge = useMemo(
     () => $prose(() => createSelectionBridgePlugin(interaction)),
     [interaction],
+  );
+  const applicationExtensions = useMemo(
+    () => applicationPlugins.map((plugin) => $prose(() => plugin)),
+    [applicationPlugins],
   );
 
   onChangeRef.current = onChange;
@@ -136,6 +142,7 @@ export default function MilkdownEditor({
         .use(posDecorations)
         .use(interactionBridge);
 
+      for (const extension of applicationExtensions) editor = editor.use(extension);
       editor = adapter.configureEditor(editor);
       return editor
         .use(
@@ -147,7 +154,7 @@ export default function MilkdownEditor({
         .use(history)
         .use(clipboard);
     },
-    [adapter, documentFormat, interactionBridge],
+    [adapter, applicationExtensions, documentFormat, interactionBridge],
   );
   const isEditorReady = readyGeneration === editorGeneration && !editorHandle.loading;
   const getRef = useRef(editorHandle.get);

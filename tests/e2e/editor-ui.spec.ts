@@ -266,6 +266,8 @@ test("editor context menu crosses renderer, preload, IPC, and native role", asyn
     "format.ruby",
     "separator",
     "format.tcy",
+    "speech.toggle",
+    "speech.stop",
   ]);
 });
 
@@ -303,6 +305,63 @@ test("renderer-owned Ruby command survives the native context-menu round-trip", 
   await nativeHarness.queueSavePath(filePath);
   await nativeHarness.saveAs();
   await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}\n");
+});
+
+test("speech uses the active selection through native menu and cleans up on tab change", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  await mainWindow.addInitScript(() => {
+    class MockUtterance {
+      text: string;
+      lang = "";
+      rate = 1;
+      pitch = 1;
+      volume = 1;
+      voice = null;
+      onstart: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onpause: (() => void) | null = null;
+      onresume: (() => void) | null = null;
+      onboundary: ((event: { charIndex: number; charLength: number }) => void) | null = null;
+      constructor(text: string) {
+        this.text = text;
+      }
+    }
+    const queue: MockUtterance[] = [];
+    Object.defineProperty(window, "SpeechSynthesisUtterance", { value: MockUtterance });
+    Object.defineProperty(window, "speechSynthesis", {
+      value: {
+        getVoices: () => [],
+        cancel: () => queue.splice(0),
+        pause: () => queue.at(0)?.onpause?.(),
+        resume: () => queue.at(0)?.onresume?.(),
+        speak: (utterance: MockUtterance) => {
+          queue.push(utterance);
+          utterance.onstart?.();
+          utterance.onboundary?.({ charIndex: 0, charLength: Math.max(1, utterance.text.length) });
+        },
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      },
+    });
+  });
+  await mainWindow.reload();
+  await mainWindow.waitForLoadState("domcontentloaded");
+
+  const filePath = path.join(workerRoot, "projects", "speech.mdi");
+  await writeFile(filePath, "読み上げる文章です", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  await selectEditorText(mainWindow);
+  await nativeHarness.speechToggle();
+  await expect(mainWindow.locator(".speech-reading")).toBeVisible();
+  await expect(mainWindow.getByRole("button", { name: "読み上げを一時停止" })).toBeVisible();
+
+  await nativeHarness.newTab();
+  await expect(mainWindow.locator(".speech-reading")).toHaveCount(0);
 });
 
 test("renderer-owned TCY command survives the native context-menu round-trip", async ({

@@ -100,6 +100,7 @@ import {
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
+import type { EditorCommandId, EditorInteractionHandle } from "@/lib/editor-interaction";
 
 // Module-level flag: persists across React StrictMode/HMR remounts,
 // but resets on page refresh (module re-evaluated).
@@ -616,7 +617,6 @@ function EditorPageContent() {
         : emptyActiveSelectionStats(),
     [activeEditorTab, activeInteractionSnapshot],
   );
-
   // Snapshot selection before SearchDialog moves focus to its input, then keep
   // a collapsed editor caret while the dialog owns DOM focus.
   const handleOpenSearchFromShortcut = useCallback(() => {
@@ -762,9 +762,11 @@ function EditorPageContent() {
       const handle = activeInteractionRef.current;
       if (!handle) return;
       const snapshot = handle.getSnapshot();
-      const token = commandById.get(commandId)?.requiresSelection
-        ? snapshot.selection.token
-        : undefined;
+      const definition = commandById.get(commandId);
+      const token =
+        definition?.requiresSelection || definition?.requiresSelectionToken
+          ? snapshot.selection.token
+          : undefined;
       if (commandId === "format.ruby") {
         void handleOpenRubyDialog(handle, token);
         return;
@@ -772,6 +774,12 @@ function EditorPageContent() {
       handle.execute({ id: commandId }, token);
     },
     [handleOpenRubyDialog],
+  );
+  const handleEditorCommand = useCallback(
+    (command: EditorCommandId) => {
+      handleExecuteEditorCommand(command);
+    },
+    [handleExecuteEditorCommand],
   );
   const handleDispatchEditorCommand = useCallback(
     (handle: EditorInteractionHandle, command: EditorCommand, token?: SelectionToken) => {
@@ -1505,6 +1513,7 @@ function EditorPageContent() {
     handleToggleWritingMode: () => toggleWritingModeRef.current(),
     handleOpenRubyDialog,
     handleToggleTcy,
+    handleEditorCommand,
     setShowSettingsModal,
     setSearchOpenTrigger,
     openSearchFromShortcut: handleOpenSearchFromShortcut,
@@ -1971,6 +1980,7 @@ function EditorPageContent() {
           registerWritingModeToggle: (toggle) => {
             toggleWritingModeRef.current = toggle ?? (() => {});
           },
+          registerInteraction,
         }}
         inspector={{
           isRightPanelCollapsed,

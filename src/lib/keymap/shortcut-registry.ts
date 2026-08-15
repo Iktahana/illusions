@@ -86,6 +86,20 @@ export const SHORTCUT_REGISTRY: Record<CommandId, ShortcutEntry> = {
     defaultBinding: { modifiers: ["CmdOrCtrl"], key: "a" },
     scope: "all",
   },
+  "speech.toggle": {
+    id: "speech.toggle",
+    label: "読み上げ／一時停止",
+    category: "edit",
+    defaultBinding: { modifiers: ["CmdOrCtrl", "Alt"], key: "s" },
+    scope: "all",
+  },
+  "speech.stop": {
+    id: "speech.stop",
+    label: "読み上げを停止",
+    category: "edit",
+    defaultBinding: null,
+    scope: "all",
+  },
 
   // -- View ------------------------------------------------------------------
   "view.zoomIn": {

@@ -64,6 +64,14 @@ function buildTcyOperation(view: EditorView): MdiEditOperation {
     : { type: "setInlineMark", mark: "tcy" as const };
 }
 
+export interface EditorCommandExecutionContext {
+  command: EditorCommand;
+  token?: SelectionToken;
+  view: EditorView;
+  generation: number;
+}
+
+export type EditorCommandExecutor = (context: EditorCommandExecutionContext) => EditorCommandResult;
 export class EditorInteractionStore implements EditorInteractionHandle {
   private listeners = new Set<() => void>();
   private view: EditorView | null = null;
@@ -73,6 +81,7 @@ export class EditorInteractionStore implements EditorInteractionHandle {
   private active = true;
   private composing = false;
   private lastNavigationNonce = -1;
+  private executors = new Map<EditorCommandId, EditorCommandExecutor>();
   private snapshot: EditorInteractionSnapshot;
   private mdiMappingGetter: (() => MdiEditorMappingSnapshot | null) | null = null;
   private posHighlightDispatcher: ((decorations: readonly PosDecorationSpec[]) => void) | null =
@@ -375,6 +384,15 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     }
   }
 
+  registerExecutor(id: EditorCommandId, executor: EditorCommandExecutor): () => void {
+    this.executors.set(id, executor);
+    this.emit();
+    return () => {
+      if (this.executors.get(id) !== executor) return;
+      this.executors.delete(id);
+      this.emit();
+    };
+  }
   private selection(): EditorSelectionSnapshot {
     const token = {
       editorId: this.editorId,
@@ -465,6 +483,11 @@ export class EditorInteractionStore implements EditorInteractionHandle {
               canApplyMdiEdit(this.view.state, buildRubyAvailabilityOperation(this.view)))) &&
           (entry.id !== "format.tcy" ||
             (this.view && canApplyMdiEdit(this.view.state, buildTcyOperation(this.view)))),
+          (!entry.requiresExecutor || this.executors.has(entry.id)),
+          (!entry.requiresCapability || capabilities[entry.requiresCapability]) &&
+          (!entry.requiresExecutor || this.executors.has(entry.id)) &&
+          (entry.id !== "format.tcy" ||
+            (this.view && canApplyMdiEdit(this.view.state, buildTcyOperation(this.view)))),
         ),
       ]),
     ) as Record<EditorCommandId, boolean>;
@@ -490,7 +513,7 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     if (!view || !definition || !this.snapshot.availability[command.id])
       return { status: "unavailable" };
     if (
-      definition.requiresSelection &&
+      (definition.requiresSelection || definition.requiresSelectionToken) &&
       (!token ||
         token.editorId !== this.editorId ||
         token.generation !== this.generation ||
@@ -498,6 +521,8 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     )
       return { status: "stale" };
     try {
+      const executor = this.executors.get(command.id);
+      if (executor) return executor({ command, token, view, generation: this.generation });
       if (command.id === "edit.undo" || command.id === "edit.redo") {
         const ran = (command.id === "edit.undo" ? undo : redo)(view.state, view.dispatch, view);
         return { status: ran ? "executed" : "unavailable" };
