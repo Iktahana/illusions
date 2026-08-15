@@ -11,7 +11,7 @@ describe("useElectronEvents editor commands", () => {
   let container: HTMLDivElement;
   let listener: ((command: EditorCommandId) => void) | undefined;
   const cleanup = vi.fn();
-  const onEditorCommand = vi.fn((next: (command: EditorCommandId) => void) => {
+  const onMenuEditorCommand = vi.fn((next: (command: EditorCommandId) => void) => {
     listener = next;
     return cleanup;
   });
@@ -21,10 +21,10 @@ describe("useElectronEvents editor commands", () => {
     document.body.appendChild(container);
     listener = undefined;
     cleanup.mockClear();
-    onEditorCommand.mockClear();
+    onMenuEditorCommand.mockClear();
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
-      value: { onEditorCommand },
+      value: { onMenuEditorCommand },
     });
   });
 
@@ -34,16 +34,16 @@ describe("useElectronEvents editor commands", () => {
   });
 
   it("forwards allowlisted native menu commands and removes the listener", () => {
-    const handleEditorCommand = vi.fn();
+    const handleExecuteEditorCommand = vi.fn();
     const root = createRoot(container);
     function Harness(): null {
-      useElectronEvents({ isElectron: true, handleEditorCommand } as never);
+      useElectronEvents({ isElectron: true, handleExecuteEditorCommand } as never);
       return null;
     }
 
     act(() => root.render(<Harness />));
     act(() => listener?.("speech.toggle"));
-    expect(handleEditorCommand).toHaveBeenCalledWith("speech.toggle");
+    expect(handleExecuteEditorCommand).toHaveBeenCalledWith("speech.toggle");
 
     act(() => root.unmount());
     expect(cleanup).toHaveBeenCalledOnce();
