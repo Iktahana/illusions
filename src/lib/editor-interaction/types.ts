@@ -1,4 +1,5 @@
 import type { DocumentCapabilities, DocumentFormat } from "@/lib/document-format";
+import type { SearchMatch, SearchOptions } from "@/lib/editor-page/find-search-matches";
 
 export type EditorCommandId =
   | "edit.undo"
@@ -62,6 +63,43 @@ export interface EditorInteractionSnapshot {
   availability: Readonly<Record<EditorCommandId, boolean>>;
 }
 
+export interface EditorSearchToken {
+  editorId: string;
+  generation: number;
+  contentRevision: number;
+}
+
+export interface EditorSearchMatch extends SearchMatch {
+  contextBefore?: string;
+  contextAfter?: string;
+}
+
+export interface EditorSearchQuery {
+  term: string;
+  options: SearchOptions;
+}
+
+export interface EditorSearchQueryResult {
+  token: EditorSearchToken;
+  matches: EditorSearchMatch[];
+}
+
+export interface EditorSearchPresentation {
+  token: EditorSearchToken | null;
+  matches: readonly SearchMatch[];
+  currentMatchIndex: number;
+  searchTerm: string;
+  visible: boolean;
+  navigationNonce: number;
+}
+
+export interface EditorSearchReplaceCommand {
+  replacement: string;
+  matches: readonly SearchMatch[];
+  token: EditorSearchToken | null;
+  options: SearchOptions;
+}
+
 export type EditorCommandResult =
   | { status: "executed" }
   | { status: "unavailable" }
@@ -72,4 +110,8 @@ export interface EditorInteractionHandle {
   getSnapshot(): EditorInteractionSnapshot;
   subscribe(listener: () => void): () => void;
   execute(command: EditorCommand, token?: SelectionToken): EditorCommandResult;
+  prepareSearchSelection(): string | undefined;
+  querySearch(query: EditorSearchQuery): EditorSearchQueryResult;
+  syncSearchPresentation(presentation: EditorSearchPresentation): void;
+  replaceSearch(command: EditorSearchReplaceCommand): EditorCommandResult;
 }

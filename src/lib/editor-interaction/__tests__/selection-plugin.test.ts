@@ -17,11 +17,14 @@ describe("selection bridge plugin", () => {
     dom.dispatchEvent(new Event("scroll"));
     window.dispatchEvent(new Event("resize"));
     const selection = { eq: vi.fn(() => false) };
+    const currentDoc = {};
+    const previousDoc = { eq: vi.fn(() => false) };
     pluginView!.update!(
-      { state: { doc: {}, selection } } as never,
-      { doc: {}, selection } as never,
+      { state: { doc: currentDoc, selection } } as never,
+      { doc: previousDoc, selection } as never,
     );
     expect(interaction.update).toHaveBeenCalledTimes(2);
+    expect(interaction.update).toHaveBeenLastCalledWith({ docChanged: true });
     expect(interaction.refreshGeometry).toHaveBeenCalledTimes(2);
     pluginView!.destroy!();
     expect(remove).toHaveBeenCalledTimes(2);

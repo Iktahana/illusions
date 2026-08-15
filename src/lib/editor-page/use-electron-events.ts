@@ -44,6 +44,10 @@ interface UseElectronEventsParams {
 
   // Open as project (double-clicked .mdi in project dir)
   handleOpenAsProject: (projectPath: string, initialFile: string) => Promise<void>;
+  handleOpenSearch: () => void;
+  handleFindNext: () => void;
+  handleFindPrevious: () => void;
+  handleOpenReplace: () => void;
   confirmBeforeAction: (action: () => void | Promise<void>) => void;
 
   // Open the bug/feedback report dialog with a preset category
@@ -77,6 +81,10 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     handleOpenProject,
     handleOpenRecentProject,
     handleOpenAsProject,
+    handleOpenSearch,
+    handleFindNext,
+    handleFindPrevious,
+    handleOpenReplace,
     confirmBeforeAction,
     onReportBug,
   } = params;
@@ -217,6 +225,47 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
       cleanup?.();
     };
   }, [isElectron, setThemeMode]);
+
+  // Search / replace menu IPC listeners
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuSearch?.(() => {
+      handleOpenSearch();
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [handleOpenSearch, isElectron]);
+
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuSearchNext?.(() => {
+      handleFindNext();
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [handleFindNext, isElectron]);
+
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuSearchPrevious?.(() => {
+      handleFindPrevious();
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [handleFindPrevious, isElectron]);
+
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuSearchReplace?.(() => {
+      handleOpenReplace();
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [handleOpenReplace, isElectron]);
 
   // Sync menu checked state to Electron main process
   useEffect(() => {

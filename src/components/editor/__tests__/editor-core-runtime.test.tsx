@@ -131,4 +131,33 @@ describe("package-first editor runtime", () => {
     await vi.waitFor(() => expect(container?.querySelector(".mdi-tcy")?.textContent).toBe("12"));
     expect(editor.flush()).toBe("^12^月\n");
   });
+
+  it("executes current-document search and replace through the interaction contract", async () => {
+    const editor = await mountEditor("markdown", "東京 東京");
+
+    const result = editor.interaction.querySearch({
+      term: "東京",
+      options: { caseSensitive: true },
+    });
+    expect(result.matches).toHaveLength(2);
+
+    let replaceResult: ReturnType<EditorInteractionHandle["replaceSearch"]> | null = null;
+    await act(async () => {
+      replaceResult = editor.interaction.replaceSearch({
+        replacement: "大阪",
+        matches: result.matches,
+        token: result.token,
+        options: { caseSensitive: true },
+      });
+    });
+    expect(replaceResult).toEqual({ status: "executed" });
+
+    await vi.waitFor(() => expect(editor.flush()).toBe("大阪 大阪\n"));
+    expect(
+      editor.interaction.querySearch({
+        term: "大阪",
+        options: { caseSensitive: true },
+      }).matches,
+    ).toHaveLength(2);
+  });
 });

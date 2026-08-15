@@ -78,9 +78,7 @@ import { usePowerSaving } from "@/lib/editor-page/use-power-saving";
 import { useIgnoredCorrections } from "@/lib/editor-page/use-ignored-corrections";
 import { useKeyboardShortcuts } from "@/lib/editor-page/use-keyboard-shortcuts";
 import { usePanelState } from "@/lib/editor-page/use-panel-state";
-import { findSearchMatches } from "@/lib/editor-page/find-search-matches";
-import { useSearchHighlight, isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
-import { takeEditorSelectionForSearch } from "@/lib/editor-page/search-selection";
+import type { SearchOptions } from "@/lib/editor-page/find-search-matches";
 import { useSaveToast } from "@/lib/editor-page/use-save-toast";
 import { useTerminalTabs } from "@/lib/editor-page/use-terminal-tabs";
 import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
@@ -93,6 +91,7 @@ import {
   emptyActiveSelectionStats,
   type EditorCommandId,
   type EditorInteractionHandle,
+  type EditorSearchQueryResult,
   type EditorInteractionSnapshot,
 } from "@/lib/editor-interaction";
 
@@ -111,6 +110,15 @@ let _popoutBufferInfo: {
   fileType: SupportedFileExtension;
 } | null = null;
 let _popoutDetected = false;
+
+const EMPTY_SEARCH_QUERY: EditorSearchQueryResult = {
+  token: {
+    editorId: "inactive-editor",
+    generation: -1,
+    contentRevision: -1,
+  },
+  matches: [],
+};
 
 function detectPopoutMode(): typeof _popoutBufferInfo {
   if (_popoutDetected) return _popoutBufferInfo;
@@ -616,22 +624,22 @@ function EditorPageContent() {
   // Snapshot selection before SearchDialog moves focus to its input, then keep
   // a collapsed editor caret while the dialog owns DOM focus.
   const handleOpenSearchFromShortcut = useCallback(() => {
-    const selectedText = takeEditorSelectionForSearch(editorViewRef.current);
+    const selectedText = activeInteractionHandle?.prepareSearchSelection();
     if (selectedText !== undefined) setSearchTerm(selectedText);
     setSearchOpenTrigger((prev) => prev + 1);
-  }, [setSearchTerm]);
+  }, [activeInteractionHandle, setSearchTerm]);
+  const handleOpenReplaceFromMenu = useCallback(() => {
+    const selectedText = activeInteractionHandle?.prepareSearchSelection();
+    if (selectedText !== undefined) setSearchTerm(selectedText);
+    trackUsageEvent("feature_view_opened", { view: "search", surface: "menu" });
+    setTopView("search");
+  }, [activeInteractionHandle, setSearchTerm, setTopView]);
 
   // --- 検索ハイライトの単一ソース ---
   // いずれかの検索 UI が表示中か。両方非表示ならハイライトを消す（要求2）。
   const isSearchVisible = isSearchDialogOpen || topView === "search";
-  // 共有 searchTerm/options からマッチを算出（唯一の計算箇所）。
-  // `content` を依存に含め、置換や編集で doc が変わった時に再計算させる。
-  // 非表示・空語の時は計算をスキップし空配列を返す。
-  const searchMatches = useMemo(() => {
-    if (!isSearchVisible || !searchTerm || !isEditorViewAlive(editorViewInstance)) {
-      return [];
-    }
-    return findSearchMatches(editorViewInstance.state.doc, searchTerm, {
+  const searchOptions = useMemo<SearchOptions>(
+    () => ({
       caseSensitive,
       regex: regexSearch,
       wholeWord: wholeWordSearch,
@@ -639,22 +647,34 @@ function EditorPageContent() {
       excludeComments,
       searchTarget,
       range: selectionOnly ? (searchSelectionRange ?? undefined) : undefined,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }),
+    [
+      caseSensitive,
+      excludeComments,
+      normalizeVariants,
+      regexSearch,
+      searchSelectionRange,
+      searchTarget,
+      selectionOnly,
+      wholeWordSearch,
+    ],
+  );
+  const activeInteractionRevision = activeInteractionSnapshot?.selection.revision ?? -1;
+  const activeInteractionGeneration = activeInteractionSnapshot?.generation ?? -1;
+  const currentSearchQuery = useMemo(() => {
+    const interactionReady = activeInteractionGeneration >= 0 && activeInteractionRevision >= 0;
+    if (!isSearchVisible || !searchTerm || !activeInteractionHandle || !interactionReady)
+      return EMPTY_SEARCH_QUERY;
+    return activeInteractionHandle.querySearch({ term: searchTerm, options: searchOptions });
   }, [
-    editorViewInstance,
-    searchTerm,
-    caseSensitive,
-    regexSearch,
-    wholeWordSearch,
-    normalizeVariants,
-    excludeComments,
-    searchTarget,
-    selectionOnly,
-    searchSelectionRange,
+    activeInteractionGeneration,
+    activeInteractionHandle,
+    activeInteractionRevision,
     isSearchVisible,
-    content,
+    searchOptions,
+    searchTerm,
   ]);
+  const searchMatches = currentSearchQuery.matches;
 
   // #1857: 明示的ナビゲーション（次へ/前へ/結果クリック）のたびに増加するカウンター。
   // コンテンツ編集で matches が再計算されても nonce は変わらないため、
@@ -670,15 +690,56 @@ function EditorPageContent() {
     },
     [setCurrentMatchIndex],
   );
+  const handleFindNextFromMenu = useCallback(() => {
+    if (!searchTerm) {
+      handleOpenSearchFromShortcut();
+      return;
+    }
+    setIsSearchDialogOpen(true);
+    if (searchMatches.length > 0) {
+      handleNavigateToMatch((prev) => (prev + 1) % searchMatches.length);
+    }
+  }, [handleNavigateToMatch, handleOpenSearchFromShortcut, searchMatches.length, searchTerm]);
+  const handleFindPreviousFromMenu = useCallback(() => {
+    if (!searchTerm) {
+      handleOpenSearchFromShortcut();
+      return;
+    }
+    setIsSearchDialogOpen(true);
+    if (searchMatches.length > 0) {
+      handleNavigateToMatch((prev) => (prev - 1 + searchMatches.length) % searchMatches.length);
+    }
+  }, [handleNavigateToMatch, handleOpenSearchFromShortcut, searchMatches.length, searchTerm]);
+  useEffect(() => {
+    if (!activeInteractionHandle) return;
+    activeInteractionHandle.syncSearchPresentation({
+      token: currentSearchQuery.token,
+      matches: searchMatches,
+      currentMatchIndex,
+      searchTerm,
+      visible: isSearchVisible,
+      navigationNonce: searchNavigationNonce,
+    });
 
-  useSearchHighlight({
-    editorView: editorViewInstance,
-    matches: searchMatches,
+    return () => {
+      activeInteractionHandle.syncSearchPresentation({
+        token: null,
+        matches: [],
+        currentMatchIndex: 0,
+        searchTerm: "",
+        visible: false,
+        navigationNonce: -1,
+      });
+    };
+  }, [
+    activeInteractionHandle,
     currentMatchIndex,
-    searchTerm,
+    currentSearchQuery.token,
     isSearchVisible,
-    navigationNonce: searchNavigationNonce,
-  });
+    searchMatches,
+    searchNavigationNonce,
+    searchTerm,
+  ]);
 
   // フローティング検索窓は <main> のトップレベル（dockview パネル外）でレンダリングし、
   // 開閉状態を page 側で持つ。dockview パネル内に置くと、パネルのクロージャが
@@ -1264,6 +1325,10 @@ function EditorPageContent() {
     },
     onToggleCompactMode: () => toggleCompactModeRef.current(),
     onToggleWritingMode: () => toggleWritingModeRef.current(),
+    onOpenSearch: handleOpenSearchFromShortcut,
+    onFindNext: handleFindNextFromMenu,
+    onFindPrevious: handleFindPreviousFromMenu,
+    onOpenReplace: handleOpenReplaceFromMenu,
     onExport: (format) => void exportAs(format),
     onCopyExport: (format) => void copyAs(format),
     onPrint: () => printDocument(),
@@ -1323,6 +1388,10 @@ function EditorPageContent() {
     handleOpenProject,
     handleOpenRecentProject,
     handleOpenAsProject,
+    handleOpenSearch: handleOpenSearchFromShortcut,
+    handleFindNext: handleFindNextFromMenu,
+    handleFindPrevious: handleFindPreviousFromMenu,
+    handleOpenReplace: handleOpenReplaceFromMenu,
     confirmBeforeAction: unsavedWarning.confirmBeforeAction,
     onReportBug: (category) => setBugReportCategory(category),
   });
@@ -1670,7 +1739,8 @@ function EditorPageContent() {
     onSelectionOnlyChange: setSelectionOnly,
     onCurrentMatchIndexChange: handleNavigateToMatch,
     onCloseSearchResults: handleCloseSearchResults,
-    editorViewInstance,
+    searchInteractionHandle: activeInteractionHandle,
+    currentSearchToken: activeInteractionHandle ? currentSearchQuery.token : null,
     dictionarySearchTrigger,
     currentFilePath: currentFile?.path ?? undefined,
     projectSearchBuffers,

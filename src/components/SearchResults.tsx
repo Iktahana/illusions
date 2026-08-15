@@ -14,7 +14,6 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import type { EditorView } from "@milkdown/prose/view";
 import clsx from "clsx";
 
 import {
@@ -35,19 +34,17 @@ import {
 } from "@/lib/editor-page/project-search";
 import { ProjectSearchWorkerClient } from "@/lib/editor-page/project-search-worker-client";
 import { addSearchHistoryEntry, loadSearchHistory } from "@/lib/editor-page/search-history";
-import { isEditorViewAlive } from "@/lib/editor-page/use-search-highlight";
-import { dispatchIfEditorViewAlive } from "@/shared/lib/editor-view-safety";
 import {
   bucketTelemetryCount,
   classifyTelemetryFailure,
   trackUsageEvent,
 } from "@/lib/analytics/usage-events";
+import type { EditorInteractionHandle, EditorSearchToken } from "@/lib/editor-interaction";
 
 type SearchScope = "project" | "current" | "folder";
 const EMPTY_PROJECT_BUFFERS: ReadonlyMap<string, string> = new Map();
 
 interface SearchResultsProps {
-  editorView: EditorView | null;
   searchTerm: string;
   onSearchTermChange: (term: string) => void;
   caseSensitive: boolean;
@@ -66,6 +63,8 @@ interface SearchResultsProps {
   onSelectionOnlyChange?: (value: boolean) => void;
   hasSelection?: boolean;
   matches: SearchMatch[];
+  searchInteractionHandle?: EditorInteractionHandle | null;
+  currentSearchToken?: EditorSearchToken | null;
   currentMatchIndex: number;
   onCurrentMatchIndexChange: (index: number) => void;
   onClose: () => void;
@@ -82,7 +81,6 @@ interface MatchGroup {
 }
 
 export default function SearchResults({
-  editorView,
   searchTerm,
   onSearchTermChange,
   caseSensitive,
@@ -101,6 +99,8 @@ export default function SearchResults({
   onSelectionOnlyChange = () => {},
   hasSelection = false,
   matches,
+  searchInteractionHandle = null,
+  currentSearchToken = null,
   currentMatchIndex,
   onCurrentMatchIndexChange,
   onClose,
@@ -275,34 +275,19 @@ export default function SearchResults({
   }, [matches.length, patternError, scope, searchOptions, searchTerm]);
 
   const getMatchContext = useCallback(
-    (match: SearchMatch): { before: string; text: string; after: string } => {
-      if (!editorView) return { before: "", text: match.text ?? "", after: "" };
-
-      const { doc } = editorView.state;
-      const contextLength = 30;
-      const beforeStart = Math.max(0, match.from - contextLength);
-      const afterEnd = Math.min(doc.content.size, match.to + contextLength);
-      const beforeText = doc.textBetween(beforeStart, match.from);
-      const afterText = doc.textBetween(match.to, afterEnd);
-
-      return {
-        before:
-          beforeText.length > contextLength ? `...${beforeText.slice(-contextLength)}` : beforeText,
-        text: match.text ?? doc.textBetween(match.from, match.to),
-        after:
-          afterText.length > contextLength ? `${afterText.slice(0, contextLength)}...` : afterText,
-      };
-    },
-    [editorView],
+    (match: SearchMatch): { before: string; text: string; after: string } => ({
+      before: "contextBefore" in match ? (match.contextBefore ?? "") : "",
+      text: match.text ?? "",
+      after: "contextAfter" in match ? (match.contextAfter ?? "") : "",
+    }),
+    [],
   );
 
   const goToMatch = useCallback(
     (index: number) => {
-      if (!isEditorViewAlive(editorView)) return;
       onCurrentMatchIndexChange(index);
-      editorView.focus();
     },
-    [editorView, onCurrentMatchIndexChange],
+    [onCurrentMatchIndexChange],
   );
 
   const navigateCurrentMatches = useCallback(
@@ -310,23 +295,20 @@ export default function SearchResults({
       if (matches.length === 0) return;
       const index = (currentMatchIndex + delta + matches.length) % matches.length;
       onCurrentMatchIndexChange(index);
-      if (isEditorViewAlive(editorView)) editorView.focus();
     },
-    [currentMatchIndex, editorView, matches.length, onCurrentMatchIndexChange],
+    [currentMatchIndex, matches.length, onCurrentMatchIndexChange],
   );
 
   const replaceMatch = useCallback(
     (match: SearchMatch) => {
-      if (!isEditorViewAlive(editorView) || !isSearchMatchReplaceable(match)) return;
-      const [step] = createReplacementSteps([match], replaceTerm, searchOptions);
-      if (!step) return;
-
-      const replaced = dispatchIfEditorViewAlive(editorView, (view) =>
-        step.text
-          ? view.state.tr.replaceWith(step.from, step.to, view.state.schema.text(step.text))
-          : view.state.tr.delete(step.from, step.to),
-      );
-      if (replaced) {
+      if (!searchInteractionHandle || !isSearchMatchReplaceable(match)) return;
+      const result = searchInteractionHandle.replaceSearch({
+        replacement: replaceTerm,
+        matches: [match],
+        token: currentSearchToken,
+        options: searchOptions,
+      });
+      if (result.status === "executed") {
         trackUsageEvent("search_replacement_completed", {
           scope: "current",
           mode: "single",
@@ -334,32 +316,28 @@ export default function SearchResults({
         });
       }
     },
-    [editorView, replaceTerm, searchOptions],
+    [currentSearchToken, replaceTerm, searchInteractionHandle, searchOptions],
   );
 
   const replaceAllCurrentMatches = useCallback(() => {
-    if (!isEditorViewAlive(editorView)) return;
-    const steps = createReplacementSteps(matches, replaceTerm, searchOptions);
-    if (steps.length === 0) return;
-
-    const replaced = dispatchIfEditorViewAlive(editorView, (view) => {
-      let tr = view.state.tr;
-      for (const step of steps) {
-        tr = step.text
-          ? tr.replaceWith(step.from, step.to, view.state.schema.text(step.text))
-          : tr.delete(step.from, step.to);
-      }
-      return tr;
+    if (!searchInteractionHandle) return;
+    const result = searchInteractionHandle.replaceSearch({
+      replacement: replaceTerm,
+      matches,
+      token: currentSearchToken,
+      options: searchOptions,
     });
-    if (replaced) {
+    if (result.status === "executed") {
       trackUsageEvent("search_replacement_completed", {
         scope: "current",
         mode: "all",
-        replacement_count_bucket: bucketTelemetryCount(steps.length),
+        replacement_count_bucket: bucketTelemetryCount(
+          createReplacementSteps(matches, replaceTerm, searchOptions).length,
+        ),
       });
     }
     setConfirmReplaceAll(false);
-  }, [editorView, matches, replaceTerm, searchOptions]);
+  }, [currentSearchToken, matches, replaceTerm, searchInteractionHandle, searchOptions]);
 
   const replaceProjectResults = useCallback(
     async (results: readonly ProjectSearchFileResult[]) => {
