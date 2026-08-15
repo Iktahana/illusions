@@ -90,9 +90,13 @@ export default function NovelEditor({
     (event: React.MouseEvent<HTMLDivElement>) => {
       if (!window.electronAPI?.showEditorContextMenu) return;
       event.preventDefault();
-      void window.electronAPI.showEditorContextMenu(
-        buildEditorContextMenu(interaction.getSnapshot().availability),
-      );
+      const snapshot = interaction.getSnapshot();
+      void window.electronAPI
+        .showEditorContextMenu(buildEditorContextMenu(snapshot.availability))
+        .then((commandId) => {
+          if (!commandId) return;
+          interaction.execute({ id: commandId }, snapshot.selection.token);
+        });
     },
     [interaction],
   );

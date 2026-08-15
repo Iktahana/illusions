@@ -88,8 +88,10 @@ import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 import { useErrorReportingConsentToast } from "@/lib/error-reporting/use-error-reporting-consent-toast";
 import {
+  commandById,
   computeActiveSelectionStats,
   emptyActiveSelectionStats,
+  type EditorCommandId,
   type EditorInteractionHandle,
   type EditorInteractionSnapshot,
 } from "@/lib/editor-interaction";
@@ -569,9 +571,14 @@ function EditorPageContent() {
   const [activeInteractionSnapshot, setActiveInteractionSnapshot] =
     useState<EditorInteractionSnapshot | null>(null);
   const editorViewRef = useRef<EditorView | null>(null);
+  const activeInteractionRef = useRef<EditorInteractionHandle | null>(null);
   const setEditorViewInstance = useCallback((view: EditorView | null) => {
     editorViewRef.current = view; // ref FIRST so sync consumers see fresh value
     setEditorViewInstanceRaw(view);
+  }, []);
+  const registerInteraction = useCallback((handle: EditorInteractionHandle | null) => {
+    activeInteractionRef.current = handle;
+    setActiveInteractionHandle(handle);
   }, []);
   useEffect(() => {
     if (!activeInteractionHandle) {
@@ -596,6 +603,15 @@ function EditorPageContent() {
         : emptyActiveSelectionStats(),
     [activeEditorTab, activeInteractionSnapshot],
   );
+  const handleExecuteEditorCommand = useCallback((commandId: EditorCommandId) => {
+    const handle = activeInteractionRef.current;
+    if (!handle) return;
+    const snapshot = handle.getSnapshot();
+    const token = commandById.get(commandId)?.requiresSelection
+      ? snapshot.selection.token
+      : undefined;
+    handle.execute({ id: commandId }, token);
+  }, []);
 
   // Snapshot selection before SearchDialog moves focus to its input, then keep
   // a collapsed editor caret while the dialog owns DOM focus.
@@ -678,11 +694,14 @@ function EditorPageContent() {
   }, [searchOpenTrigger]);
 
   // --- Ruby/TCY hook ---
-  const { handleOpenRubyDialog, handleApplyRuby, handleToggleTcy } = useRubyTcy({
+  const { handleOpenRubyDialog, handleApplyRuby } = useRubyTcy({
     editorViewRef,
     setRubySelectedText: panelHandlers.setRubySelectedText,
     setShowRubyDialog: panelHandlers.setShowRubyDialog,
   });
+  const handleToggleTcy = useCallback(() => {
+    handleExecuteEditorCommand("format.tcy");
+  }, [handleExecuteEditorCommand]);
 
   // --- Project lifecycle hook ---
   const projectLifecycle = useProjectLifecycle({
@@ -1287,6 +1306,7 @@ function EditorPageContent() {
     handlePasteAsPlaintext,
     handleToggleCompactMode,
     handleToggleWritingMode: () => toggleWritingModeRef.current(),
+    handleExecuteEditorCommand,
     setLineHeight: settingsSetters.setLineHeight,
     setParagraphSpacing: settingsSetters.setParagraphSpacing,
     setTextIndent: settingsSetters.setTextIndent,
@@ -1848,11 +1868,12 @@ function EditorPageContent() {
           onCurrentMatchIndexChange: handleNavigateToMatch,
           onCloseSearchDialog: closeSearchDialog,
           setEditorViewInstance,
-          registerInteraction: setActiveInteractionHandle,
+          registerInteraction,
           handleShowAllSearchResults,
           switchTab,
           updateTab,
           registerFlush,
+          registerInteraction,
           registerWritingModeToggle: (toggle) => {
             toggleWritingModeRef.current = toggle ?? (() => {});
           },

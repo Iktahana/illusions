@@ -55,6 +55,40 @@ test("toolbar and bubble menu format the current MDI selection", async ({
   await expect(bubble).toBeHidden();
 });
 
+test("TCY stays canonical across bubble menu, save, and reopen", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "tcy.mdi");
+  await writeFile(filePath, "12月", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  const editor = mainWindow.locator(".ProseMirror").last();
+
+  await editor.evaluate((element) => {
+    const text = element.firstChild;
+    if (!text) return;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 2);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+  });
+  const bubble = mainWindow.getByRole("toolbar", { name: "選択範囲の書式" });
+  await expect(bubble).toBeVisible();
+  await bubble.getByRole("button", { name: "縦中横を切替" }).click();
+  await expect(editor.locator(".mdi-tcy")).toContainText("12");
+
+  await nativeHarness.save();
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  await expect(editor.locator(".mdi-tcy")).toContainText("12");
+  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("^12^月");
+});
+
 test("plain text does not expose the formatting bubble", async ({
   mainWindow,
   nativeHarness,
@@ -120,5 +154,34 @@ test("editor context menu crosses renderer, preload, IPC, and native role", asyn
     "paste",
     undefined,
     "selectAll",
+    undefined,
   ]);
+});
+
+test("renderer-owned TCY command survives the native context-menu round-trip", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "context-tcy.mdi");
+  await writeFile(filePath, "12月", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  const editor = mainWindow.locator(".ProseMirror").last();
+
+  await editor.evaluate((element) => {
+    const text = element.firstChild;
+    if (!text) return;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 2);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+  });
+
+  await nativeHarness.selectContextCommand("format.tcy");
+  await editor.click({ button: "right" });
+  await expect(editor.locator(".mdi-tcy")).toContainText("12");
 });

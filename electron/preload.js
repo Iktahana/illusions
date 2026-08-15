@@ -98,6 +98,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   syncMenuUiState: invokeChannel(MENU_CHANNELS.invoke.syncUiState, { arity: 1 }),
   updateKeymapOverrides: invokeChannel(MENU_CHANNELS.invoke.updateKeymapOverrides, { arity: 1 }),
   onMenuShowInFileManager: eventChannel(MENU_CHANNELS.event.showInFileManager, { arity: 0 }),
+  onMenuEditorCommand: eventChannel(MENU_CHANNELS.event.editorCommand, { arity: 1 }),
   onToggleCompactMode: eventChannel(MENU_CHANNELS.event.toggleCompactMode, { arity: 0 }),
   onToggleWritingMode: eventChannel(MENU_CHANNELS.event.toggleWritingMode, { arity: 0 }),
   onFormatChange: eventChannel(MENU_CHANNELS.event.format, { arity: 2 }),

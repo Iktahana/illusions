@@ -4,11 +4,12 @@ const {
 } = require("../../src/lib/editor-interaction/command-registry.json");
 
 const EDITOR_COMMANDS = Object.freeze(
-  Object.fromEntries(
-    COMMAND_REGISTRY.filter((command) => typeof command.nativeRole === "string").map(
-      ({ id, label, accelerator, nativeRole }) => [id, { label, accelerator, role: nativeRole }],
-    ),
-  ),
+  Object.fromEntries(COMMAND_REGISTRY.map(({ id, label, accelerator, nativeRole }) => [
+    id,
+    nativeRole
+      ? { label, accelerator, role: nativeRole, rendererOwned: false }
+      : { label, accelerator, rendererOwned: true },
+  ])),
 );
 
 function buildEditorContextMenuTemplate(items) {
@@ -31,7 +32,21 @@ function buildEditorContextMenuTemplate(items) {
     if (item.command !== expected) return null;
     const definition = EDITOR_COMMANDS[item.command];
     if (!definition) return null;
-    template.push({ ...definition, enabled: item.enabled });
+    template.push(
+      definition.rendererOwned
+        ? {
+            label: definition.label,
+            accelerator: definition.accelerator,
+            enabled: item.enabled,
+            command: item.command,
+          }
+        : {
+            label: definition.label,
+            accelerator: definition.accelerator,
+            role: definition.role,
+            enabled: item.enabled,
+          },
+    );
   }
   return template;
 }

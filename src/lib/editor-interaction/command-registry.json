@@ -34,6 +34,13 @@
       "nativeRole": "selectAll"
     },
     {
+      "id": "format.tcy",
+      "label": "縦中横を切替",
+      "accelerator": "CmdOrCtrl+Shift+T",
+      "requiresSelection": true,
+      "requiresCapability": "tcy"
+    },
+    {
       "id": "format.strong",
       "label": "太字",
       "requiresSelection": true,
@@ -97,6 +104,8 @@
     "edit.copy",
     "edit.paste",
     "separator",
-    "edit.selectAll"
+    "edit.selectAll",
+    "separator",
+    "format.tcy"
   ]
 }

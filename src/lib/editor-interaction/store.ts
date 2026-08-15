@@ -4,6 +4,12 @@ import { redo, undo } from "@milkdown/prose/history";
 import { setBlockType, wrapIn } from "@milkdown/prose/commands";
 import { wrapInList } from "@milkdown/prose/schema-list";
 import type { DocumentAdapter, DocumentFormat } from "@/lib/document-format";
+import {
+  canApplyMdiEdit,
+  inspectMdiSelection,
+  mdiEditCommand,
+  type MdiEditOperation,
+} from "./mdi-editing";
 import { commandById, commandRegistry } from "./registry";
 import type {
   EditorCommand,
@@ -16,6 +22,13 @@ import type {
 } from "./types";
 
 const EMPTY_RECT = null;
+
+function buildTcyOperation(view: EditorView): MdiEditOperation {
+  const selectionState = inspectMdiSelection(view.state);
+  return selectionState.marks.tcy
+    ? { type: "removeInlineMark", mark: "tcy" as const }
+    : { type: "setInlineMark", mark: "tcy" as const };
+}
 
 export class EditorInteractionStore implements EditorInteractionHandle {
   private listeners = new Set<() => void>();
@@ -164,7 +177,10 @@ export class EditorInteractionStore implements EditorInteractionHandle {
           this.view &&
           this.active &&
           (!entry.requiresSelection || (selection.kind !== "caret" && selection.kind !== "none")) &&
-          (!entry.requiresFormatting || formatting),
+          (!entry.requiresFormatting || formatting) &&
+          (!entry.requiresCapability || capabilities[entry.requiresCapability]) &&
+          (entry.id !== "format.tcy" ||
+            (this.view && canApplyMdiEdit(this.view.state, buildTcyOperation(this.view)))),
         ),
       ]),
     ) as Record<EditorCommandId, boolean>;
@@ -205,6 +221,10 @@ export class EditorInteractionStore implements EditorInteractionHandle {
       if (command.id === "edit.selectAll") {
         view.dispatch(view.state.tr.setSelection(new AllSelection(view.state.doc)));
         return { status: "executed" };
+      }
+      if (command.id === "format.tcy") {
+        const ran = mdiEditCommand(buildTcyOperation(view))(view.state, view.dispatch, view);
+        return { status: ran ? "executed" : "unavailable" };
       }
       if (definition.nativeRole) return { status: "unavailable" };
       const { from, to } = view.state.selection;

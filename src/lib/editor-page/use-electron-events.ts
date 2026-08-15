@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { persistAppState } from "@/lib/storage/app-state-manager";
 import { getProjectFileService } from "@/lib/services/project-file-service";
 import type { BugReportCategory } from "@/lib/bug-report/bug-report-types";
+import type { EditorCommandId } from "@/lib/editor-interaction";
 
 interface UseElectronEventsParams {
   isElectron: boolean;
@@ -14,6 +15,7 @@ interface UseElectronEventsParams {
   // Compact mode toggle
   handleToggleCompactMode: () => void;
   handleToggleWritingMode: () => void;
+  handleExecuteEditorCommand: (commandId: EditorCommandId) => void;
 
   // Format change: direct setters for IPC-driven adjustments
   setLineHeight: Dispatch<SetStateAction<number>>;
@@ -58,6 +60,7 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
     handlePasteAsPlaintext,
     handleToggleCompactMode,
     handleToggleWritingMode,
+    handleExecuteEditorCommand,
     setLineHeight,
     setParagraphSpacing,
     setTextIndent,
@@ -101,6 +104,16 @@ export function useElectronEvents(params: UseElectronEventsParams): void {
       cleanup?.();
     };
   }, [isElectron, handleToggleCompactMode]);
+
+  useEffect(() => {
+    if (!isElectron || typeof window === "undefined") return;
+    const cleanup = window.electronAPI?.onMenuEditorCommand?.((commandId) => {
+      handleExecuteEditorCommand(commandId);
+    });
+    return () => {
+      cleanup?.();
+    };
+  }, [handleExecuteEditorCommand, isElectron]);
 
   // Writing-mode toggle IPC listener
   useEffect(() => {

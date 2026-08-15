@@ -5,13 +5,14 @@ import {
   type ElectronApplication,
   type Page,
 } from "@playwright/test";
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 type CapturedMenuItem = {
   label?: string;
   accelerator?: string;
   role?: string;
+  command?: string;
   enabled?: boolean;
   type?: string;
 };
@@ -26,6 +27,7 @@ type NativeHarness = {
   queueOpenPaths(filePaths: string[]): Promise<void>;
   selectContextCommand(command: string): Promise<void>;
   takeContextMenus(): Promise<CapturedMenuItem[][]>;
+  readSavedFile(filePath: string): Promise<string>;
 };
 
 type Fixtures = {
@@ -133,20 +135,26 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         filePaths: state.openPaths.shift() ?? [],
       });
       Menu.buildFromTemplate = ((template: Electron.MenuItemConstructorOptions[]) => {
+        const getCommand = (
+          item: Electron.MenuItemConstructorOptions,
+        ): string | undefined =>
+          (item as Electron.MenuItemConstructorOptions & { command?: string }).command;
         const isEditorContextMenu =
-          template.length === 8 &&
-          template.filter((item) => item.type === "separator").length === 2 &&
+          template.length === 10 &&
+          template.filter((item) => item.type === "separator").length === 3 &&
           template.some((item) => item.role === "undo") &&
-          template.some((item) => item.role === "selectAll");
+          template.some((item) => item.role === "selectAll") &&
+          template.some((item) => getCommand(item) === "format.tcy");
         if (!isEditorContextMenu) return originalBuildFromTemplate(template);
 
         state.menus.push(
-          template.map(({ label, accelerator, role, enabled, type }) => ({
-            label,
-            accelerator: typeof accelerator === "string" ? accelerator : undefined,
-            role,
-            enabled,
-            type,
+          template.map((item) => ({
+            label: item.label,
+            accelerator: typeof item.accelerator === "string" ? item.accelerator : undefined,
+            role: item.role,
+            command: getCommand(item),
+            enabled: item.enabled,
+            type: item.type,
           })),
         );
         const menu = originalBuildFromTemplate(template);
@@ -160,9 +168,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
             "edit.paste": "paste",
             "edit.selectAll": "selectAll",
           };
-          const role = state.selectedCommand ? commandToRole[state.selectedCommand] : undefined;
+          const selectedCommand = state.selectedCommand;
+          const role = selectedCommand ? commandToRole[selectedCommand] : undefined;
           state.selectedCommand = null;
-          const item = role ? template.find((candidate) => candidate.role === role) : undefined;
+          const item = role
+            ? template.find((candidate) => candidate.role === role)
+            : template.find((candidate) => getCommand(candidate) === selectedCommand);
           if (item && options?.window) {
             if (item.click)
               item.click({} as Electron.MenuItem, options.window, {} as Electron.KeyboardEvent);
@@ -241,6 +252,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       selectContextCommand: async (command) => void (await mutate("context", command)),
       takeContextMenus: async () =>
         ((await mutate("take-menus")) as CapturedMenuItem[][] | undefined) ?? [],
+      readSavedFile: async (filePath) => readFile(filePath, "utf8"),
     });
   },
   mainWindow: async ({ electronApp }, use) => {

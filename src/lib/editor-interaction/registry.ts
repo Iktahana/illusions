@@ -1,4 +1,5 @@
 import commandRegistryData from "./command-registry.json";
+import type { DocumentCapabilities } from "@/lib/document-format";
 import type { EditorCommandId } from "./types";
 
 export interface CommandDefinition {
@@ -8,6 +9,7 @@ export interface CommandDefinition {
   nativeRole?: "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll";
   requiresSelection?: boolean;
   requiresFormatting?: boolean;
+  requiresCapability?: keyof Pick<DocumentCapabilities, "ruby" | "tcy">;
 }
 
 const { commands, editorContextMenu } = commandRegistryData as {
