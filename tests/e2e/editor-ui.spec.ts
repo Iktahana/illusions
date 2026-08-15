@@ -307,12 +307,20 @@ test("renderer-owned Ruby command survives the native context-menu round-trip", 
   await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}\n");
 });
 
-test("speech uses the active selection through native menu and cleans up on tab change", async ({
+test("speech follows the active selection and cleans up on tab change", async ({
   mainWindow,
   nativeHarness,
   workerRoot,
 }) => {
   await mainWindow.addInitScript(() => {
+    Object.assign(window as Window & { __speechDebug?: Record<string, number> }, {
+      __speechDebug: {
+        speakCalls: 0,
+        startCalls: 0,
+        boundaryCalls: 0,
+        menuEvents: 0,
+      },
+    });
     class MockUtterance {
       text: string;
       lang = "";
@@ -339,8 +347,11 @@ test("speech uses the active selection through native menu and cleans up on tab 
         pause: () => queue.at(0)?.onpause?.(),
         resume: () => queue.at(0)?.onresume?.(),
         speak: (utterance: MockUtterance) => {
+          window.__speechDebug!.speakCalls += 1;
           queue.push(utterance);
+          window.__speechDebug!.startCalls += 1;
           utterance.onstart?.();
+          window.__speechDebug!.boundaryCalls += 1;
           utterance.onboundary?.({ charIndex: 0, charLength: Math.max(1, utterance.text.length) });
         },
         addEventListener: () => undefined,
@@ -350,14 +361,39 @@ test("speech uses the active selection through native menu and cleans up on tab 
   });
   await mainWindow.reload();
   await mainWindow.waitForLoadState("domcontentloaded");
+  await mainWindow.evaluate(() => {
+    window.electronAPI?.onMenuEditorCommand?.((commandId) => {
+      if (commandId === "speech.toggle") window.__speechDebug!.menuEvents += 1;
+    });
+  });
 
   const filePath = path.join(workerRoot, "projects", "speech.mdi");
   await writeFile(filePath, "読み上げる文章です", "utf8");
   await nativeHarness.queueOpenPaths([filePath]);
   await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
   await selectEditorText(mainWindow);
+  await expect(mainWindow.getByRole("toolbar", { name: "選択範囲の書式" })).toBeVisible();
+  await expect(mainWindow.getByRole("button", { name: "読み上げを開始" })).toBeVisible();
+
   await nativeHarness.speechToggle();
-  await expect(mainWindow.locator(".speech-reading")).toBeVisible();
+  await expect
+    .poll(() =>
+      mainWindow.evaluate(
+        () =>
+          (
+            window as Window & {
+              __speechDebug?: {
+                speakCalls: number;
+                startCalls: number;
+                boundaryCalls: number;
+                menuEvents: number;
+              };
+            }
+          ).__speechDebug,
+      ),
+    )
+    .toMatchObject({ speakCalls: 1, startCalls: 1, boundaryCalls: 1, menuEvents: 1 });
+  await expect(mainWindow.locator(".speech-reading")).toHaveCount(1);
   await expect(mainWindow.getByRole("button", { name: "読み上げを一時停止" })).toBeVisible();
 
   await nativeHarness.newTab();
