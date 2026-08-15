@@ -61,18 +61,12 @@ describe("pos decorations", async () => {
 
     const replacement = { decorations: { kind: "replacement" } };
     expect(
-      plugin.spec.state.apply(
-        { getMeta: () => replacement, docChanged: false },
-        initial,
-      ),
+      plugin.spec.state.apply({ getMeta: () => replacement, docChanged: false }, initial),
     ).toBe(replacement);
 
-    expect(
-      plugin.spec.state.apply(
-        { getMeta: () => undefined, docChanged: false },
-        initial,
-      ),
-    ).toBe(initial);
+    expect(plugin.spec.state.apply({ getMeta: () => undefined, docChanged: false }, initial)).toBe(
+      initial,
+    );
 
     const mapped = plugin.spec.state.apply(
       { getMeta: () => undefined, docChanged: true, mapping: { step: 1 }, doc: { id: "next-doc" } },

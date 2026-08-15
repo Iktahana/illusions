@@ -200,7 +200,10 @@ export class EditorInteractionStore implements EditorInteractionHandle {
       };
     }
 
-    const visibleParagraphs = getVisibleParagraphs(this.view, collectParagraphs(this.view.state.doc));
+    const visibleParagraphs = getVisibleParagraphs(
+      this.view,
+      collectParagraphs(this.view.state.doc),
+    );
     return {
       token: this.posHighlightToken(),
       documentFormat: this.format,
@@ -679,7 +682,8 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     if (match.end <= match.start) return null;
     const from =
       segment.pos + 1 + match.start + getAtomOffset(segment.atomAdjustments, match.start);
-    const to = segment.pos + 1 + match.end + getAtomOffset(segment.atomAdjustments, match.end, true);
+    const to =
+      segment.pos + 1 + match.end + getAtomOffset(segment.atomAdjustments, match.end, true);
     return to > from ? { from, to } : null;
   }
 
