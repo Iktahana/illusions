@@ -26,21 +26,34 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   ],
   electronApp: async ({ workerRoot }, use) => {
     const diagnostics: string[] = [];
+    const executablePath = process.env.ILLUSIONS_E2E_EXECUTABLE;
+    let expectedExit = false;
     const app = await electron.launch({
-      args: [".", `--user-data-dir=${path.join(workerRoot, "user-data")}`],
+      ...(executablePath ? { executablePath } : {}),
+      args: [
+        ...(executablePath ? [] : ["."]),
+        `--user-data-dir=${path.join(workerRoot, "user-data")}`,
+      ],
       env: { ...process.env, ILLUSIONS_E2E: "1", ELECTRON_ENABLE_LOGGING: "1" },
       timeout: 30_000,
     });
     app.process().stdout?.on("data", (chunk) => diagnostics.push(`[main:stdout] ${chunk}`));
     app.process().stderr?.on("data", (chunk) => diagnostics.push(`[main:stderr] ${chunk}`));
+    const unexpectedExit = new Promise<never>((_, reject) => {
+      app.process().once("exit", (code, signal) => {
+        if (!expectedExit)
+          reject(new Error(`Electron exited unexpectedly (code=${code}, signal=${signal})`));
+      });
+    });
     try {
-      await use(app);
+      await Promise.race([use(app), unexpectedExit]);
     } finally {
       if (diagnostics.length)
         test
           .info()
           .attach("main-process.log", { body: diagnostics.join(""), contentType: "text/plain" });
-      await app.evaluate(({ app: electronApp }) => electronApp.exit(0)).catch(() => undefined);
+      expectedExit = true;
+      await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined);
       await app.close().catch(() => undefined);
     }
   },

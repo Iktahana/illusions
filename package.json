@@ -32,6 +32,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test --config=playwright.electron.config.ts",
+    "test:e2e:smoke": "playwright test --config=playwright.electron.config.ts --grep @smoke",
     "generate:credits": "npx tsx scripts/generate-credits.ts",
     "generate:store-assets": "node scripts/generate-store-assets.mjs",
     "clean:local": "node scripts/clean-local-artifacts.mjs",
