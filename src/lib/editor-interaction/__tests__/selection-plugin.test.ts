@@ -16,12 +16,36 @@ describe("selection bridge plugin", () => {
     dom.dispatchEvent(new Event("pointerup"));
     dom.dispatchEvent(new Event("scroll"));
     window.dispatchEvent(new Event("resize"));
-    pluginView!.update!({} as never, {} as never);
+    const selection = { eq: vi.fn(() => false) };
+    pluginView!.update!(
+      { state: { doc: {}, selection } } as never,
+      { doc: {}, selection } as never,
+    );
     expect(interaction.update).toHaveBeenCalledTimes(2);
     expect(interaction.refreshGeometry).toHaveBeenCalledTimes(2);
     pluginView!.destroy!();
     expect(remove).toHaveBeenCalledTimes(2);
     expect(interaction.detach).toHaveBeenCalledOnce();
+  });
+
+  it("does not publish a no-op plugin view update", () => {
+    const interaction = {
+      update: vi.fn(),
+      refreshGeometry: vi.fn(),
+      detach: vi.fn(),
+      setComposing: vi.fn(),
+    };
+    const plugin = createSelectionBridgePlugin(interaction as never);
+    const doc = {};
+    const selection = { eq: vi.fn(() => true) };
+    const pluginView = plugin.spec.view?.({
+      dom: document.createElement("div"),
+      state: { doc, selection },
+    } as never);
+
+    pluginView!.update!({ state: { doc, selection } } as never, { doc, selection } as never);
+
+    expect(interaction.update).not.toHaveBeenCalled();
   });
 
   it("forwards focus, blur and composition lifecycle", () => {
@@ -37,7 +61,8 @@ describe("selection bridge plugin", () => {
     expect(handlers.blur!.call(plugin, {} as never, {} as never)).toBe(false);
     expect(handlers.compositionstart!.call(plugin, {} as never, {} as never)).toBe(false);
     expect(handlers.compositionend!.call(plugin, {} as never, {} as never)).toBe(false);
-    expect(interaction.update).toHaveBeenCalledTimes(2);
+    expect(interaction.refreshGeometry).toHaveBeenCalledTimes(2);
+    expect(interaction.update).not.toHaveBeenCalled();
     expect(interaction.setComposing).toHaveBeenNthCalledWith(1, true);
     expect(interaction.setComposing).toHaveBeenNthCalledWith(2, false);
   });

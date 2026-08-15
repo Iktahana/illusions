@@ -1,4 +1,4 @@
-import { Plugin } from "@milkdown/prose/state";
+import { Plugin, type EditorState } from "@milkdown/prose/state";
 import type { EditorView } from "@milkdown/prose/view";
 import type { EditorInteractionStore } from "./store";
 
@@ -11,11 +11,23 @@ export function createSelectionBridgePlugin(interaction: EditorInteractionStore)
     view: (view: EditorView) => {
       const refreshGeometry = (): void => interaction.refreshGeometry();
       const refreshSelection = (): void => interaction.update();
+      const publishTransaction = (currentView: EditorView, previousState: EditorState): void => {
+        // Milkdown may ask plugin views to update while React is reconciling
+        // even when ProseMirror state is unchanged. Publishing for those
+        // no-op updates makes an external-store subscriber render the editor
+        // again and creates a React/ProseMirror feedback loop.
+        if (
+          previousState.doc === currentView.state.doc &&
+          previousState.selection.eq(currentView.state.selection)
+        )
+          return;
+        interaction.update();
+      };
       view.dom.addEventListener("pointerup", refreshSelection);
       view.dom.addEventListener("scroll", refreshGeometry, true);
       window.addEventListener("resize", refreshGeometry);
       return {
-        update: refreshSelection,
+        update: publishTransaction,
         destroy: () => {
           view.dom.removeEventListener("pointerup", refreshSelection);
           view.dom.removeEventListener("scroll", refreshGeometry, true);
@@ -27,11 +39,11 @@ export function createSelectionBridgePlugin(interaction: EditorInteractionStore)
     props: {
       handleDOMEvents: {
         focus: () => {
-          interaction.update();
+          interaction.refreshGeometry();
           return false;
         },
         blur: () => {
-          interaction.update();
+          interaction.refreshGeometry();
           return false;
         },
         compositionstart: () => {
