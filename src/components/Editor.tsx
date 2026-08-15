@@ -115,7 +115,8 @@ export default function NovelEditor({
             );
             return;
           }
-          if (onEditorCommand) onEditorCommand(interaction, { id: commandId }, snapshot.selection.token);
+          if (onEditorCommand)
+            onEditorCommand(interaction, { id: commandId }, snapshot.selection.token);
           else interaction.execute({ id: commandId }, snapshot.selection.token);
         });
     },

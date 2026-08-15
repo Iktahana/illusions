@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import RubyDialog from "./RubyDialog";
 import type { RubyDialogRequest, RubyDialogResult } from "@/lib/editor-page/ruby-dialog-contract";
 
 export default function RubyDialogWindow(): React.JSX.Element | null {
   const [request, setRequest] = useState<RubyDialogRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const completedRef = useRef(false);
 
   useEffect(() => {
     const getRequest = window.electronAPI?.getRubyDialogRequest;
@@ -23,6 +24,8 @@ export default function RubyDialogWindow(): React.JSX.Element | null {
   }, []);
 
   const complete = (result: RubyDialogResult): void => {
+    if (completedRef.current) return;
+    completedRef.current = true;
     void window.electronAPI?.completeRubyDialog?.(result);
   };
 

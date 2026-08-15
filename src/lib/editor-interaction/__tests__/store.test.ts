@@ -16,19 +16,17 @@ vi.mock("../mdi-editing", () => ({
     ruby: mdiEditing.rubySelection,
   }),
   canApplyMdiEdit: () => mdiEditing.canApply,
-  mdiEditCommand:
-    (operation: Record<string, unknown>) =>
-    () => {
-      mdiEditing.appliedOperations.push(operation);
-      mdiEditing.tcyActive = operation.type === "setInlineMark";
-      if (operation.type === "removeRuby") mdiEditing.rubySelection = null;
-      if (operation.type === "setRuby")
-        mdiEditing.rubySelection = {
-          base: mdiEditing.rubySelection?.base ?? "",
-          reading: operation.reading as string | readonly string[],
-        };
-      return mdiEditing.canApply;
-    },
+  mdiEditCommand: (operation: Record<string, unknown>) => () => {
+    mdiEditing.appliedOperations.push(operation);
+    mdiEditing.tcyActive = operation.type === "setInlineMark";
+    if (operation.type === "removeRuby") mdiEditing.rubySelection = null;
+    if (operation.type === "setRuby")
+      mdiEditing.rubySelection = {
+        base: mdiEditing.rubySelection?.base ?? "",
+        reading: operation.reading as string | readonly string[],
+      };
+    return mdiEditing.canApply;
+  },
 }));
 
 import { EditorInteractionStore } from "../store";
@@ -123,7 +121,10 @@ describe("EditorInteractionStore", () => {
       interaction.execute({ id: "format.strong" }, interaction.getSnapshot().selection.token),
     ).toEqual({ status: "unavailable" });
     expect(
-      interaction.execute({ id: "format.ruby", mode: "remove" }, interaction.getSnapshot().selection.token),
+      interaction.execute(
+        { id: "format.ruby", mode: "remove" },
+        interaction.getSnapshot().selection.token,
+      ),
     ).toEqual({ status: "unavailable" });
     expect(
       interaction.execute({ id: "format.tcy" }, interaction.getSnapshot().selection.token),

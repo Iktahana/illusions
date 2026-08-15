@@ -248,9 +248,7 @@ describe("NovelEditor", () => {
     Object.assign(window, {
       electronAPI: { showEditorContextMenu },
     });
-    act(() =>
-      root.render(<NovelEditor documentFormat="mdi" onEditorCommand={onEditorCommand} />),
-    );
+    act(() => root.render(<NovelEditor documentFormat="mdi" onEditorCommand={onEditorCommand} />));
 
     const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
     container.firstElementChild?.dispatchEvent(event);

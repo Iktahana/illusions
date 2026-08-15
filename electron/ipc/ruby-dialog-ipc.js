@@ -1,21 +1,11 @@
-const { BrowserWindow, ipcMain, app, screen } = require("electron");
+const { BrowserWindow, ipcMain, app } = require("electron");
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { RUBY_DIALOG_CHANNELS } = require("../lib/ipc-channels");
 const { isDev } = require("../app-constants");
 
 const dialogs = new Map();
-
-function getCenteredWindowPosition(parent, width, height) {
-  const parentBounds = parent.getBounds();
-  const workArea = screen.getDisplayMatching(parentBounds).workArea;
-  const preferredX = Math.round(parentBounds.x + (parentBounds.width - width) / 2);
-  const preferredY = Math.round(parentBounds.y + (parentBounds.height - height) / 2);
-  return {
-    x: Math.max(workArea.x, Math.min(preferredX, workArea.x + workArea.width - width)),
-    y: Math.max(workArea.y, Math.min(preferredY, workArea.y + workArea.height - height)),
-  };
-}
+const IS_E2E = process.env.ILLUSIONS_E2E === "1";
 
 function restoreParentAfterModal(parent, callback) {
   if (parent.isDestroyed()) {
@@ -23,9 +13,8 @@ function restoreParentAfterModal(parent, callback) {
     return;
   }
 
-  parent.setFocusable(true);
   if (parent.isMinimized()) parent.restore();
-  parent.show();
+  if (!IS_E2E) parent.show();
   parent.focus();
   setImmediate(callback);
 }
@@ -86,26 +75,18 @@ function registerRubyDialogHandlers() {
     return new Promise((resolve) => {
       const width = 720;
       const height = 680;
-      const macWindowOptions =
-        process.platform === "darwin"
-          ? {
-              ...getCenteredWindowPosition(parent, width, height),
-              modal: false,
-              alwaysOnTop: true,
-              skipTaskbar: true,
-            }
-          : { parent, modal: true };
       const win = new BrowserWindow({
-        ...macWindowOptions,
+        parent,
+        modal: true,
         width,
         height,
         minWidth: 600,
         minHeight: 560,
         show: false,
-        frame: false,
-        transparent: true,
+        frame: true,
+        transparent: false,
         hasShadow: true,
-        backgroundColor: "#00000000",
+        backgroundColor: "#1f2024",
         title: "ルビ設定",
         webPreferences: {
           preload: path.join(__dirname, "preload.js"),
@@ -114,16 +95,14 @@ function registerRubyDialogHandlers() {
           sandbox: true,
         },
       });
-      if (process.platform === "darwin") {
-        parent.setFocusable(false);
-        win.setAlwaysOnTop(true, "modal-panel");
-      }
       const webContentsId = win.webContents.id;
       dialogs.set(webContentsId, { request, resolve, completed: false, result: null });
 
       win.once("ready-to-show", () => {
-        win.show();
-        win.focus();
+        if (!IS_E2E) {
+          win.show();
+          win.focus();
+        }
       });
       win.on("closed", () => {
         const entry = dialogs.get(webContentsId);

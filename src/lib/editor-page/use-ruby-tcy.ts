@@ -52,7 +52,10 @@ export function useRubyTcy({
   );
 
   const handleOpenRubyDialog = useCallback(
-    async (interactionOverride?: EditorInteractionHandle | null, tokenOverride?: SelectionToken) => {
+    async (
+      interactionOverride?: EditorInteractionHandle | null,
+      tokenOverride?: SelectionToken,
+    ) => {
       const handle = interactionOverride ?? getInteraction();
       if (!handle) return;
       const snapshot = handle.getSnapshot();

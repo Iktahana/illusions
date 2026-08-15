@@ -3,7 +3,11 @@
 import { useState, type RefObject } from "react";
 
 import { useEditorInteraction } from "@/lib/editor-interaction/context";
-import type { EditorCommand, EditorInteractionHandle, SelectionToken } from "@/lib/editor-interaction";
+import type {
+  EditorCommand,
+  EditorInteractionHandle,
+  SelectionToken,
+} from "@/lib/editor-interaction";
 
 const buttons: Array<{ label: string; command: EditorCommand; text: string }> = [
   { label: "ルビを設定", command: { id: "format.ruby", mode: "apply", segments: [] }, text: "ル" },

@@ -6,15 +6,15 @@ export interface RubyDialogRequest {
 }
 
 export type RubyDialogResult =
-  | { action: "apply"; segments: readonly RubyApplicationSegment[] }
-  | { action: "remove" }
-  | null;
+  { action: "apply"; segments: readonly RubyApplicationSegment[] } | { action: "remove" } | null;
 
 export function serializeRubyReading(reading: string | readonly string[]): string {
   return Array.isArray(reading) ? reading.join(".") : String(reading);
 }
 
-export function normalizeRubyReading(reading: string | readonly string[]): string | readonly string[] {
+export function normalizeRubyReading(
+  reading: string | readonly string[],
+): string | readonly string[] {
   if (Array.isArray(reading)) return reading;
   const raw = String(reading).trim();
   if (!raw) return "";

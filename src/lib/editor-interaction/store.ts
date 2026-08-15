@@ -33,9 +33,7 @@ const EMPTY_RECT = null;
 
 function buildRubyAvailabilityOperation(view: EditorView): MdiEditOperation {
   const selectionState = inspectMdiSelection(view.state);
-  return selectionState.ruby
-    ? { type: "removeRuby" }
-    : { type: "setRuby", reading: "ふりがな" };
+  return selectionState.ruby ? { type: "removeRuby" } : { type: "setRuby", reading: "ふりがな" };
 }
 
 function buildTcyOperation(view: EditorView): MdiEditOperation {
@@ -292,7 +290,8 @@ export class EditorInteractionStore implements EditorInteractionHandle {
           (!entry.requiresFormatting || formatting) &&
           (!entry.requiresCapability || capabilities[entry.requiresCapability]) &&
           (entry.id !== "format.ruby" ||
-            (this.view && canApplyMdiEdit(this.view.state, buildRubyAvailabilityOperation(this.view)))) &&
+            (this.view &&
+              canApplyMdiEdit(this.view.state, buildRubyAvailabilityOperation(this.view)))) &&
           (entry.id !== "format.tcy" ||
             (this.view && canApplyMdiEdit(this.view.state, buildTcyOperation(this.view)))),
         ),
@@ -360,7 +359,9 @@ export class EditorInteractionStore implements EditorInteractionHandle {
         for (const segment of [...command.segments].reverse()) {
           const start = end - segment.base.length;
           if (segment.ruby) {
-            view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, start, end)));
+            view.dispatch(
+              view.state.tr.setSelection(TextSelection.create(view.state.doc, start, end)),
+            );
             const ran = mdiEditCommand({
               type: "setRuby",
               reading: normalizeRubyReading(segment.ruby),

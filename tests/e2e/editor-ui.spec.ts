@@ -95,34 +95,41 @@ test("toolbar and bubble menu format the current MDI selection", async ({
 });
 
 test("Ruby stays canonical across bubble menu, save, and reopen", async ({
+  electronApp,
   mainWindow,
   nativeHarness,
   workerRoot,
 }) => {
   const filePath = path.join(workerRoot, "projects", "ruby.mdi");
-  await writeFile(filePath, "漢字", "utf8");
+  await writeFile(filePath, "漢字\n", "utf8");
   await nativeHarness.queueOpenPaths([filePath]);
   await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
-  const editor = mainWindow.locator(".ProseMirror").last();
 
-  await selectEditorText(mainWindow);
-  await nativeHarness.queueRubyDialogResult({
-    action: "apply",
-    segments: [{ base: "漢字", ruby: "かんじ" }],
-  });
+  await selectFirstEditorCharacters(mainWindow, 2);
   const bubble = mainWindow.getByRole("toolbar", { name: "選択範囲の書式" });
   await expect(bubble).toBeVisible();
+  const rubyWindowPromise = electronApp.waitForEvent("window");
   await bubble.getByRole("button", { name: "ルビを設定" }).click();
+  const rubyWindow = await rubyWindowPromise;
+  await rubyWindow.waitForLoadState("domcontentloaded");
+  await expect(rubyWindow.getByRole("dialog", { name: "ルビ設定" })).toBeVisible();
+  const reading = rubyWindow.getByPlaceholder("読み");
+  await reading.fill("かんじ");
+  await rubyWindow.getByRole("button", { name: "適用" }).click();
+  await expect
+    .poll(() => electronApp.windows().some((page) => page.url().includes("ruby-dialog")))
+    .toBe(false);
+  await expect(mainWindow).toHaveTitle(/\*/);
 
-  await nativeHarness.save();
+  await nativeHarness.queueSavePath(filePath);
+  await nativeHarness.saveAs();
+  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}\n");
+  await nativeHarness.closeTab();
   await nativeHarness.queueOpenPaths([filePath]);
-  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
-  await expect(editor).toContainText("漢字");
-  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}");
-  await expect.poll(() => nativeHarness.takeRubyDialogRequests()).toContainEqual({
-    selectedText: "漢字",
-    existingRuby: null,
-  });
+  await nativeHarness.open();
+  await expect(mainWindow.locator(".ProseMirror").last().locator("ruby.mdi-ruby rt")).toHaveText(
+    "かんじ",
+  );
 });
 
 test("TCY stays canonical across bubble menu, save, and reopen", async ({
@@ -225,26 +232,39 @@ test("editor context menu crosses renderer, preload, IPC, and native role", asyn
 });
 
 test("renderer-owned Ruby command survives the native context-menu round-trip", async ({
+  electronApp,
   mainWindow,
   nativeHarness,
   workerRoot,
 }) => {
   const filePath = path.join(workerRoot, "projects", "context-ruby.mdi");
-  await writeFile(filePath, "漢字", "utf8");
+  await writeFile(filePath, "漢字\n", "utf8");
   await nativeHarness.queueOpenPaths([filePath]);
   await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
   const editor = mainWindow.locator(".ProseMirror").last();
 
-  await selectEditorText(mainWindow);
-  await nativeHarness.queueRubyDialogResult({
-    action: "apply",
-    segments: [{ base: "漢字", ruby: "かんじ" }],
-  });
+  await selectFirstEditorCharacters(mainWindow, 2);
   await nativeHarness.selectContextCommand("format.ruby");
-  await editor.click({ button: "right" });
+  const rubyWindowPromise = electronApp.waitForEvent("window");
+  await editor.evaluate((element) => {
+    element.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true, button: 2 }),
+    );
+  });
+  const rubyWindow = await rubyWindowPromise;
+  await rubyWindow.waitForLoadState("domcontentloaded");
+  await expect(rubyWindow.getByRole("dialog", { name: "ルビ設定" })).toBeVisible();
+  const reading = rubyWindow.getByPlaceholder("読み");
+  await reading.fill("かんじ");
+  await rubyWindow.getByRole("button", { name: "適用" }).click();
+  await expect
+    .poll(() => electronApp.windows().some((page) => page.url().includes("ruby-dialog")))
+    .toBe(false);
+  await expect(mainWindow).toHaveTitle(/\*/);
 
-  await nativeHarness.save();
-  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}");
+  await nativeHarness.queueSavePath(filePath);
+  await nativeHarness.saveAs();
+  await expect.poll(() => nativeHarness.readSavedFile(filePath)).toBe("{漢字|かんじ}\n");
 });
 
 test("renderer-owned TCY command survives the native context-menu round-trip", async ({

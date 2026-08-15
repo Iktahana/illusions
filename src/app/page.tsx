@@ -2028,9 +2028,9 @@ export default function EditorPage() {
           ? "export"
           : query.has("ruby-dialog")
             ? "ruby-dialog"
-          : query.has("create-project")
-            ? "create-project"
-            : "editor",
+            : query.has("create-project")
+              ? "create-project"
+              : "editor",
     );
   }, []);
 
