@@ -492,11 +492,45 @@ html:not(.dark) {
 /* Statistics panel text opacity */
 .stats-panel {
   --stats-text: rgb(var(--foreground) / 0.8);
+  container-type: inline-size;
 }
 
 .stats-panel,
 .stats-panel * {
   color: var(--stats-text) !important;
+}
+
+/* The inspector can be resized independently from the app window. */
+@container (max-width: 180px) {
+  .stats-panel .stats-card {
+    padding: 0.75rem;
+  }
+
+  .stats-panel .stats-card > .space-y-1\.5 > .flex {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .stats-panel .stats-card > .space-y-1\.5 > .flex > :last-child {
+    align-self: flex-end;
+    max-width: 100%;
+    text-align: right;
+    white-space: normal;
+  }
+
+  .stats-panel .stats-card .grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 0.375rem;
+  }
+
+  .stats-panel .stats-card .grid-cols-4 > div {
+    min-width: 0;
+  }
+
+  .stats-panel .stats-card .grid-cols-4 span {
+    overflow-wrap: anywhere;
+  }
 }
 
 .info-tooltip-content {

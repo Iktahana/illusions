@@ -215,7 +215,7 @@ export default function StatsPanel({
 
       {/* 可読性分析 (Readability) */}
       {readabilityAnalysis && !isSelection && (
-        <div className="bg-background-secondary rounded-lg p-4 border border-border">
+        <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
           <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
             読みやすさ
           </h4>
@@ -358,7 +358,7 @@ export default function StatsPanel({
       )}
 
       {/* 文字数内訳 */}
-      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+      <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
           文字数
         </h4>
@@ -448,7 +448,7 @@ export default function StatsPanel({
 
       {/* 文字種内訳 (Character Type Analysis) */}
       {charTypeAnalysis && !isSelection && (
-        <div className="bg-background-secondary rounded-lg p-4 border border-border">
+        <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
           <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
             文字種別
           </h4>
@@ -587,7 +587,7 @@ export default function StatsPanel({
       )}
 
       {/* 段落構成 */}
-      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+      <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
           段落
         </h4>
@@ -630,7 +630,7 @@ export default function StatsPanel({
       </div>
 
       {/* 読了時間（目安） */}
-      <div className="bg-background-secondary rounded-lg p-4 border border-border">
+      <div className="stats-card bg-background-secondary rounded-lg p-4 border border-border">
         <h4 className="text-xs font-medium text-foreground-tertiary uppercase tracking-wide mb-3">
           読了時間
         </h4>
