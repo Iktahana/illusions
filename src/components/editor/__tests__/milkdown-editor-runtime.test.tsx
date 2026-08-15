@@ -6,6 +6,7 @@ import type { EditorView } from "@milkdown/prose/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
+import { computeActiveSelectionStats, EditorInteractionStore } from "@/lib/editor-interaction";
 
 let showParagraphNumbers = false;
 
@@ -33,6 +34,7 @@ interface RuntimeProps {
   onEditorViewReady?: (view: EditorView) => void;
   onExternalContentApplied?: () => void;
   registerFlush?: (flush: (() => string | null) | null) => void;
+  interaction?: EditorInteractionStore;
 }
 
 async function waitFor(assertion: () => void, timeout = 3000): Promise<void> {
@@ -133,8 +135,66 @@ describe("MilkdownEditor real runtime", () => {
       lineLength: 28,
       onExternalContentApplied,
     });
-    await waitFor(() => expect(onExternalContentApplied).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onExternalContentApplied).toHaveBeenCalled());
     expect(runFlush(flush)).toBe(replacement);
+  });
+
+  it("clears selection-derived stats after external replacement in the current runtime", async () => {
+    await getDocumentAdapter("markdown").initialize();
+    const adapter = getDocumentAdapter("markdown");
+    const interaction = new EditorInteractionStore("selection-stats-runtime", "markdown", adapter);
+    const views: EditorView[] = [];
+
+    await render({
+      documentFormat: "markdown",
+      initialContent: "一二\n\n三四",
+      isVertical: false,
+      lineLength: 40,
+      onEditorViewReady: (view) => views.push(view),
+      interaction,
+    });
+
+    await waitFor(() => expect(views).toHaveLength(1));
+
+    await act(async () => {
+      expect(interaction.execute({ id: "edit.selectAll" })).toEqual({ status: "executed" });
+      interaction.update();
+    });
+
+    await waitFor(() =>
+      expect(computeActiveSelectionStats(interaction.getSnapshot(), ".md")).toMatchObject({
+        selectedCharCount: 4,
+        selectedManuscriptCells: 40,
+        selectedManuscriptPages: 1,
+        searchSelectionRange: expect.any(Object),
+      }),
+    );
+
+    const onExternalContentApplied = vi.fn();
+    await render({
+      documentFormat: "markdown",
+      initialContent: "一二\n\n三四",
+      externalContent: "差し替え後",
+      isVertical: false,
+      lineLength: 40,
+      onEditorViewReady: (view) => views.push(view),
+      onExternalContentApplied,
+      interaction,
+    });
+
+    await waitFor(() => expect(onExternalContentApplied).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(computeActiveSelectionStats(interaction.getSnapshot(), ".md")).toEqual({
+        selectedCharCount: 0,
+        selectedManuscriptCells: 0,
+        selectedManuscriptPages: 0,
+        searchSelectionRange: null,
+      }),
+    );
+    expect(interaction.getSnapshot()).toMatchObject({
+      generation: 1,
+      selection: { kind: "caret", from: 1, to: 1, text: "" },
+    });
   });
 
   it("recreates the real editor for a format switch without applying commands to the old view", async () => {

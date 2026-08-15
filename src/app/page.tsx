@@ -87,6 +87,12 @@ import { useDiffTabs } from "@/lib/editor-page/use-diff-tabs";
 import { useContextMenu } from "@/lib/hooks/use-context-menu";
 import { usePreviousDayStats } from "@/lib/editor-page/use-previous-day-stats";
 import { useErrorReportingConsentToast } from "@/lib/error-reporting/use-error-reporting-consent-toast";
+import {
+  computeActiveSelectionStats,
+  emptyActiveSelectionStats,
+  type EditorInteractionHandle,
+  type EditorInteractionSnapshot,
+} from "@/lib/editor-interaction";
 
 import type { EditorView } from "@milkdown/prose/view";
 import type { SupportedFileExtension } from "@/lib/project/project-types";
@@ -555,19 +561,37 @@ function EditorPageContent() {
     name: string;
     execute: () => Promise<void>;
   } | null>(null);
-  // 選択追跡は新エディター拡張として再実装するまで UI の値を 0 に固定する。
-  const selectedCharCount = 0;
-  const selectedManuscriptCells = 0;
-  const selectedManuscriptPages = 0;
-  const searchSelectionRange = null;
   const { menu: tabBarMenu, show: showTabBarMenu, close: closeTabBarMenu } = useContextMenu();
   const hasAutoRecoveredRef = useRef(false);
   const [editorViewInstance, setEditorViewInstanceRaw] = useState<EditorView | null>(null);
+  const [activeInteractionHandle, setActiveInteractionHandle] =
+    useState<EditorInteractionHandle | null>(null);
+  const [activeInteractionSnapshot, setActiveInteractionSnapshot] =
+    useState<EditorInteractionSnapshot | null>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const setEditorViewInstance = useCallback((view: EditorView | null) => {
     editorViewRef.current = view; // ref FIRST so sync consumers see fresh value
     setEditorViewInstanceRaw(view);
   }, []);
+  useEffect(() => {
+    if (!activeInteractionHandle) {
+      setActiveInteractionSnapshot(null);
+      return;
+    }
+    setActiveInteractionSnapshot(activeInteractionHandle.getSnapshot());
+    return activeInteractionHandle.subscribe(() => {
+      setActiveInteractionSnapshot(activeInteractionHandle.getSnapshot());
+    });
+  }, [activeInteractionHandle]);
+
+  const { selectedCharCount, selectedManuscriptCells, selectedManuscriptPages, searchSelectionRange } =
+    useMemo(
+      () =>
+        activeEditorTab
+          ? computeActiveSelectionStats(activeInteractionSnapshot, activeEditorTab.fileType)
+          : emptyActiveSelectionStats(),
+      [activeEditorTab, activeInteractionSnapshot],
+    );
 
   // Snapshot selection before SearchDialog moves focus to its input, then keep
   // a collapsed editor caret while the dialog owns DOM focus.
@@ -1820,6 +1844,7 @@ function EditorPageContent() {
           onCurrentMatchIndexChange: handleNavigateToMatch,
           onCloseSearchDialog: closeSearchDialog,
           setEditorViewInstance,
+          registerInteraction: setActiveInteractionHandle,
           handleShowAllSearchResults,
           switchTab,
           updateTab,

@@ -7,6 +7,7 @@ import { history } from "@milkdown/plugin-history";
 import { listener, listenerCtx } from "@milkdown/plugin-listener";
 import { commonmark } from "@milkdown/preset-commonmark";
 import type { Node as ProseNode } from "@milkdown/prose/model";
+import { Selection } from "@milkdown/prose/state";
 import type { EditorView } from "@milkdown/prose/view";
 import { Milkdown, useEditor } from "@milkdown/react";
 import { nord } from "@milkdown/theme-nord";
@@ -217,7 +218,11 @@ export default function MilkdownEditor({
     if (!isEditorReady || externalContent == null) return;
     const editor = get();
     if (!editor) return;
-    editor.action(replaceAll(externalContent));
+    editor.action((ctx) => {
+      replaceAll(externalContent)(ctx);
+      const view = ctx.get(editorViewCtx);
+      view.dispatch(view.state.tr.setSelection(Selection.atStart(view.state.doc)));
+    });
     interaction.detach();
     interaction.attach(
       editor.ctx.get(editorViewCtx),
