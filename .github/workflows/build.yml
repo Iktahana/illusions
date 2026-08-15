@@ -842,6 +842,131 @@ jobs:
   # Publish & Release
   # ---------------------------------------------------------------------------
 
+  packaged-smoke-windows:
+    name: Packaged Smoke (Windows x64)
+    needs: [detect-changes, compute-version, package-windows-nsis]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.detect-changes.outputs.desktop_changed == 'true' &&
+      needs.compute-version.result == 'success' &&
+      needs.package-windows-nsis.result == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Download the x64 NSIS artifact from this build
+        uses: actions/download-artifact@v8
+        with:
+          name: illusions-windows-x64-${{ needs.compute-version.outputs.full }}
+          path: packaged
+      - name: Verify signature and install silently
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem packaged -Filter *.exe | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer was not found" }
+          $signature = Get-AuthenticodeSignature $installer.FullName
+          if ($signature.Status -ne "Valid") { throw "Invalid installer signature: $($signature.Status)" }
+          $installDir = Join-Path $env:RUNNER_TEMP "illusions-smoke"
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "NSIS install failed: $($process.ExitCode)" }
+          $executable = Join-Path $installDir "illusions.exe"
+          if (-not (Test-Path $executable)) { throw "Installed executable was not found" }
+          "ILLUSIONS_E2E_EXECUTABLE=$executable" >> $env:GITHUB_ENV
+      - name: Run packaged smoke
+        run: npm run test:e2e:smoke
+      - name: Ensure the app did not leave a process behind
+        if: always()
+        shell: pwsh
+        run: |
+          $remaining = Get-Process illusions -ErrorAction SilentlyContinue
+          if ($remaining) {
+            $remaining | Stop-Process -Force
+            throw "Packaged smoke left an illusions process running"
+          }
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaged-smoke-windows-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  packaged-smoke-macos:
+    name: Packaged Smoke (macOS ${{ matrix.arch }})
+    needs: [detect-changes, compute-version, build-macos]
+    if: |
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.detect-changes.outputs.desktop_changed == 'true' &&
+      needs.compute-version.result == 'success' &&
+      needs.build-macos.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            os: macos-15-intel
+          - arch: arm64
+            os: macos-15
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Download the signed ZIP from this build
+        uses: actions/download-artifact@v8
+        with:
+          name: illusions-macos-${{ matrix.arch }}-${{ needs.compute-version.outputs.full }}
+          path: packaged
+      - name: Verify and unpack the signed application
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip_path=$(find packaged -maxdepth 1 -name '*-mac.zip' -print -quit)
+          test -n "$zip_path"
+          ditto -x -k "$zip_path" "$RUNNER_TEMP/illusions-smoke"
+          app_path=$(find "$RUNNER_TEMP/illusions-smoke" -maxdepth 2 -name '*.app' -print -quit)
+          test -n "$app_path"
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          spctl --assess --type execute --verbose=2 "$app_path"
+          executable="$app_path/Contents/MacOS/illusions"
+          test -x "$executable"
+          echo "ILLUSIONS_E2E_EXECUTABLE=$executable" >> "$GITHUB_ENV"
+      - name: Run packaged smoke
+        run: npm run test:e2e:smoke
+      - name: Ensure the app did not leave a process behind
+        if: always()
+        shell: bash
+        run: |
+          if pgrep -x illusions; then
+            pkill -x illusions || true
+            echo "::error::Packaged smoke left an illusions process running"
+            exit 1
+          fi
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaged-smoke-macos-${{ matrix.arch }}-${{ github.run_attempt }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
   release:
     name: Create GitHub Release
     if: |
@@ -858,6 +983,8 @@ jobs:
         build-linux,
         test-windows,
         test-macos,
+        packaged-smoke-windows,
+        packaged-smoke-macos,
       ]
     runs-on: ubuntu-latest
 
