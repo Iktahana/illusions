@@ -40,6 +40,8 @@ interface MilkdownEditorProps {
   applicationPlugins?: readonly Plugin[];
 }
 
+const EMPTY_APPLICATION_PLUGINS: readonly Plugin[] = [];
+
 function encodeDocument(
   format: DocumentFormat,
   adapter: ReturnType<typeof getDocumentAdapter>,
@@ -65,7 +67,7 @@ export default function MilkdownEditor({
   onExternalContentApplied,
   registerFlush,
   interaction: providedInteraction,
-  applicationPlugins = [],
+  applicationPlugins = EMPTY_APPLICATION_PLUGINS,
 }: MilkdownEditorProps): React.ReactElement {
   const { fontScale, lineHeight, paragraphSpacing, showParagraphNumbers, textIndent, fontFamily } =
     useTypographySettings();

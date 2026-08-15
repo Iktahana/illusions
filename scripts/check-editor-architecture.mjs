@@ -16,7 +16,6 @@ const retiredEditorPaths = [
   "src/lib/editor-page/novel-editor-features",
   "src/lib/editor-page/pos-highlight",
   "src/lib/editor-page/search-highlight-plugin.ts",
-  "src/lib/editor-page/speech-highlight-plugin.ts",
   "src/lib/editor-page/use-selection-tracking.ts",
   "src/lib/editor-page/vertical-wheel-scroll.ts",
 ];
@@ -26,7 +25,6 @@ const forbiddenCoreImports = [
   "novel-editor-features",
   "pos-highlight",
   "search-highlight-plugin",
-  "speech-highlight-plugin",
   "use-selection-tracking",
 ];
 

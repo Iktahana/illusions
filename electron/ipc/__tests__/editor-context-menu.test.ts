@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 const { buildEditorContextMenuTemplate } = require("../../lib/editor-command-registry.js");
 
-const validItems = [
+const validMenu = () => [
   { command: "edit.undo", enabled: true },
   { command: "edit.redo", enabled: true },
   { separator: true },
@@ -15,7 +15,9 @@ const validItems = [
   { command: "format.ruby", enabled: true },
   { separator: true },
   { command: "format.tcy", enabled: true },
-] as const;
+  { command: "speech.toggle", enabled: true },
+  { command: "speech.stop", enabled: true },
+];
 
 describe("editor context menu contract", () => {
   it("resolves allowlisted IDs to Japanese native editing roles", () => {
@@ -32,9 +34,6 @@ describe("editor context menu contract", () => {
         { separator: true },
         { command: "format.ruby", enabled: false },
         { separator: true },
-        { command: "format.tcy", enabled: true },
-        { command: "speech.toggle", enabled: true },
-        { command: "speech.stop", enabled: false },
         { command: "format.tcy", enabled: true },
         { command: "speech.toggle", enabled: true },
         { command: "speech.stop", enabled: false },
@@ -130,14 +129,17 @@ describe("editor context menu contract", () => {
     expect(buildEditorContextMenuTemplate(items)).toBeNull();
   });
 
-  it.each([
-    [2, { separator: true, label: "injected" }],
-    [0, null],
-    [0, { command: "edit.redo", enabled: true }],
-    [0, { command: "edit.undo", enabled: "yes" }],
-  ] as const)("rejects an invalid item at the expected menu position", (index, replacement) => {
-    const items: unknown[] = [...validItems];
-    items[index] = replacement;
-    expect(buildEditorContextMenuTemplate(items)).toBeNull();
+  it("rejects malformed entries even when the template length is correct", () => {
+    const malformedSeparator = validMenu();
+    malformedSeparator[2] = { separator: true, label: "injected" } as never;
+    expect(buildEditorContextMenuTemplate(malformedSeparator)).toBeNull();
+
+    const malformedCommand = validMenu();
+    malformedCommand[4] = { command: "edit.copy", enabled: "yes" } as never;
+    expect(buildEditorContextMenuTemplate(malformedCommand)).toBeNull();
+
+    const wrongAllowlistedCommand = validMenu();
+    wrongAllowlistedCommand[4] = { command: "edit.cut", enabled: true };
+    expect(buildEditorContextMenuTemplate(wrongAllowlistedCommand)).toBeNull();
   });
 });

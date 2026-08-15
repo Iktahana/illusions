@@ -59,7 +59,7 @@ vi.mock("@/lib/document-format", () => ({
 vi.mock("@milkdown/react", () => ({
   Milkdown: () => <div data-testid="milkdown" />,
   useEditor: (_factory: unknown, deps: readonly unknown[]) => {
-    const format = deps[1] as DocumentFormat;
+    const format = (deps[0] as { format: DocumentFormat }).format;
     return {
       get: () => mocks.runtime[format].editor,
       loading: mocks.runtime[format].loading,
