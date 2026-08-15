@@ -56,7 +56,6 @@ function Wrapper({
 }) {
   return (
     <SearchResults
-      editorView={null}
       searchTerm={searchTerm}
       onSearchTermChange={() => {}}
       caseSensitive={false}

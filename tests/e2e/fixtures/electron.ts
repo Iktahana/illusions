@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/rules-of-hooks */
+
 import {
   test as base,
   expect,
@@ -23,6 +25,10 @@ type NativeHarness = {
   saveAs(): Promise<void>;
   open(): Promise<void>;
   closeTab(): Promise<void>;
+  openSearch(): Promise<void>;
+  findNext(): Promise<void>;
+  findPrevious(): Promise<void>;
+  openReplace(): Promise<void>;
   queueSavePath(filePath: string): Promise<void>;
   queueOpenPaths(filePaths: string[]): Promise<void>;
   selectContextCommand(command: string): Promise<void>;
@@ -216,6 +222,10 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
             "save-as-menu": "別名で保存...",
             "open-menu": "ファイルを開く...",
             "close-tab": "タブを閉じる",
+            "open-search": "検索...",
+            "find-next": "次を検索",
+            "find-previous": "前を検索",
+            "open-replace": "置換...",
           };
           const label = labels[op];
           if (label) {
@@ -245,6 +255,10 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       saveAs: async () => invokeMenu("save-as-menu"),
       open: async () => invokeMenu("open-menu"),
       closeTab: async () => invokeMenu("close-tab"),
+      openSearch: async () => invokeMenu("open-search"),
+      findNext: async () => invokeMenu("find-next"),
+      findPrevious: async () => invokeMenu("find-previous"),
+      openReplace: async () => invokeMenu("open-replace"),
       queueSavePath: async (filePath) => void (await mutate("save", filePath)),
       queueOpenPaths: async (filePaths) => void (await mutate("open", filePaths)),
       selectContextCommand: async (command) => void (await mutate("context", command)),

@@ -16,6 +16,10 @@ interface UseWebMenuHandlersProps {
   onCloseWindow?: () => void;
   onToggleCompactMode?: () => void;
   onToggleWritingMode?: () => void;
+  onOpenSearch?: () => void;
+  onFindNext?: () => void;
+  onFindPrevious?: () => void;
+  onOpenReplace?: () => void;
   onExport?: (format: ExportFormat) => void;
   onCopyExport?: (format: "txt" | "txt-ruby" | "narou" | "kakuyomu" | "aozora" | "note") => void;
   onPrint?: () => void;
@@ -40,7 +44,7 @@ interface UseWebMenuHandlersProps {
 }
 
 export function useWebMenuHandlers({
-  onNew,
+  onNew: _onNew,
   onOpen,
   onSave,
   onSaveAs,
@@ -49,6 +53,10 @@ export function useWebMenuHandlers({
   onCloseWindow,
   onToggleCompactMode,
   onToggleWritingMode,
+  onOpenSearch,
+  onFindNext,
+  onFindPrevious,
+  onOpenReplace,
   onExport,
   onCopyExport,
   onPrint,
@@ -216,6 +224,18 @@ export function useWebMenuHandlers({
             document.execCommand("selectAll");
           }
           break;
+        case "search":
+          if (isEditorTabActive) onOpenSearch?.();
+          break;
+        case "search-next":
+          if (isEditorTabActive) onFindNext?.();
+          break;
+        case "search-previous":
+          if (isEditorTabActive) onFindPrevious?.();
+          break;
+        case "replace":
+          if (isEditorTabActive) onOpenReplace?.();
+          break;
 
         // View menu
         case "zoom-in": {
@@ -311,7 +331,6 @@ export function useWebMenuHandlers({
       }
     },
     [
-      onNew,
       onOpen,
       onSave,
       onSaveAs,
@@ -320,6 +339,10 @@ export function useWebMenuHandlers({
       onCloseWindow,
       onToggleCompactMode,
       onToggleWritingMode,
+      onOpenSearch,
+      onFindNext,
+      onFindPrevious,
+      onOpenReplace,
       onExport,
       onCopyExport,
       onPrint,

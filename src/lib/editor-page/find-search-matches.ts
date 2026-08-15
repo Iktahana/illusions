@@ -35,6 +35,8 @@ export interface SearchMatch {
   from: number;
   to: number;
   text?: string;
+  contextBefore?: string;
+  contextAfter?: string;
   source?: SearchMatchSource;
   replaceable?: boolean;
   captures?: string[];

@@ -13,7 +13,7 @@ import type { ActivityBarView } from "@/components/ActivityBar";
 import type { EditorMode, SupportedFileExtension } from "@/lib/project/project-types";
 import type { SearchMatch, SearchTarget } from "@/lib/editor-page/find-search-matches";
 import type { AffectedTab } from "@/lib/tab-manager/tab-path-sync";
-import type { EditorView } from "@milkdown/prose/view";
+import type { EditorInteractionHandle, EditorSearchToken } from "@/lib/editor-interaction";
 
 interface SidebarPanelProps {
   /** Which panel to render. */
@@ -53,8 +53,8 @@ interface SidebarPanelProps {
   onCurrentMatchIndexChange: (index: number) => void;
   /** Called when the search panel should close. */
   onCloseSearchResults: () => void;
-  /** The active ProseMirror EditorView (required by the search panel). */
-  editorViewInstance: EditorView | null;
+  searchInteractionHandle: EditorInteractionHandle | null;
+  currentSearchToken: EditorSearchToken | null;
   /** Dictionary search trigger (changes trigger a new search). */
   dictionarySearchTrigger: { term: string; id: number };
   /** Path of the currently open file (used by the word frequency panel). */
@@ -114,7 +114,8 @@ export default function SidebarPanel({
   currentMatchIndex,
   onCurrentMatchIndexChange,
   onCloseSearchResults,
-  editorViewInstance,
+  searchInteractionHandle,
+  currentSearchToken,
   dictionarySearchTrigger,
   currentFilePath,
   projectSearchBuffers,
@@ -167,7 +168,6 @@ export default function SidebarPanel({
     case "search":
       return (
         <SearchResults
-          editorView={editorViewInstance}
           searchTerm={searchTerm}
           onSearchTermChange={onSearchTermChange}
           caseSensitive={caseSensitive}
@@ -186,6 +186,8 @@ export default function SidebarPanel({
           onSelectionOnlyChange={onSelectionOnlyChange}
           hasSelection={hasSearchSelection}
           matches={searchMatches}
+          searchInteractionHandle={searchInteractionHandle}
+          currentSearchToken={currentSearchToken}
           currentMatchIndex={currentMatchIndex}
           onCurrentMatchIndexChange={onCurrentMatchIndexChange}
           projectSearchEnabled={isProjectMode(editorMode)}

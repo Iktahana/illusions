@@ -21,7 +21,7 @@ export function createSelectionBridgePlugin(interaction: EditorInteractionStore)
           previousState.selection.eq(currentView.state.selection)
         )
           return;
-        interaction.update();
+        interaction.update({ docChanged: !previousState.doc.eq(currentView.state.doc) });
       };
       view.dom.addEventListener("pointerup", refreshSelection);
       view.dom.addEventListener("scroll", refreshGeometry, true);

@@ -234,6 +234,10 @@ describe("ipc-channels: pinned channel names (public IPC contract)", () => {
       reportBug: "menu-report-bug",
       reportAiInappropriate: "menu-report-ai-inappropriate",
       openSettings: "menu-open-settings",
+      search: "menu-search",
+      searchNext: "menu-search-next",
+      searchPrevious: "menu-search-previous",
+      searchReplace: "menu-search-replace",
     });
   });
 

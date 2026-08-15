@@ -70,7 +70,6 @@ describe("SearchResults project navigation", () => {
     await act(async () => {
       root.render(
         <SearchResults
-          editorView={null}
           searchTerm="target"
           onSearchTermChange={() => {}}
           caseSensitive={false}
@@ -122,7 +121,6 @@ describe("SearchResults project navigation", () => {
     act(() => {
       root.render(
         <SearchResults
-          editorView={null}
           searchTerm="target"
           onSearchTermChange={() => {}}
           caseSensitive={false}

@@ -1,5 +1,5 @@
-import { AllSelection, NodeSelection } from "@milkdown/prose/state";
-import type { EditorView } from "@milkdown/prose/view";
+import { AllSelection, NodeSelection, TextSelection } from "@milkdown/prose/state";
+import { Decoration, type EditorView } from "@milkdown/prose/view";
 import { redo, undo } from "@milkdown/prose/history";
 import { setBlockType, wrapIn } from "@milkdown/prose/commands";
 import { wrapInList } from "@milkdown/prose/schema-list";
@@ -10,12 +10,19 @@ import {
   mdiEditCommand,
   type MdiEditOperation,
 } from "./mdi-editing";
+import { centerEditorPosition } from "@/lib/editor-page/center-editor-position";
+import { createReplacementSteps, findSearchMatches } from "@/lib/editor-page/find-search-matches";
 import { commandById, commandRegistry } from "./registry";
 import type {
   EditorCommand,
   EditorCommandId,
   EditorCommandResult,
   EditorInteractionHandle,
+  EditorSearchPresentation,
+  EditorSearchQuery,
+  EditorSearchQueryResult,
+  EditorSearchReplaceCommand,
+  EditorSearchToken,
   EditorInteractionSnapshot,
   EditorSelectionSnapshot,
   SelectionToken,
@@ -35,8 +42,10 @@ export class EditorInteractionStore implements EditorInteractionHandle {
   private view: EditorView | null = null;
   private revision = 0;
   private generation = 0;
+  private contentRevision = 0;
   private active = true;
   private composing = false;
+  private lastNavigationNonce = -1;
   private snapshot: EditorInteractionSnapshot;
 
   constructor(
@@ -68,11 +77,13 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     this.format = format;
     this.adapter = adapter;
     this.revision++;
+    this.contentRevision++;
     this.emit();
   }
-  update(): void {
+  update({ docChanged = false }: { docChanged?: boolean } = {}): void {
     if (!this.view || this.composing) return;
     this.revision++;
+    if (docChanged) this.contentRevision++;
     this.emit();
   }
   refreshGeometry(): void {
@@ -81,6 +92,7 @@ export class EditorInteractionStore implements EditorInteractionHandle {
   }
   setActive(active: boolean): void {
     if (this.active === active) return;
+    if (!active) this.clearSearchDecorations();
     this.active = active;
     this.revision++;
     this.emit();
@@ -91,10 +103,99 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     this.emit();
   }
   detach(): void {
+    this.clearSearchDecorations();
     this.view = null;
     this.generation++;
     this.revision++;
+    this.contentRevision++;
     this.emit();
+  }
+
+  prepareSearchSelection(): string | undefined {
+    const view = this.view;
+    if (!view) return undefined;
+
+    const { selection } = view.state;
+    if (selection.empty) return undefined;
+
+    const text = view.state.doc.textBetween(selection.from, selection.to, "\n") || undefined;
+    if (text && selection instanceof TextSelection) {
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, selection.to)));
+      this.update();
+    }
+
+    return text;
+  }
+
+  querySearch(query: EditorSearchQuery): EditorSearchQueryResult {
+    return {
+      token: this.searchToken(),
+      matches: this.buildSearchMatches(query),
+    };
+  }
+
+  syncSearchPresentation(presentation: EditorSearchPresentation): void {
+    const view = this.view;
+    if (!view || !this.active) return;
+
+    if (!this.isCurrentSearchToken(presentation.token)) {
+      this.clearSearchDecorations();
+      return;
+    }
+
+    if (!presentation.visible || !presentation.searchTerm || presentation.matches.length === 0) {
+      this.clearSearchDecorations();
+      return;
+    }
+
+    const decorations = presentation.matches.map((match, index) =>
+      Decoration.inline(match.from, match.to, {
+        class: index === presentation.currentMatchIndex ? "search-result-current" : "search-result",
+      }),
+    );
+
+    try {
+      view.dispatch(view.state.tr.setMeta("searchDecorations", decorations));
+
+      if (presentation.navigationNonce === this.lastNavigationNonce) return;
+      this.lastNavigationNonce = presentation.navigationNonce;
+
+      const current = presentation.matches[presentation.currentMatchIndex];
+      if (!current) return;
+
+      view.dispatch(
+        view.state.tr.setSelection(
+          TextSelection.create(view.state.doc, current.from, current.from),
+        ),
+      );
+      centerEditorPosition(view, current.from);
+    } catch {
+      /* destroyed or detached view */
+    }
+  }
+
+  replaceSearch(command: EditorSearchReplaceCommand): EditorCommandResult {
+    const view = this.view;
+    if (!view || !this.active) return { status: "unavailable" };
+    if (!this.isCurrentSearchToken(command.token)) return { status: "stale" };
+
+    const steps = createReplacementSteps(command.matches, command.replacement, command.options);
+    if (steps.length === 0) return { status: "unavailable" };
+
+    try {
+      let tr = view.state.tr;
+      for (const step of steps) {
+        tr = step.text
+          ? tr.replaceWith(step.from, step.to, view.state.schema.text(step.text))
+          : tr.delete(step.from, step.to);
+      }
+      view.dispatch(tr.scrollIntoView());
+      view.focus();
+      this.update({ docChanged: true });
+      return { status: "executed" };
+    } catch (error) {
+      return { status: "failed", error };
+    }
   }
 
   private selection(): EditorSelectionSnapshot {
@@ -276,6 +377,54 @@ export class EditorInteractionStore implements EditorInteractionHandle {
       return { status: "executed" };
     } catch (error) {
       return { status: "failed", error };
+    }
+  }
+
+  private searchToken(): EditorSearchToken {
+    return {
+      editorId: this.editorId,
+      generation: this.generation,
+      contentRevision: this.contentRevision,
+    };
+  }
+
+  private isCurrentSearchToken(token: EditorSearchToken | null): boolean {
+    return Boolean(
+      token &&
+      token.editorId === this.editorId &&
+      token.generation === this.generation &&
+      token.contentRevision === this.contentRevision,
+    );
+  }
+
+  private buildSearchMatches(query: EditorSearchQuery) {
+    const view = this.view;
+    if (!view || !this.active || !query.term) return [];
+
+    const matches = findSearchMatches(view.state.doc, query.term, query.options);
+    return matches.map((match) => {
+      const contextLength = 30;
+      const beforeStart = Math.max(0, match.from - contextLength);
+      const afterEnd = Math.min(view.state.doc.content.size, match.to + contextLength);
+      const beforeText = view.state.doc.textBetween(beforeStart, match.from);
+      const afterText = view.state.doc.textBetween(match.to, afterEnd);
+
+      return {
+        ...match,
+        contextBefore:
+          beforeText.length > contextLength ? `...${beforeText.slice(-contextLength)}` : beforeText,
+        contextAfter:
+          afterText.length > contextLength ? `${afterText.slice(0, contextLength)}...` : afterText,
+      };
+    });
+  }
+
+  private clearSearchDecorations(): void {
+    if (!this.view) return;
+    try {
+      this.view.dispatch(this.view.state.tr.setMeta("searchDecorations", []));
+    } catch {
+      /* destroyed or detached view */
     }
   }
 }

@@ -102,7 +102,6 @@ describe("SearchResults stale navigation guard (#1867)", () => {
     await act(async () => {
       root.render(
         <SearchResults
-          editorView={null}
           searchTerm="target"
           onSearchTermChange={() => {}}
           caseSensitive={false}

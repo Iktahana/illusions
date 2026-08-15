@@ -76,6 +76,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMenuSaveAs: eventChannel(MENU_CHANNELS.event.saveAsTriggered, { arity: 0 }),
   onMenuCloseTab: eventChannel(MENU_CHANNELS.event.closeTab, { arity: 0 }),
   onMenuNewTab: eventChannel(MENU_CHANNELS.event.newTab, { arity: 1 }),
+  onMenuSearch: eventChannel(MENU_CHANNELS.event.search, { arity: 0 }),
+  onMenuSearchNext: eventChannel(MENU_CHANNELS.event.searchNext, { arity: 0 }),
+  onMenuSearchPrevious: eventChannel(MENU_CHANNELS.event.searchPrevious, { arity: 0 }),
+  onMenuSearchReplace: eventChannel(MENU_CHANNELS.event.searchReplace, { arity: 0 }),
   onMenuOpenSettings: eventChannel(MENU_CHANNELS.event.openSettings, { arity: 0 }),
   onSaveBeforeClose: eventChannel(SYSTEM_CHANNELS.event.requestSaveBeforeClose, { arity: 0 }),
   onFlushStateBeforeClose: eventChannel(SYSTEM_CHANNELS.event.requestFlushStateBeforeClose, {

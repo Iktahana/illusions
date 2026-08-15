@@ -333,4 +333,86 @@ describe("EditorInteractionStore", () => {
     interaction.attach(makeView() as never, 0, "markdown", getDocumentAdapter("markdown"));
     expect(interaction.execute({ id: "format.strong" })).toEqual({ status: "stale" });
   });
+
+  it("prepares the selected text for search without exposing EditorView to the caller", () => {
+    const interaction = store();
+    const view = makeView("検索対象", 1, 3);
+    interaction.attach(view as never, 0, "markdown", getDocumentAdapter("markdown"));
+
+    expect(interaction.prepareSearchSelection()).toBe("検索");
+    expect(interaction.getSnapshot().selection).toMatchObject({
+      kind: "caret",
+      from: 3,
+      to: 3,
+      text: "",
+    });
+  });
+
+  it("queries current-document search matches with a content-bound token", () => {
+    const interaction = store();
+    interaction.attach(
+      makeView("前 target 後 target", 1, 1) as never,
+      5,
+      "markdown",
+      getDocumentAdapter("markdown"),
+    );
+
+    const result = interaction.querySearch({
+      term: "target",
+      options: { caseSensitive: true },
+    });
+
+    expect(result.token).toEqual({
+      editorId: "editor-a",
+      generation: 5,
+      contentRevision: 1,
+    });
+    expect(result.matches).toHaveLength(2);
+    expect(result.matches[0]).toMatchObject({
+      text: "target",
+      contextBefore: expect.stringContaining("前"),
+      contextAfter: expect.stringContaining("後"),
+    });
+
+    interaction.update({ docChanged: true });
+    expect(
+      interaction.replaceSearch({
+        replacement: "swap",
+        matches: result.matches,
+        token: result.token,
+        options: { caseSensitive: true },
+      }),
+    ).toEqual({ status: "stale" });
+  });
+
+  it("replaces current search matches and guards stale generations", () => {
+    const interaction = store();
+    const view = makeView("target target", 1, 1);
+    interaction.attach(view as never, 2, "markdown", getDocumentAdapter("markdown"));
+
+    const result = interaction.querySearch({
+      term: "target",
+      options: { caseSensitive: true },
+    });
+    expect(
+      interaction.replaceSearch({
+        replacement: "swap",
+        matches: result.matches,
+        token: result.token,
+        options: { caseSensitive: true },
+      }),
+    ).toEqual({ status: "executed" });
+    expect(view.state.doc.textContent).toBe("swap swap");
+
+    const stale = result.token;
+    interaction.attach(makeView("fresh", 1, 1) as never, 3, "markdown", getDocumentAdapter("markdown"));
+    expect(
+      interaction.replaceSearch({
+        replacement: "older",
+        matches: result.matches,
+        token: stale,
+        options: { caseSensitive: true },
+      }),
+    ).toEqual({ status: "stale" });
+  });
 });

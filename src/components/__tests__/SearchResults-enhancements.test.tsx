@@ -28,7 +28,6 @@ function renderSearchResults(
   act(() => {
     root.render(
       <SearchResults
-        editorView={null}
         searchTerm="target"
         onSearchTermChange={() => {}}
         caseSensitive={false}

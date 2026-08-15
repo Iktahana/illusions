@@ -39,6 +39,33 @@ async function selectFirstEditorCharacters(
   await page.keyboard.up("Shift");
 }
 
+async function selectFirstOccurrence(
+  page: import("@playwright/test").Page,
+  text: string,
+): Promise<void> {
+  await page
+    .locator(".ProseMirror")
+    .last()
+    .evaluate((editor, searchText) => {
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const value = node.textContent ?? "";
+        const start = value.indexOf(searchText);
+        if (start < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, start);
+        range.setEnd(node, start + searchText.length);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        editor.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+        return;
+      }
+      throw new Error(`Could not find text: ${searchText}`);
+    }, text);
+}
+
 async function openStatsPanel(page: import("@playwright/test").Page): Promise<void> {
   await page.getByRole("button", { name: /^統計(?:\s|$)/ }).click();
   await expect(page.getByRole("heading", { name: "全体の統計" })).toBeVisible();
@@ -187,4 +214,57 @@ test("renderer-owned TCY command survives the native context-menu round-trip", a
     );
   });
   await expect(editor.locator(".mdi-tcy")).toContainText("12");
+});
+
+test("native search menu prefills the current selection and navigates matches", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "search-menu.md");
+  await writeFile(filePath, "東京 大阪 東京", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+
+  await selectFirstOccurrence(mainWindow, "東京");
+  await nativeHarness.openSearch();
+
+  const searchInput = mainWindow.getByPlaceholder("検索...").last();
+  await expect(searchInput).toBeVisible();
+  await expect(searchInput).toHaveValue("東京");
+  await expect(mainWindow.getByText("1/2")).toBeVisible();
+
+  await nativeHarness.findNext();
+  await expect(mainWindow.getByText("2/2")).toBeVisible();
+
+  await nativeHarness.findPrevious();
+  await expect(mainWindow.getByText("1/2")).toBeVisible();
+});
+
+test("native replace menu reuses the active interaction search state for current-file replace", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "search-replace.md");
+  await writeFile(filePath, "東京 東京", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  const editor = mainWindow.locator(".ProseMirror").last();
+
+  await selectFirstOccurrence(mainWindow, "東京");
+  await nativeHarness.openReplace();
+
+  const searchInput = mainWindow.getByPlaceholder("検索...").last();
+  await expect(searchInput).toHaveValue("東京");
+  await expect(mainWindow.getByPlaceholder("置換後...")).toBeVisible();
+  await expect(mainWindow.getByText("2件見つかりました")).toBeVisible();
+
+  await mainWindow.getByPlaceholder("置換後...").fill("大阪");
+  await mainWindow.getByRole("button", { name: "すべて置換" }).click();
+  await expect(mainWindow.getByRole("heading", { name: "置換の確認" })).toBeVisible();
+  await mainWindow.getByRole("button", { name: "置換する" }).click();
+
+  await expect(editor).toHaveText("大阪 大阪");
+  await expect(mainWindow.getByText("検索結果がありません")).toBeVisible();
 });
