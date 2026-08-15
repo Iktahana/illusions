@@ -218,11 +218,11 @@ export default function MilkdownEditor({
     if (!isEditorReady || externalContent == null) return;
     const editor = get();
     if (!editor) return;
-    editor.action((ctx) => {
-      replaceAll(externalContent)(ctx);
-      const view = ctx.get(editorViewCtx);
+    editor.action(replaceAll(externalContent));
+    const view = editor.ctx.get(editorViewCtx);
+    if (view.state?.tr && view.state.doc) {
       view.dispatch(view.state.tr.setSelection(Selection.atStart(view.state.doc)));
-    });
+    }
     interaction.detach();
     interaction.attach(
       editor.ctx.get(editorViewCtx),
