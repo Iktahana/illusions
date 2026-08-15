@@ -3,8 +3,25 @@ import { Decoration, type EditorView } from "@milkdown/prose/view";
 import { redo, undo } from "@milkdown/prose/history";
 import { setBlockType, wrapIn } from "@milkdown/prose/commands";
 import { wrapInList } from "@milkdown/prose/schema-list";
+import {
+  mapMdiSourceSpansToEditorRanges,
+  type MdiEditorMappingSnapshot,
+} from "@illusions-lab/milkdown-plugin-mdi";
+import {
+  formatMdiTextPosition,
+  getMdiTextBlocks,
+  sourceSpansForTextRange,
+} from "@illusions-lab/mdi";
 import type { DocumentAdapter, DocumentFormat } from "@/lib/document-format";
 import { normalizeRubyReading } from "@/lib/editor-page/ruby-dialog-contract";
+import type { PosDecorationSpec } from "@/lib/editor-interaction/pos-decorations";
+import {
+  collectParagraphs,
+  findScrollContainer,
+  getAtomOffset,
+  getVisibleParagraphs,
+} from "@/lib/editor-page/paragraph-helpers";
+import { codeUnitOffsetToGraphemeIndex } from "@/lib/editor-page/pos-highlight-utils";
 import {
   canApplyMdiEdit,
   inspectMdiSelection,
@@ -19,6 +36,10 @@ import type {
   EditorCommandId,
   EditorCommandResult,
   EditorInteractionHandle,
+  EditorPosHighlightMatch,
+  EditorPosHighlightPresentation,
+  EditorPosHighlightRequest,
+  EditorPosHighlightSegment,
   EditorSearchPresentation,
   EditorSearchQuery,
   EditorSearchQueryResult,
@@ -53,6 +74,9 @@ export class EditorInteractionStore implements EditorInteractionHandle {
   private composing = false;
   private lastNavigationNonce = -1;
   private snapshot: EditorInteractionSnapshot;
+  private mdiMappingGetter: (() => MdiEditorMappingSnapshot | null) | null = null;
+  private posHighlightDispatcher: ((decorations: readonly PosDecorationSpec[]) => void) | null =
+    null;
 
   constructor(
     private readonly editorId: string,
@@ -70,6 +94,16 @@ export class EditorInteractionStore implements EditorInteractionHandle {
   private emit(): void {
     this.snapshot = this.buildSnapshot();
     this.listeners.forEach((listener) => listener());
+  }
+
+  setMdiMappingGetter(getter: (() => MdiEditorMappingSnapshot | null) | null): void {
+    this.mdiMappingGetter = getter;
+  }
+
+  setPosHighlightDispatcher(
+    dispatcher: ((decorations: readonly PosDecorationSpec[]) => void) | null,
+  ): void {
+    this.posHighlightDispatcher = dispatcher;
   }
 
   attach(
@@ -98,7 +132,10 @@ export class EditorInteractionStore implements EditorInteractionHandle {
   }
   setActive(active: boolean): void {
     if (this.active === active) return;
-    if (!active) this.clearSearchDecorations();
+    if (!active) {
+      this.clearSearchDecorations();
+      this.clearPosHighlights();
+    }
     this.active = active;
     this.revision++;
     this.emit();
@@ -110,11 +147,145 @@ export class EditorInteractionStore implements EditorInteractionHandle {
   }
   detach(): void {
     this.clearSearchDecorations();
+    this.clearPosHighlights();
     this.view = null;
     this.generation++;
     this.revision++;
     this.contentRevision++;
     this.emit();
+  }
+
+  createPosHighlightRequest(): EditorPosHighlightRequest | null {
+    if (!this.view || this.composing) return null;
+
+    if (this.format === "mdi") {
+      const snapshot = this.mdiMappingGetter?.();
+      if (!snapshot) return null;
+
+      const blocks = getMdiTextBlocks(snapshot.source).blocks.filter((block) => block.span);
+      const mappedSegments = blocks.map((block) => {
+        const [resolution] = mapMdiSourceSpansToEditorRanges(snapshot, [block.span!], {
+          source: snapshot.source,
+          doc: this.view!.state.doc,
+        });
+
+        return {
+          segment: {
+            segmentType: "mdi-block",
+            index: block.index,
+            blockIndex: block.index,
+            kind: block.kind,
+            text: block.text,
+            range: block.range,
+            span: block.span,
+            sourceMap: block.sourceMap,
+            annotations: block.annotations,
+            node: block.node,
+          } satisfies EditorPosHighlightSegment,
+          visible: resolution.matches.some((match) => this.rangeIsVisible(match.from, match.to)),
+        };
+      });
+
+      const visibleSegments = mappedSegments.filter(({ visible }) => visible);
+      const fallbackSegments =
+        visibleSegments.length > 0
+          ? visibleSegments
+          : mappedSegments.slice(0, Math.min(5, mappedSegments.length));
+
+      return {
+        token: this.posHighlightToken(),
+        documentFormat: this.format,
+        source: snapshot.source,
+        segments: fallbackSegments.map(({ segment }) => segment),
+      };
+    }
+
+    const visibleParagraphs = getVisibleParagraphs(
+      this.view,
+      collectParagraphs(this.view.state.doc),
+    );
+    return {
+      token: this.posHighlightToken(),
+      documentFormat: this.format,
+      segments: visibleParagraphs.map((paragraph) => ({
+        segmentType: "paragraph",
+        index: paragraph.index,
+        pos: paragraph.pos,
+        text: paragraph.text,
+        atomAdjustments: paragraph.atomAdjustments,
+      })),
+    };
+  }
+
+  syncPosHighlightPresentation(presentation: EditorPosHighlightPresentation): void {
+    const view = this.view;
+    if (!view || !this.active) {
+      this.clearPosHighlights();
+      return;
+    }
+
+    if (
+      !presentation.visible ||
+      !presentation.token ||
+      !presentation.request ||
+      !this.isCurrentPosHighlightToken(presentation.token)
+    ) {
+      this.clearPosHighlights();
+      return;
+    }
+
+    const decorations: PosDecorationSpec[] = [];
+    for (const match of presentation.matches) {
+      const segment = presentation.request.segments[match.segmentIndex];
+      if (!segment) continue;
+      if (presentation.disabledTypes.includes(match.category)) continue;
+      const color = presentation.colors[match.category];
+      if (!color) continue;
+
+      if (segment.segmentType === "paragraph") {
+        const range = this.plainSegmentRange(segment, match);
+        if (!range) continue;
+        decorations.push({ ...range, category: match.category, color });
+        continue;
+      }
+
+      const snapshot = this.mdiMappingGetter?.();
+      if (!snapshot) continue;
+      const spans = sourceSpansForTextRange(segment, {
+        start: formatMdiTextPosition({
+          block: segment.blockIndex,
+          character: codeUnitOffsetToGraphemeIndex(segment.text, match.start) + 1,
+        }),
+        end: formatMdiTextPosition({
+          block: segment.blockIndex,
+          character: codeUnitOffsetToGraphemeIndex(segment.text, match.end) + 1,
+        }),
+      });
+      if (spans.length === 0) continue;
+
+      const resolutions = mapMdiSourceSpansToEditorRanges(snapshot, spans, {
+        source: snapshot.source,
+        doc: view.state.doc,
+      });
+
+      for (const resolution of resolutions) {
+        for (const candidate of resolution.matches) {
+          if (candidate.channel !== "blockText") continue;
+          decorations.push({
+            from: candidate.from,
+            to: candidate.to,
+            category: match.category,
+            color,
+          });
+        }
+      }
+    }
+
+    try {
+      this.posHighlightDispatcher?.(decorations);
+    } catch {
+      /* detached or stale editor */
+    }
   }
 
   prepareSearchSelection(): string | undefined {
@@ -438,12 +609,31 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     };
   }
 
+  private posHighlightToken() {
+    return {
+      editorId: this.editorId,
+      generation: this.generation,
+      contentRevision: this.contentRevision,
+      viewportRevision: this.revision,
+    };
+  }
+
   private isCurrentSearchToken(token: EditorSearchToken | null): boolean {
     return Boolean(
       token &&
       token.editorId === this.editorId &&
       token.generation === this.generation &&
       token.contentRevision === this.contentRevision,
+    );
+  }
+
+  private isCurrentPosHighlightToken(token: EditorPosHighlightRequest["token"] | null): boolean {
+    return Boolean(
+      token &&
+      token.editorId === this.editorId &&
+      token.generation === this.generation &&
+      token.contentRevision === this.contentRevision &&
+      token.viewportRevision === this.revision,
     );
   }
 
@@ -469,10 +659,46 @@ export class EditorInteractionStore implements EditorInteractionHandle {
     });
   }
 
+  private rangeIsVisible(from: number, to: number): boolean {
+    const view = this.view;
+    if (!view) return false;
+
+    try {
+      const start = view.coordsAtPos(from);
+      const end = view.coordsAtPos(to);
+      const containerRect = findScrollContainer(view.dom).getBoundingClientRect();
+      const top = Math.min(start.top, end.top);
+      const bottom = Math.max(start.bottom, end.bottom);
+      return bottom >= containerRect.top && top <= containerRect.bottom;
+    } catch {
+      return false;
+    }
+  }
+
+  private plainSegmentRange(
+    segment: Extract<EditorPosHighlightSegment, { segmentType: "paragraph" }>,
+    match: EditorPosHighlightMatch,
+  ): { from: number; to: number } | null {
+    if (match.end <= match.start) return null;
+    const from =
+      segment.pos + 1 + match.start + getAtomOffset(segment.atomAdjustments, match.start);
+    const to =
+      segment.pos + 1 + match.end + getAtomOffset(segment.atomAdjustments, match.end, true);
+    return to > from ? { from, to } : null;
+  }
+
   private clearSearchDecorations(): void {
     if (!this.view) return;
     try {
       this.view.dispatch(this.view.state.tr.setMeta("searchDecorations", []));
+    } catch {
+      /* destroyed or detached view */
+    }
+  }
+
+  private clearPosHighlights(): void {
+    try {
+      this.posHighlightDispatcher?.([]);
     } catch {
       /* destroyed or detached view */
     }

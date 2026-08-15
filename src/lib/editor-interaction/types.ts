@@ -1,5 +1,12 @@
 import type { DocumentCapabilities, DocumentFormat } from "@/lib/document-format";
 import type { SearchMatch, SearchOptions } from "@/lib/editor-page/find-search-matches";
+import type {
+  MdiNode,
+  MdiSourceSpan,
+  MdiTextAnnotation,
+  MdiTextRange,
+  MdiTextSourceMap,
+} from "@illusions-lab/mdi";
 
 export type EditorCommandId =
   | "edit.undo"
@@ -78,6 +85,74 @@ export interface EditorInteractionSnapshot {
   availability: Readonly<Record<EditorCommandId, boolean>>;
 }
 
+export interface EditorPosHighlightToken {
+  editorId: string;
+  generation: number;
+  contentRevision: number;
+  viewportRevision: number;
+}
+
+export interface EditorPosHighlightAtomAdjustment {
+  textPos: number;
+  cumulativeOffset: number;
+}
+
+export interface EditorPosHighlightParagraphSegment {
+  segmentType: "paragraph";
+  index: number;
+  pos: number;
+  text: string;
+  atomAdjustments: EditorPosHighlightAtomAdjustment[];
+}
+
+export interface EditorPosHighlightMdiSegment {
+  segmentType: "mdi-block";
+  index: number;
+  blockIndex: number;
+  kind:
+    | "heading"
+    | "paragraph"
+    | "listItem"
+    | "blockquote"
+    | "code"
+    | "table"
+    | "footnote"
+    | "html"
+    | "other";
+  text: string;
+  range: MdiTextRange;
+  span?: MdiSourceSpan;
+  sourceMap: MdiTextSourceMap;
+  annotations: MdiTextAnnotation[];
+  node: MdiNode;
+}
+
+export type EditorPosHighlightSegment =
+  EditorPosHighlightParagraphSegment | EditorPosHighlightMdiSegment;
+
+export interface EditorPosHighlightRequest {
+  token: EditorPosHighlightToken;
+  documentFormat: DocumentFormat;
+  source?: string;
+  segments: readonly EditorPosHighlightSegment[];
+}
+
+export interface EditorPosHighlightMatch {
+  segmentIndex: number;
+  start: number;
+  end: number;
+  category: string;
+}
+
+export interface EditorPosHighlightPresentation {
+  token: EditorPosHighlightToken | null;
+  request: EditorPosHighlightRequest | null;
+  matches: readonly EditorPosHighlightMatch[];
+  colors: Readonly<Record<string, string>>;
+  disabledTypes: readonly string[];
+  visible: boolean;
+}
+
 export interface EditorSearchToken {
   editorId: string;
   generation: number;
@@ -125,6 +200,8 @@ export interface EditorInteractionHandle {
   getSnapshot(): EditorInteractionSnapshot;
   subscribe(listener: () => void): () => void;
   execute(command: EditorCommand, token?: SelectionToken): EditorCommandResult;
+  createPosHighlightRequest(): EditorPosHighlightRequest | null;
+  syncPosHighlightPresentation(presentation: EditorPosHighlightPresentation): void;
   prepareSearchSelection(): string | undefined;
   querySearch(query: EditorSearchQuery): EditorSearchQueryResult;
   syncSearchPresentation(presentation: EditorSearchPresentation): void;

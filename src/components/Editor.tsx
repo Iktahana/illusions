@@ -22,6 +22,7 @@ import { buildEditorContextMenu } from "@/lib/editor-interaction";
 import { EditorInteractionProvider } from "@/lib/editor-interaction/context";
 import EditorToolbar from "./editor/EditorToolbar";
 import BubbleMenu from "./editor/BubbleMenu";
+import PosHighlightController from "./editor/PosHighlightController";
 
 interface EditorProps {
   initialContent?: string;
@@ -150,6 +151,7 @@ export default function NovelEditor({
             />
           </ProsemirrorAdapterProvider>
         </MilkdownProvider>
+        <PosHighlightController />
         <BubbleMenu
           isVertical={isVertical}
           editorSurface={editorSurfaceRef}

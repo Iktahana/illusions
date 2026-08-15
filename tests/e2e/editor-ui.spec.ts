@@ -71,6 +71,41 @@ async function openStatsPanel(page: import("@playwright/test").Page): Promise<vo
   await expect(page.getByRole("heading", { name: "全体の統計" })).toBeVisible();
 }
 
+async function openCorrectionsPanel(page: import("@playwright/test").Page): Promise<void> {
+  await page.getByRole("button", { name: /^校正(?:\s|$)/ }).click();
+  await expect(page.getByRole("heading", { name: "品詞ハイライト" })).toBeVisible();
+}
+
+async function dismissStartupPrompts(page: import("@playwright/test").Page): Promise<void> {
+  const maybeDismiss = async (label: string) => {
+    const button = page.getByRole("button", { name: label, exact: true });
+    if (await button.isVisible().catch(() => false)) await button.click();
+  };
+  await maybeDismiss("今はしない");
+  await maybeDismiss("OK");
+  await maybeDismiss("閉じる");
+}
+
+async function setPosHighlightEnabled(
+  page: import("@playwright/test").Page,
+  enabled: boolean,
+): Promise<void> {
+  await openCorrectionsPanel(page);
+  const heading = page.getByRole("heading", { name: "品詞ハイライト" });
+  const section = heading.locator("..").locator("..").locator("..");
+  const toggle = heading.locator("..").locator("..").locator("button");
+  const legend = section.getByText("名詞", { exact: true });
+  const hasLegend = async () => (await legend.count()) > 0;
+  const isEnabled = await hasLegend();
+  if (isEnabled !== enabled) await toggle.click();
+  if (enabled) await expect(legend).toBeVisible();
+  else await expect(legend).toBeHidden();
+}
+
+function visibleEditor(page: import("@playwright/test").Page) {
+  return page.locator(".ProseMirror:visible").last();
+}
+
 test("toolbar and bubble menu format the current MDI selection", async ({
   mainWindow,
   nativeHarness,
@@ -294,6 +329,66 @@ test("renderer-owned TCY command survives the native context-menu round-trip", a
     );
   });
   await expect(editor.locator(".mdi-tcy")).toContainText("12");
+});
+
+test("POS highlight decorates active MDI content and clears when disabled", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const filePath = path.join(workerRoot, "projects", "pos-highlight.mdi");
+  await writeFile(filePath, "{東京|とうきょう}と^12^。", "utf8");
+  await nativeHarness.queueOpenPaths([filePath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  await dismissStartupPrompts(mainWindow);
+
+  const editor = visibleEditor(mainWindow);
+  await expect(editor).toContainText("東京");
+  await expect(editor).toContainText("12。");
+  await expect(editor.locator("ruby[data-mdi-ruby]")).toHaveCount(1);
+
+  await setPosHighlightEnabled(mainWindow, true);
+  await expect
+    .poll(async () => editor.locator("[data-pos-highlight-category]").count())
+    .toBeGreaterThan(0);
+
+  await setPosHighlightEnabled(mainWindow, false);
+  await expect(editor.locator("[data-pos-highlight-category]")).toHaveCount(0);
+});
+
+test("POS highlight follows the active tab without leaking stale decorations", async ({
+  mainWindow,
+  nativeHarness,
+  workerRoot,
+}) => {
+  const firstPath = path.join(workerRoot, "projects", "pos-a.mdi");
+  const secondPath = path.join(workerRoot, "projects", "pos-b.md");
+  await writeFile(firstPath, "東京へ行く", "utf8");
+  await writeFile(secondPath, "大阪へ行く", "utf8");
+
+  await nativeHarness.queueOpenPaths([firstPath]);
+  await mainWindow.getByRole("button", { name: "ファイルを開く", exact: true }).click();
+  await dismissStartupPrompts(mainWindow);
+  await setPosHighlightEnabled(mainWindow, true);
+
+  await expect(visibleEditor(mainWindow)).toContainText("東京へ行く");
+  await expect
+    .poll(async () => visibleEditor(mainWindow).locator("[data-pos-highlight-category]").count())
+    .toBeGreaterThan(0);
+
+  await nativeHarness.queueOpenPaths([secondPath]);
+  await nativeHarness.open();
+  await expect(visibleEditor(mainWindow)).toContainText("大阪へ行く");
+  await expect
+    .poll(async () => visibleEditor(mainWindow).locator("[data-pos-highlight-category]").count())
+    .toBeGreaterThan(0);
+
+  await mainWindow.getByText("pos-a.mdi", { exact: true }).click();
+  await expect(visibleEditor(mainWindow)).toContainText("東京へ行く");
+  await expect
+    .poll(async () => visibleEditor(mainWindow).locator("[data-pos-highlight-category]").count())
+    .toBeGreaterThan(0);
+  await expect(visibleEditor(mainWindow)).not.toContainText("大阪へ行く");
 });
 
 test("native search menu prefills the current selection and navigates matches", async ({

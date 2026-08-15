@@ -73,6 +73,8 @@ function render(overrides: Partial<React.ComponentProps<typeof SearchResults>> =
       }) as ReturnType<EditorInteractionHandle["getSnapshot"]>,
     subscribe: () => () => {},
     execute: () => ({ status: "unavailable" }),
+    createPosHighlightRequest: () => null,
+    syncPosHighlightPresentation: () => {},
     prepareSearchSelection: () => undefined,
     querySearch: () => ({
       token: { editorId: "editor-a", generation: 2, contentRevision: 5 },
