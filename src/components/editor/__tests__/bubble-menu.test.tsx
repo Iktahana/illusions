@@ -23,9 +23,21 @@ import BubbleMenu from "../BubbleMenu";
 describe("BubbleMenu", () => {
   let container: HTMLDivElement;
   let root: Root;
+  let editorSurface: HTMLDivElement;
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
+    editorSurface = document.createElement("div");
+    Object.defineProperty(editorSurface, "getBoundingClientRect", {
+      value: () => ({
+        left: 200,
+        top: 40,
+        right: 520,
+        bottom: 240,
+        width: 320,
+        height: 200,
+      }),
+    });
     root = createRoot(container);
     interaction.handle.execute.mockReset().mockReturnValue({ status: "executed" });
     Object.assign(interaction.snapshot, {
@@ -39,7 +51,12 @@ describe("BubbleMenu", () => {
     act(() => root.unmount());
     container.remove();
   });
-  const render = (vertical = false) => act(() => root.render(<BubbleMenu isVertical={vertical} />));
+  const render = (vertical = false) =>
+    act(() =>
+      root.render(<BubbleMenu isVertical={vertical} editorSurface={{ current: editorSurface }} />),
+    );
+  const renderWithoutSurface = (vertical = false) =>
+    act(() => root.render(<BubbleMenu isVertical={vertical} />));
 
   it("shows every formatting command for a current rich-text selection", () => {
     render();
@@ -93,9 +110,30 @@ describe("BubbleMenu", () => {
   });
 
   it("places vertical controls on the read side and clamps to the viewport", () => {
-    Object.assign(interaction.snapshot.selection.rect, { left: 2, top: 2 });
+    Object.assign(interaction.snapshot.selection.rect, { left: 2, right: 12, top: 2 });
     render(true);
     const menu = container.querySelector('[aria-label="選択範囲の書式"]') as HTMLElement;
+    expect(menu.style.left).toBe("208px");
+    expect(menu.style.top).toBe("48px");
+  });
+
+  it("clamps horizontal controls inside the editor viewport", () => {
+    Object.assign(interaction.snapshot.selection.rect, { left: 4, right: 340, top: 50 });
+    render(false);
+    const menu = container.querySelector('[aria-label="選択範囲の書式"]') as HTMLElement;
+    expect(menu.style.left).toBe("208px");
+    expect(menu.style.top).toBe("48px");
+  });
+
+  it("falls back to the window viewport and preserves the captured selection on mousedown", () => {
+    Object.assign(interaction.snapshot.selection.rect, { left: 280, right: 320, top: 12 });
+    Object.defineProperty(window, "innerWidth", { value: 360, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 200, configurable: true });
+    renderWithoutSurface(false);
+    const menu = container.querySelector('[aria-label="選択範囲の書式"]') as HTMLElement;
+    const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    menu.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
     expect(menu.style.left).toBe("8px");
     expect(menu.style.top).toBe("8px");
   });

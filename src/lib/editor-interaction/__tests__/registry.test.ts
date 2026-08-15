@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { buildEditorContextMenu, commandRegistry } from "../registry";
 const loadModule = createRequire(import.meta.url);
-const { EDITOR_COMMANDS } = loadModule("../../../../electron/lib/editor-command-registry.js");
+const { COMMAND_REGISTRY, EDITOR_COMMANDS, EDITOR_CONTEXT_MENU } = loadModule(
+  "../../../../electron/lib/editor-command-registry.js",
+);
 
 describe("editor command registry", () => {
   it("has unique allowlisted IDs and native roles", () => {
@@ -13,6 +15,7 @@ describe("editor command registry", () => {
   });
 
   it("keeps renderer and Electron native metadata in parity", () => {
+    expect(COMMAND_REGISTRY).toEqual(commandRegistry);
     const rendererNative = Object.fromEntries(
       commandRegistry
         .filter(({ nativeRole }) => nativeRole)
@@ -30,6 +33,9 @@ describe("editor command registry", () => {
     ) as never;
     const menu = buildEditorContextMenu(availability);
     expect(menu).toHaveLength(8);
+    expect(menu.map((item) => ("separator" in item ? "separator" : item.command))).toEqual(
+      EDITOR_CONTEXT_MENU,
+    );
     expect(menu).toContainEqual({ command: "edit.copy", enabled: true });
     expect(menu.filter((item) => "separator" in item)).toHaveLength(2);
   });

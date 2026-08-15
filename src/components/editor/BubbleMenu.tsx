@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 
 import { useEditorInteraction } from "@/lib/editor-interaction/context";
 import type { EditorCommand } from "@/lib/editor-interaction";
@@ -21,8 +21,10 @@ const buttons: Array<{ label: string; command: EditorCommand; text: string }> = 
 
 export default function BubbleMenu({
   isVertical,
+  editorSurface,
 }: {
   isVertical: boolean;
+  editorSurface?: RefObject<HTMLElement | null>;
 }): React.ReactElement | null {
   const { handle, snapshot } = useEditorInteraction();
   const selection = snapshot.selection;
@@ -40,16 +42,28 @@ export default function BubbleMenu({
     !selection.rect
   )
     return null;
-  const maxLeft = typeof window === "undefined" ? selection.rect.left : window.innerWidth - 320;
-  const maxTop = typeof window === "undefined" ? selection.rect.top : window.innerHeight - 44;
+  const viewport =
+    editorSurface?.current?.querySelector<HTMLElement>("[data-milkdown-root]") ??
+    editorSurface?.current;
+  const viewportRect = viewport?.getBoundingClientRect() ?? {
+    left: 0,
+    top: 0,
+    right: typeof window === "undefined" ? selection.rect.right : window.innerWidth,
+    bottom: typeof window === "undefined" ? selection.rect.bottom : window.innerHeight,
+  };
+  const menuWidth = Math.min(480, Math.max(160, viewportRect.right - viewportRect.left - 16));
+  const minLeft = viewportRect.left + 8;
+  const minTop = viewportRect.top + 8;
+  const maxLeft = Math.max(minLeft, viewportRect.right - menuWidth - 8);
+  const maxTop = Math.max(minTop, viewportRect.bottom - 44);
   const style: React.CSSProperties = isVertical
     ? {
-        left: Math.max(8, Math.min(maxLeft, selection.rect.left - 48)),
-        top: Math.max(8, Math.min(maxTop, selection.rect.top)),
+        left: Math.max(minLeft, Math.min(maxLeft, selection.rect.right + 8)),
+        top: Math.max(minTop, Math.min(maxTop, selection.rect.top)),
       }
     : {
-        left: Math.max(8, Math.min(maxLeft, selection.rect.left)),
-        top: Math.max(8, Math.min(maxTop, selection.rect.top - 44)),
+        left: Math.max(minLeft, Math.min(maxLeft, selection.rect.left)),
+        top: Math.max(minTop, Math.min(maxTop, selection.rect.top - 44)),
       };
   return (
     <div

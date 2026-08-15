@@ -1,5 +1,5 @@
 import { Schema } from "@milkdown/prose/model";
-import { EditorState, TextSelection } from "@milkdown/prose/state";
+import { AllSelection, EditorState, NodeSelection, TextSelection } from "@milkdown/prose/state";
 import { describe, expect, it, vi } from "vitest";
 import { getDocumentAdapter, type DocumentFormat } from "@/lib/document-format";
 import { EditorInteractionStore } from "../store";
@@ -14,12 +14,16 @@ const schema = new Schema({
   marks: { strong: {}, emphasis: {}, strike_through: {}, inlineCode: {} },
 });
 
-function makeView(text = "選択範囲", from = 1, to = 3) {
+function makeState(text = "選択範囲", from = 1, to = 3) {
   let state = EditorState.create({
     schema,
     doc: schema.node("doc", null, [schema.node("paragraph", null, schema.text(text))]),
   });
   state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, from, to)));
+  return state;
+}
+
+function makeViewFromState(state: EditorState) {
   const view = {
     state,
     dispatch: vi.fn((transaction) => {
@@ -35,6 +39,10 @@ function makeView(text = "選択範囲", from = 1, to = 3) {
     focus: vi.fn(),
   };
   return view;
+}
+
+function makeView(text = "選択範囲", from = 1, to = 3) {
+  return makeViewFromState(makeState(text, from, to));
 }
 
 function store(format: DocumentFormat = "markdown") {
@@ -99,6 +107,44 @@ describe("EditorInteractionStore", () => {
     expect(interaction.getSnapshot().selection.rect).toBeNull();
   });
 
+  it("prefers the DOM range bounding rect when the live selection is measurable", () => {
+    const interaction = store();
+    const view = makeView();
+    const anchorNode = {};
+    const focusNode = {};
+    Object.assign(view, {
+      dom: {
+        ownerDocument: {
+          getSelection: () => ({
+            rangeCount: 1,
+            anchorNode,
+            focusNode,
+            getRangeAt: () => ({
+              getBoundingClientRect: () => ({
+                left: 44,
+                top: 18,
+                right: 144,
+                bottom: 66,
+                width: 100,
+                height: 48,
+              }),
+            }),
+          }),
+        },
+        contains: (node: unknown) => node === anchorNode || node === focusNode,
+      },
+    });
+    interaction.attach(view as never, 0, "markdown", getDocumentAdapter("markdown"));
+    expect(interaction.getSnapshot().selection.rect).toMatchObject({
+      left: 44,
+      top: 18,
+      right: 144,
+      bottom: 66,
+      width: 100,
+      height: 48,
+    });
+  });
+
   it("notifies subscribers and refreshes geometry without invalidating the token", () => {
     const interaction = store();
     const listener = vi.fn();
@@ -112,6 +158,80 @@ describe("EditorInteractionStore", () => {
     unsubscribe();
     interaction.update();
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves backward multi-block selection text and anchor/head ordering", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, schema.text("前段")),
+      schema.node("paragraph", null, schema.text("後段")),
+    ]);
+    let state = EditorState.create({ schema, doc });
+    state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 7, 2)));
+    const view = makeViewFromState(state);
+    const interaction = store();
+    interaction.attach(view as never, 3, "markdown", getDocumentAdapter("markdown"));
+    const snapshot = interaction.getSnapshot().selection;
+    expect(snapshot.kind).toBe("text");
+    expect(snapshot.text).toBe(state.doc.textBetween(snapshot.from, snapshot.to, "\n"));
+    expect(snapshot.text).toContain("\n");
+    expect(snapshot.anchor).toEqual({ x: 70, y: 20 });
+    expect(snapshot.head).toEqual({ x: 22, y: 36 });
+  });
+
+  it("distinguishes node and all selections", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, schema.text("一段落")),
+      schema.node("paragraph", null, schema.text("二段落")),
+    ]);
+
+    let nodeState = EditorState.create({ schema, doc });
+    nodeState = nodeState.apply(nodeState.tr.setSelection(NodeSelection.create(nodeState.doc, 0)));
+    const nodeInteraction = store();
+    nodeInteraction.attach(
+      makeViewFromState(nodeState) as never,
+      1,
+      "markdown",
+      getDocumentAdapter("markdown"),
+    );
+    expect(nodeInteraction.getSnapshot().selection.kind).toBe("node");
+
+    let allState = EditorState.create({ schema, doc });
+    allState = allState.apply(allState.tr.setSelection(new AllSelection(allState.doc)));
+    const allInteraction = store();
+    allInteraction.attach(
+      makeViewFromState(allState) as never,
+      1,
+      "markdown",
+      getDocumentAdapter("markdown"),
+    );
+    expect(allInteraction.getSnapshot().selection.kind).toBe("all");
+  });
+
+  it("invalidates old tokens after generation replacement and disables inactive panes", () => {
+    const interaction = store();
+    interaction.attach(
+      makeView("旧", 1, 2) as never,
+      1,
+      "markdown",
+      getDocumentAdapter("markdown"),
+    );
+    const staleToken = interaction.getSnapshot().selection.token;
+
+    interaction.attach(
+      makeView("新", 1, 2) as never,
+      2,
+      "markdown",
+      getDocumentAdapter("markdown"),
+    );
+    expect(interaction.getSnapshot()).toMatchObject({ generation: 2, selection: { text: "新" } });
+    expect(interaction.execute({ id: "format.strong" }, staleToken)).toEqual({ status: "stale" });
+
+    const currentToken = interaction.getSnapshot().selection.token;
+    interaction.setActive(false);
+    expect(interaction.getSnapshot().availability["format.strong"]).toBe(false);
+    expect(interaction.execute({ id: "format.strong" }, currentToken)).toEqual({
+      status: "unavailable",
+    });
   });
 
   it("executes selection and mark commands through the current view", () => {

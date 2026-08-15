@@ -1,21 +1,34 @@
-const EDITOR_COMMANDS = Object.freeze({
-  "edit.undo": { label: "取り消す", accelerator: "CmdOrCtrl+Z", role: "undo" },
-  "edit.redo": { label: "やり直す", accelerator: "CmdOrCtrl+Shift+Z", role: "redo" },
-  "edit.cut": { label: "切り取り", accelerator: "CmdOrCtrl+X", role: "cut" },
-  "edit.copy": { label: "コピー", accelerator: "CmdOrCtrl+C", role: "copy" },
-  "edit.paste": { label: "貼り付け", accelerator: "CmdOrCtrl+V", role: "paste" },
-  "edit.selectAll": { label: "すべて選択", accelerator: "CmdOrCtrl+A", role: "selectAll" },
-});
+const {
+  commands: COMMAND_REGISTRY,
+  editorContextMenu: EDITOR_CONTEXT_MENU,
+} = require("../../src/lib/editor-interaction/command-registry.json");
+
+const EDITOR_COMMANDS = Object.freeze(
+  Object.fromEntries(
+    COMMAND_REGISTRY.filter((command) => typeof command.nativeRole === "string").map(
+      ({ id, label, accelerator, nativeRole }) => [id, { label, accelerator, role: nativeRole }],
+    ),
+  ),
+);
 
 function buildEditorContextMenuTemplate(items) {
-  if (!Array.isArray(items) || items.length === 0 || items.length > 20) return null;
+  if (
+    !Array.isArray(items) ||
+    items.length === 0 ||
+    items.length > 20 ||
+    items.length !== EDITOR_CONTEXT_MENU.length
+  )
+    return null;
   const template = [];
-  for (const item of items) {
-    if (item && item.separator === true && Object.keys(item).length === 1) {
+  for (const [index, item] of items.entries()) {
+    const expected = EDITOR_CONTEXT_MENU[index];
+    if (expected === "separator") {
+      if (!(item && item.separator === true && Object.keys(item).length === 1)) return null;
       template.push({ type: "separator" });
       continue;
     }
     if (!item || typeof item.command !== "string" || typeof item.enabled !== "boolean") return null;
+    if (item.command !== expected) return null;
     const definition = EDITOR_COMMANDS[item.command];
     if (!definition) return null;
     template.push({ ...definition, enabled: item.enabled });
@@ -23,4 +36,9 @@ function buildEditorContextMenuTemplate(items) {
   return template;
 }
 
-module.exports = { EDITOR_COMMANDS, buildEditorContextMenuTemplate };
+module.exports = {
+  COMMAND_REGISTRY,
+  EDITOR_COMMANDS,
+  EDITOR_CONTEXT_MENU,
+  buildEditorContextMenuTemplate,
+};

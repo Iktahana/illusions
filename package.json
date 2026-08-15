@@ -32,7 +32,7 @@
     "build:quicklook": "node -e \"if(process.platform==='darwin'){const {execSync}=require('child_process');execSync('bash scripts/build-quicklook.sh',{stdio:'inherit'});}else{console.log('build:quicklook skipped (macOS only)');}\" ",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage && node scripts/check-editor-coverage.mjs",
     "test:e2e": "playwright test --config=playwright.electron.config.ts",
     "test:e2e:smoke": "playwright test --config=playwright.electron.config.ts --grep @smoke",
     "generate:credits": "npx tsx scripts/generate-credits.ts",

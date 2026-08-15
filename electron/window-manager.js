@@ -6,6 +6,12 @@ const { isDev } = require("./app-constants");
 const { isSafeExternalUrl, normalizeExternalUrl } = require("./lib/url-policy");
 const { SYSTEM_CHANNELS, POWER_CHANNELS } = require("./lib/ipc-channels");
 
+// Playwright can operate an off-screen Electron window through CDP.  Keeping
+// the test window hidden prevents local E2E runs from stealing focus or
+// leaving visible windows behind when a test fails; production behaviour is
+// unchanged.
+const IS_E2E = process.env.ILLUSIONS_E2E === "1";
+
 // #1839: backstop timeout for the quit-and-install close handshake. If the
 // renderer neither closes nor signals abort within this window, we treat it as
 // aborted (quit cancelled, data preserved) rather than hang forever.
@@ -206,7 +212,7 @@ async function createWindow({ showWelcome = false, hasPendingFile = false } = {}
   });
 
   newWindow.once("ready-to-show", () => {
-    newWindow?.show();
+    if (!IS_E2E) newWindow?.show();
   });
 
   // ウィンドウ終了前に状態をフラッシュする（未保存の場合はダイアログも表示）
