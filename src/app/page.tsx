@@ -1873,7 +1873,6 @@ function EditorPageContent() {
           switchTab,
           updateTab,
           registerFlush,
-          registerInteraction,
           registerWritingModeToggle: (toggle) => {
             toggleWritingModeRef.current = toggle ?? (() => {});
           },

@@ -51,6 +51,7 @@ const baseSnapshot = (
     "format.orderedList": true,
     "format.inlineCode": true,
     "format.clear": true,
+    "format.tcy": true,
     "view.toggleWritingMode": true,
   },
   ...overrides,
