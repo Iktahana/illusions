@@ -500,8 +500,10 @@ html:not(.dark) {
   color: var(--stats-text) !important;
 }
 
-/* The inspector can be resized independently from the app window. */
-@container (max-width: 180px) {
+/* The inspector can be resized independently from the app window.
+   Raised from 180px: the right panel's real minWidth is 160-200px
+   (EditorLayout.tsx), so a 180px breakpoint almost never fired. */
+@container (max-width: 220px) {
   .stats-panel .stats-card {
     padding: 0.75rem;
   }
@@ -509,7 +511,7 @@ html:not(.dark) {
   .stats-panel .stats-card > .space-y-1\.5 > .flex {
     align-items: stretch;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: 0.25rem;
   }
 
   .stats-panel .stats-card > .space-y-1\.5 > .flex > :last-child {
@@ -530,6 +532,10 @@ html:not(.dark) {
 
   .stats-panel .stats-card .grid-cols-4 span {
     overflow-wrap: anywhere;
+  }
+
+  .stats-panel .stats-card > .space-y-1\.5 > * + * {
+    margin-top: 0.5rem;
   }
 }
 
