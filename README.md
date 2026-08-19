@@ -1,5 +1,9 @@
 # illusions - 日本語小説エディタ
 
+> **公開アーカイブについて**<br>
+> このリポジトリは公開版の履歴を保存するためのアーカイブです。新規開発は非公開リポジトリへ移行しており、ここでは Pull Request・Issue・機能要望を受け付けていません。移行については [お知らせ](https://note.com/iktahana/n/n566c9037723e) をご覧ください。<br>
+> この公開履歴に含まれるコードは、各コミット時点で付与されていたライセンス（AGPL-3.0）に従います。
+
 <div align="center" style="display: flex; flex-direction: column; gap: 12px; align-items: center; margin: 20px 0;">
 
 ![banner](/public/banner/github.png)
@@ -66,8 +70,7 @@ illusions は、日本語で小説を書くためのエディタです。
 
 ## 開発者向け
 
-このリポジトリを開発用途で扱う場合は、まず [`docs/`](docs/README.md) を参照してください。  
-AI 協作ルールは [CLAUDE.md](CLAUDE.md) にあります。
+このリポジトリは公開履歴のアーカイブです。新規の開発・コントリビューションは受け付けていません。
 
 ## ライセンスと問い合わせ
 
